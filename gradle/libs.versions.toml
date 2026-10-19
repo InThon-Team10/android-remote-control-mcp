@@ -27,7 +27,7 @@ mcp-kotlin-sdk = "0.15.0"
 java-jwt = "4.6.0"
 
 # Jackson (transitive via java-jwt) — pinned to a patched release to close CVE alerts
-jackson = "2.22.2"
+jackson = "2.22.4"
 
 # Image loading (OAuth client logos)
 coil = "3.5.0"
