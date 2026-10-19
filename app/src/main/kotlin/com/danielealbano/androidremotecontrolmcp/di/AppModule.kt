@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
@@ -155,6 +157,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindEventChannelSettings(impl: EventChannelSettingsImpl): EventChannelSettings
+
+    /** Binds the free E2E tunnel settings slice delegated to by [SettingsRepositoryImpl]. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelSettings(impl: ArcTunnelSettingsImpl): ArcTunnelSettings
 
     /** Binds the persisted OAuth client registry. */
     @Binds
