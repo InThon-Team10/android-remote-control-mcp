@@ -56,6 +56,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CloudflareTunnelMode
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -67,6 +68,7 @@ fun TunnelSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
+    arcViewModel: ArcTunnelViewModel = hiltViewModel(),
 ) {
     val serverConfig by viewModel.serverConfig.collectAsStateWithLifecycle()
     val serverStatus by viewModel.serverStatus.collectAsStateWithLifecycle()
@@ -79,9 +81,10 @@ fun TunnelSettingsScreen(
     val isEnabled =
         serverStatus !is ServerStatus.Running &&
             serverStatus !is ServerStatus.Starting
-    // The entire remote-access section is disabled while HTTPS is enabled (a tunnel always
-    // targets an http://localhost origin).
-    val sectionEnabled = isEnabled && !serverConfig.httpsEnabled
+    val arcSelected = serverConfig.tunnelProvider == TunnelProviderType.ARC_TUNNEL
+    // The toggle, the provider list and the free E2E tunnel fields are editable whenever the server is
+    // stopped; HTTPS only disables the Cloudflare/ngrok fields (they target http://localhost).
+    val proxyFieldsEnabled = isEnabled && !serverConfig.httpsEnabled
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
@@ -100,7 +103,7 @@ fun TunnelSettingsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
         ) {
-            if (serverConfig.httpsEnabled) {
+            if (serverConfig.httpsEnabled && !arcSelected) {
                 ElevatedCard(
                     modifier =
                         Modifier
@@ -115,6 +118,14 @@ fun TunnelSettingsScreen(
                     )
                 }
             }
+            if (serverConfig.httpsEnabled && arcSelected) {
+                Text(
+                    text = stringResource(R.string.remote_access_https_note_arc_tunnel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+            }
 
             // Tunnel Enable/Disable Toggle
             Row(
@@ -128,139 +139,159 @@ fun TunnelSettingsScreen(
                 )
                 Switch(
                     checked = serverConfig.tunnelEnabled,
-                    onCheckedChange = viewModel::updateTunnelEnabled,
-                    enabled = sectionEnabled,
+                    onCheckedChange = { on ->
+                        viewModel.updateTunnelEnabled(on)
+                        if (on && arcSelected) arcViewModel.requestEnrollment()
+                    },
+                    enabled = isEnabled,
                 )
             }
 
-            AnimatedVisibility(visible = serverConfig.tunnelEnabled) {
-                Column {
-                    Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                    // Tunnel Provider Selector
-                    Text(
-                        text = stringResource(R.string.remote_access_provider_label),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Column(modifier = Modifier.selectableGroup()) {
-                        TunnelProviderType.entries.forEach { provider ->
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .selectable(
-                                            selected = provider == serverConfig.tunnelProvider,
-                                            onClick = { viewModel.updateTunnelProvider(provider) },
-                                            role = Role.RadioButton,
-                                            enabled = sectionEnabled,
-                                        ).padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                RadioButton(
+            // Tunnel Provider Selector
+            Text(
+                text = stringResource(R.string.remote_access_provider_label),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Column(modifier = Modifier.selectableGroup()) {
+                TunnelProviderType.entries.forEach { provider ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .selectable(
                                     selected = provider == serverConfig.tunnelProvider,
-                                    onClick = null,
-                                    enabled = sectionEnabled,
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                    onClick = { viewModel.updateTunnelProvider(provider) },
+                                    role = Role.RadioButton,
+                                    enabled = isEnabled,
+                                ).padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = provider == serverConfig.tunnelProvider,
+                            onClick = null,
+                            enabled = isEnabled,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (provider == TunnelProviderType.ARC_TUNNEL) {
+                            Column {
                                 Text(
-                                    text =
-                                        when (provider) {
-                                            TunnelProviderType.CLOUDFLARE -> {
-                                                stringResource(R.string.remote_access_provider_cloudflare)
-                                            }
-
-                                            TunnelProviderType.NGROK -> {
-                                                stringResource(R.string.remote_access_provider_ngrok)
-                                            }
-                                        },
+                                    text = stringResource(R.string.remote_access_provider_arc_tunnel),
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text =
-                                        when (provider) {
-                                            TunnelProviderType.CLOUDFLARE -> {
-                                                stringResource(R.string.remote_access_provider_cloudflare_desc)
-                                            }
-
-                                            TunnelProviderType.NGROK -> {
-                                                stringResource(R.string.remote_access_provider_ngrok_desc)
-                                            }
-                                        },
+                                    text = stringResource(R.string.remote_access_provider_arc_tunnel_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                        }
-                    }
-
-                    // Cloudflare mode selector (Free vs Token)
-                    AnimatedVisibility(
-                        visible = serverConfig.tunnelProvider == TunnelProviderType.CLOUDFLARE,
-                    ) {
-                        Column {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            CloudflareModeSelector(
-                                selectedMode = serverConfig.cloudflareTunnelMode,
-                                enabled = sectionEnabled,
-                                onModeSelected = viewModel::updateCloudflareTunnelMode,
+                        } else {
+                            Text(text = providerTitle(provider), style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = providerDescription(provider),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-
-                    // Cloudflare token-mode fields
-                    AnimatedVisibility(
-                        visible =
-                            serverConfig.tunnelProvider == TunnelProviderType.CLOUDFLARE &&
-                                serverConfig.cloudflareTunnelMode == CloudflareTunnelMode.TOKEN,
-                    ) {
-                        Column {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            CloudflareTokenFields(
-                                token = cloudflareTokenInput,
-                                serviceUrl = "http://localhost:${serverConfig.port}",
-                                enabled = sectionEnabled,
-                                onTokenChange = viewModel::updateCloudflareTunnelToken,
-                            )
-                        }
-                    }
-
-                    // Cloudflare extra arguments
-                    AnimatedVisibility(
-                        visible = serverConfig.tunnelProvider == TunnelProviderType.CLOUDFLARE,
-                    ) {
-                        Column {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            CloudflareExtraArgsField(
-                                extraArgs = cloudflareExtraArgsInput,
-                                enabled = sectionEnabled,
-                                onExtraArgsChange = viewModel::updateCloudflareTunnelExtraArgs,
-                            )
-                        }
-                    }
-
-                    // ngrok-specific fields
-                    AnimatedVisibility(visible = serverConfig.tunnelProvider == TunnelProviderType.NGROK) {
-                        Column {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            NgrokConfigFields(
-                                authtoken = ngrokAuthtokenInput,
-                                domain = ngrokDomainInput,
-                                enabled = sectionEnabled,
-                                onAuthtokenChange = viewModel::updateNgrokAuthtoken,
-                                onDomainChange = viewModel::updateNgrokDomain,
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TunnelStatusIndicator(status = tunnelStatus)
                 }
             }
+
+            // Cloudflare mode selector (Free vs Token)
+            AnimatedVisibility(
+                visible = serverConfig.tunnelProvider == TunnelProviderType.CLOUDFLARE,
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CloudflareModeSelector(
+                        selectedMode = serverConfig.cloudflareTunnelMode,
+                        enabled = proxyFieldsEnabled,
+                        onModeSelected = viewModel::updateCloudflareTunnelMode,
+                    )
+                }
+            }
+
+            // Cloudflare token-mode fields
+            AnimatedVisibility(
+                visible =
+                    serverConfig.tunnelProvider == TunnelProviderType.CLOUDFLARE &&
+                        serverConfig.cloudflareTunnelMode == CloudflareTunnelMode.TOKEN,
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CloudflareTokenFields(
+                        token = cloudflareTokenInput,
+                        serviceUrl = "http://localhost:${serverConfig.port}",
+                        enabled = proxyFieldsEnabled,
+                        onTokenChange = viewModel::updateCloudflareTunnelToken,
+                    )
+                }
+            }
+
+            // Cloudflare extra arguments
+            AnimatedVisibility(
+                visible = serverConfig.tunnelProvider == TunnelProviderType.CLOUDFLARE,
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CloudflareExtraArgsField(
+                        extraArgs = cloudflareExtraArgsInput,
+                        enabled = proxyFieldsEnabled,
+                        onExtraArgsChange = viewModel::updateCloudflareTunnelExtraArgs,
+                    )
+                }
+            }
+
+            // ngrok-specific fields
+            AnimatedVisibility(visible = serverConfig.tunnelProvider == TunnelProviderType.NGROK) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    NgrokConfigFields(
+                        authtoken = ngrokAuthtokenInput,
+                        domain = ngrokDomainInput,
+                        enabled = proxyFieldsEnabled,
+                        onAuthtokenChange = viewModel::updateNgrokAuthtoken,
+                        onDomainChange = viewModel::updateNgrokDomain,
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = arcSelected) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ArcTunnelSettingsSection(
+                        tunnelEnabled = serverConfig.tunnelEnabled,
+                        enabled = isEnabled,
+                        ctCheckEnabled = serverConfig.arcTunnelCtCheckEnabled,
+                        viewModel = arcViewModel,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            TunnelStatusIndicator(status = tunnelStatus)
         }
     }
 }
+
+@Composable
+private fun providerTitle(provider: TunnelProviderType): String =
+    when (provider) {
+        TunnelProviderType.ARC_TUNNEL -> stringResource(R.string.remote_access_provider_arc_tunnel)
+        TunnelProviderType.CLOUDFLARE -> stringResource(R.string.remote_access_provider_cloudflare)
+        TunnelProviderType.NGROK -> stringResource(R.string.remote_access_provider_ngrok)
+    }
+
+@Composable
+private fun providerDescription(provider: TunnelProviderType): String =
+    when (provider) {
+        TunnelProviderType.ARC_TUNNEL -> stringResource(R.string.remote_access_provider_arc_tunnel_desc)
+        TunnelProviderType.CLOUDFLARE -> stringResource(R.string.remote_access_provider_cloudflare_desc)
+        TunnelProviderType.NGROK -> stringResource(R.string.remote_access_provider_ngrok_desc)
+    }
 
 @Composable
 private fun NgrokConfigFields(
