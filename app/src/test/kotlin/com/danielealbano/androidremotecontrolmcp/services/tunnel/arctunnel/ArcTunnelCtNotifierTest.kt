@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import com.danielealbano.androidremotecontrolmcp.McpApplication
 import com.danielealbano.androidremotecontrolmcp.R
 import io.mockk.EqMatcher
+import io.mockk.MockKMatcherScope
 import io.mockk.OfTypeMatcher
 import io.mockk.every
 import io.mockk.mockk
@@ -48,18 +49,21 @@ class ArcTunnelCtNotifierTest {
         every { ContextCompat.checkSelfPermission(any(), any()) } returns result
     }
 
+    /** The builder created for the alert channel; MockK routes a construction only to matchers known beforehand. */
+    private fun MockKMatcherScope.alertChannelBuilder(): NotificationCompat.Builder =
+        constructedWith(
+            OfTypeMatcher<Context>(Context::class),
+            EqMatcher(McpApplication.ARC_TUNNEL_ALERT_CHANNEL_ID),
+        )
+
     @Test
     fun `post notifies 1004 on the alert channel with the fqdn`() {
         permission(granted = true)
+        every { alertChannelBuilder().build() } returns notification
 
         ArcTunnelCtNotifier.post(context, "abc.d.example.test")
 
-        val builder =
-            constructedWith<NotificationCompat.Builder>(
-                OfTypeMatcher<Context>(Context::class),
-                EqMatcher(McpApplication.ARC_TUNNEL_ALERT_CHANNEL_ID),
-            )
-        verify { builder.setContentText("Body") }
+        verify { alertChannelBuilder().setContentText("Body") }
         verify { context.getString(R.string.notification_arc_tunnel_ct_body, "abc.d.example.test") }
         verify { manager.notify(ArcTunnelCtNotifier.NOTIFICATION_ID, notification) }
     }

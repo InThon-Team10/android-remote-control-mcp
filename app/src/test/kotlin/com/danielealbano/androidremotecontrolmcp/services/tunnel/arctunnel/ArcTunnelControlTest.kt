@@ -337,13 +337,20 @@ class ArcTunnelControlTest {
                         MockResponse
                             .Builder()
                             .code(503)
+                            .doNotReadRequestBody()
                             .build(),
-                        ArcTunnelTestServer.answer(200) { },
+                        ArcTunnelTestServer.answer(200) { socket -> socket.cancel() },
                         ArcTunnelTestServer.hold(),
                     ),
                 )
+            // peek() tells the server not to read the never-ending duplex request body before dispatching.
             server.dispatcher =
                 object : Dispatcher() {
+                    override fun peek(): MockResponse {
+                        val next = synchronized(answers) { answers.firstOrNull() }
+                        return next ?: ArcTunnelTestServer.hold()
+                    }
+
                     override fun dispatch(request: RecordedRequest): MockResponse {
                         arrivals += System.nanoTime()
                         return synchronized(answers) { answers.removeFirstOrNull() } ?: ArcTunnelTestServer.hold()
@@ -355,7 +362,7 @@ class ArcTunnelControlTest {
 
             val gapMs = (arrivals[2] - arrivals[1]) / NANOS_PER_MS
             assertTrue(gapMs in 900..1_700, "gap after the bound stream was $gapMs ms")
-            assertEquals(2, events.boundCount.get())
+            awaitThat { events.boundCount.get() == 2 }
         }
 
     @Test
