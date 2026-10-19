@@ -66,6 +66,8 @@ import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocatio
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.AndroidCloudflareBinaryResolver
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflaredBinaryResolver
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.AndroidArcTunnelKeyStore
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelKeyStore
 import com.danielealbano.androidremotecontrolmcp.services.update.AppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.BuildConfigAppVersionProvider
@@ -302,4 +304,9 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindArcTunnelKeyStore(impl: AndroidArcTunnelKeyStore): ArcTunnelKeyStore
+
+    /** Binds the free E2E tunnel enrollment service. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelEnrollment(impl: ArcTunnelEnrollmentImpl): ArcTunnelEnrollment
 }
