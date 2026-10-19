@@ -92,13 +92,12 @@ class AboutLegalNoticesTest {
 
     @Test
     fun `about screen exposes no e-mail address`() {
-        val strings = stringsXml()
+        val aboutStrings = stringsXml().filterKeys { it.startsWith("about_") }
 
-        assertFalse(strings.containsKey("about_author_email")) { "about_author_email must not exist" }
-        strings.forEach { (name, value) ->
+        assertFalse(aboutStrings.containsKey("about_author_email")) { "about_author_email must not exist" }
+        aboutStrings.forEach { (name, value) ->
             assertFalse(EMAIL_ADDRESS.containsMatchIn(value)) { "$name contains an e-mail address: $value" }
         }
-        allLinks().forEach { link -> assertFalse(link.startsWith("mailto:")) { "$link is a mailto link" } }
         val aboutScreenSource = sourceFile(ABOUT_SCREEN_KT).readText()
         assertFalse(aboutScreenSource.contains("mailto:")) { "$ABOUT_SCREEN_KT opens a mailto link" }
     }

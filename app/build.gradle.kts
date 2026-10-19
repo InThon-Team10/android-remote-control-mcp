@@ -497,6 +497,7 @@ tasks.withType<Test> {
             rootProject.file("LICENSE.md"),
             rootProject.file("THIRD_PARTY_LICENSES.md"),
             file("src/main/res/values/strings.xml"),
+            file("src/main/kotlin/com/danielealbano/androidremotecontrolmcp/ui/screens/AboutScreen.kt"),
         ).withPropertyName("legalNoticeFiles")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     maxHeapSize = "3g"

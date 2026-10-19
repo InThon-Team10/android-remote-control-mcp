@@ -27,11 +27,12 @@ class AppIconCacheTest {
 
     @Test
     fun `getLaunchableApps maps resolve infos to package and label sorted case-insensitively`() {
-        stubLaunchableApps(resolveInfo("com.b", "beta"), resolveInfo("com.a", "Alpha"))
+        // "Beta" < "alpha" in a case-sensitive sort, so this order only holds for a case-insensitive one.
+        stubLaunchableApps(resolveInfo("com.b", "Beta"), resolveInfo("com.a", "alpha"))
 
         val apps = cache.getLaunchableApps()
 
-        assertEquals(listOf("com.a" to "Alpha", "com.b" to "beta"), apps)
+        assertEquals(listOf("com.a" to "alpha", "com.b" to "Beta"), apps)
     }
 
     @Test
