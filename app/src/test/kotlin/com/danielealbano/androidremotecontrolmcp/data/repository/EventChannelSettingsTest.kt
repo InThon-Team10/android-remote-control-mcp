@@ -107,6 +107,7 @@ class EventChannelSettingsTest {
                     mockk(relaxed = true),
                     SettingsChangeLogger(RecordingServerLogRepository(), Dispatchers.Unconfined, 0L),
                 ),
+                mockk<ArcTunnelSettings>(relaxed = true),
             )
 
         @Test

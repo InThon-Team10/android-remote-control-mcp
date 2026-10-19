@@ -16,6 +16,7 @@ import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocatio
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -459,6 +460,81 @@ class AdbConfigHandlerTest {
                     }
                 handler.handle(context, intent)
                 coVerify(exactly = 0) { settingsRepository.updateTunnelProvider(any()) }
+            }
+
+        @Test
+        @DisplayName("tunnel_provider hyphenated value is applied")
+        fun tunnelProviderArcTunnel() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_TUNNEL_PROVIDER, "android-remote-control-mcp-tunneld")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateTunnelProvider(TunnelProviderType.ARC_TUNNEL) }
+            }
+
+        @Test
+        @DisplayName("tunnel_provider enum name ARC_TUNNEL is ignored")
+        fun tunnelProviderEnumNameIgnored() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_TUNNEL_PROVIDER, "ARC_TUNNEL")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateTunnelProvider(any()) }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_base_address valid value is applied")
+        fun arcTunnelBaseAddressApplied() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_ARC_TUNNEL_BASE_ADDRESS, "tunnel.example.org")
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateArcTunnelBaseAddress("tunnel.example.org") }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_base_address invalid value is ignored")
+        fun arcTunnelBaseAddressInvalid() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_ARC_TUNNEL_BASE_ADDRESS, "not a host")
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateArcTunnelBaseAddress(any()) }
+            }
+
+        @Test
+        @DisplayName("arc_tunnel_ct_check_enabled is applied")
+        fun arcTunnelCtCheckApplied() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateArcTunnelCtCheckEnabled(false) }
+            }
+
+        @Test
+        @DisplayName("handleConfigure runs the migration before any write")
+        fun migrationRunsFirst() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_TUNNEL_ENABLED, true)
+                    }
+                handler.handle(context, intent)
+                coVerifyOrder {
+                    settingsRepository.ensureAuthModelMigrated()
+                    settingsRepository.updateTunnelEnabled(true)
+                }
             }
 
         @Test
