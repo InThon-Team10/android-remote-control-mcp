@@ -150,8 +150,10 @@ class ArcTunnelControlTest {
             """{"token":"t","addr":"$addr","use_https":false,"use_mtls":false}""",
         )
 
-    private fun nudge(nonce: String): ByteArray =
-        ArcTunnelTestServer.frame(ArcTunnelFrames.RENEW_NUDGE, """{"nonce":"$nonce"}""")
+    private fun nudge(nonce: String): ByteArray {
+        val payload = """{"nonce":"$nonce"}"""
+        return ArcTunnelTestServer.frame(ArcTunnelFrames.RENEW_NUDGE, payload)
+    }
 
     @Test
     fun `PING is answered with PONG`() =

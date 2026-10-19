@@ -40,7 +40,11 @@ class ArcTunnelNetTest {
                 .url(url)
                 .get()
                 .build()
-        return net.serverClient().newCall(request).execute().use { it.code }
+        return net
+            .serverClient()
+            .newCall(request)
+            .execute()
+            .use { it.code }
     }
 
     @Test

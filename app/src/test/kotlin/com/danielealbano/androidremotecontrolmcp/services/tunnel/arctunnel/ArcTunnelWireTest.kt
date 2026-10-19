@@ -8,8 +8,10 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ArcTunnel wire types")
 class ArcTunnelWireTest {
-    private fun open(json: String): ArcTunnelOpenPayload =
-        ArcTunnelJson.decodeFromString(ArcTunnelOpenPayload.serializer(), json)
+    private fun open(json: String): ArcTunnelOpenPayload {
+        val serializer = ArcTunnelOpenPayload.serializer()
+        return ArcTunnelJson.decodeFromString(serializer, json)
+    }
 
     @Test
     fun `OpenPayload isValid rules`() {

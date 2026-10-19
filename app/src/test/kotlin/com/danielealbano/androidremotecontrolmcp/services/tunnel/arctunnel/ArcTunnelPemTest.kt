@@ -25,8 +25,18 @@ class ArcTunnelPemTest {
 
     @Test
     fun `chainPem and parseChain round-trip`() {
-        val root = HeldCertificate.Builder().certificateAuthority(0).commonName("root").build()
-        val leaf = HeldCertificate.Builder().signedBy(root).commonName("leaf").build()
+        val root =
+            HeldCertificate
+                .Builder()
+                .certificateAuthority(0)
+                .commonName("root")
+                .build()
+        val leaf =
+            HeldCertificate
+                .Builder()
+                .signedBy(root)
+                .commonName("leaf")
+                .build()
         val chain = listOf(leaf.certificate, root.certificate)
 
         val parsed = ArcTunnelPem.parseChain(ArcTunnelPem.chainPem(chain))
@@ -45,7 +55,12 @@ class ArcTunnelPemTest {
 
     @Test
     fun `publicKeySha256 matches MessageDigest`() {
-        val key = HeldCertificate.Builder().ecdsa256().build().keyPair.public
+        val key =
+            HeldCertificate
+                .Builder()
+                .ecdsa256()
+                .build()
+                .keyPair.public
         val expected = MessageDigest.getInstance("SHA-256").digest(key.encoded).joinToString("") { "%02x".format(it) }
 
         val actual = ArcTunnelPem.publicKeySha256(key)

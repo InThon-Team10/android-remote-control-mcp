@@ -41,14 +41,24 @@ class ArcTunnelEnrollerTest {
         override fun dispatch(request: RecordedRequest): MockResponse {
             requests += request
             return when (request.url.encodedPath) {
-                NONCE_PATH -> ArcTunnelTestServer.json(nonceBody(NONCE_BASE + nonceCounter.incrementAndGet()))
-                ENROLL_PATH -> ArcTunnelTestServer.json(enrollBody())
-                ISSUE_PATH -> issueAnswers.poll() ?: ArcTunnelTestServer.json(issueBody(publicPem()))
-                else ->
+                NONCE_PATH -> {
+                    ArcTunnelTestServer.json(nonceBody(NONCE_BASE + nonceCounter.incrementAndGet()))
+                }
+
+                ENROLL_PATH -> {
+                    ArcTunnelTestServer.json(enrollBody())
+                }
+
+                ISSUE_PATH -> {
+                    issueAnswers.poll() ?: ArcTunnelTestServer.json(issueBody(publicPem()))
+                }
+
+                else -> {
                     MockResponse
                         .Builder()
                         .code(404)
                         .build()
+                }
             }
         }
 
@@ -56,8 +66,10 @@ class ArcTunnelEnrollerTest {
 
         fun count(path: String): Int = requests.count { it.url.encodedPath == path }
 
-        fun bodies(path: String): List<String> =
-            requests.filter { it.url.encodedPath == path }.map { requireNotNull(it.body).utf8() }
+        fun bodies(path: String): List<String> {
+            val matching = requests.filter { it.url.encodedPath == path }
+            return matching.map { requireNotNull(it.body).utf8() }
+        }
     }
 
     @BeforeEach

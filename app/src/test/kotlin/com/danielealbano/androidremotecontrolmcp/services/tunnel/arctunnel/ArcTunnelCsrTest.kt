@@ -37,11 +37,10 @@ class ArcTunnelCsrTest {
     }
 
     private fun sanNames(csr: PKCS10CertificationRequest): List<GeneralName> {
-        val attribute =
-            csr.getAttributes(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest).singleOrNull() ?: return emptyList()
-        val extensions = Extensions.getInstance(attribute.attrValues.getObjectAt(0))
-        val san = GeneralNames.fromExtensions(extensions, Extension.subjectAlternativeName) ?: return emptyList()
-        return san.names.toList()
+        val attribute = csr.getAttributes(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest).singleOrNull()
+        val extensions = attribute?.let { Extensions.getInstance(it.attrValues.getObjectAt(0)) }
+        val san = extensions?.let { GeneralNames.fromExtensions(it, Extension.subjectAlternativeName) }
+        return san?.names?.toList().orEmpty()
     }
 
     @Test

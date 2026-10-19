@@ -74,20 +74,26 @@ class ArcTunnelEnrollmentImplTest {
             val path = request.url.encodedPath
             requests += path
             return when (path) {
-                NONCE_PATH -> ArcTunnelTestServer.json(nonceBody(NONCE_BASE + nonce.incrementAndGet()))
+                NONCE_PATH -> {
+                    ArcTunnelTestServer.json(nonceBody(NONCE_BASE + nonce.incrementAndGet()))
+                }
+
                 ENROLL_PATH -> {
                     enrollGate?.await(GATE_S, TimeUnit.SECONDS)
                     enrollAnswer ?: ArcTunnelTestServer.json(enrollBody(synchronized(names) { names.removeFirst() }))
                 }
+
                 ISSUE_PATH -> {
                     issueGate?.await(GATE_S, TimeUnit.SECONDS)
                     ArcTunnelTestServer.json(issueBody())
                 }
-                else ->
+
+                else -> {
                     MockResponse
                         .Builder()
                         .code(404)
                         .build()
+                }
             }
         }
 
@@ -125,11 +131,16 @@ class ArcTunnelEnrollmentImplTest {
 
     private fun quote(value: String): String = "\"" + value.replace("\n", "\\n") + "\""
 
-    private fun enrollBody(name: String): String =
-        """{"name":"$name","identity_cert":${quote(pem("id"))},"issue_nonce":"0b01"}"""
+    private fun enrollBody(name: String): String {
+        val identityCert = quote(pem("id"))
+        return """{"name":"$name","identity_cert":$identityCert,"issue_nonce":"0b01"}"""
+    }
 
-    private fun issueBody(): String =
-        """{"identity_cert":${quote(pem("id"))},"public_cert":${quote(pem("pub"))},"ca":"letsencrypt"}"""
+    private fun issueBody(): String {
+        val identityCert = quote(pem("id"))
+        val publicCert = quote(pem("pub"))
+        return """{"identity_cert":$identityCert,"public_cert":$publicCert,"ca":"letsencrypt"}"""
+    }
 
     private fun expiredChain(
         alias: String,

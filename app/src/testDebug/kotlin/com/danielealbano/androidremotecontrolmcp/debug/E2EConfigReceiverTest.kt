@@ -97,8 +97,11 @@ class E2EConfigReceiverTest {
             every { it.getIntExtra(any(), any()) } returns -1
         }
 
-    private fun actionIntent(action: String): Intent =
-        mockk<Intent>(relaxed = true).also { every { it.action } returns action }
+    private fun actionIntent(action: String): Intent {
+        val intent = mockk<Intent>(relaxed = true)
+        every { intent.action } returns action
+        return intent
+    }
 
     @Test
     fun `ACTION_E2E_CONFIGURE constant is defined`() {

@@ -33,7 +33,12 @@ import javax.net.ssl.X509TrustManager
 
 @DisplayName("McpServer tunnel listener")
 class McpServerTunnelListenerTest {
-    private val held = HeldCertificate.Builder().ecdsa256().commonName("127.0.0.1").build()
+    private val held =
+        HeldCertificate
+            .Builder()
+            .ecdsa256()
+            .commonName("127.0.0.1")
+            .build()
     private val material = TunnelTlsMaterial(held.keyPair.private, listOf(held.certificate))
     private lateinit var server: McpServer
 
