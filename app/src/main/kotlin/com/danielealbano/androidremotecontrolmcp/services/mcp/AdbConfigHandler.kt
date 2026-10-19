@@ -12,6 +12,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelHosts
 import com.danielealbano.androidremotecontrolmcp.utils.RecentsUtils
 
@@ -27,6 +29,7 @@ class AdbConfigHandler(
     private val settingsRepository: SettingsRepository,
     private val storageLocationProvider: StorageLocationProvider,
     private val serverLogRepository: ServerLogRepository,
+    private val arcTunnelEnrollment: ArcTunnelEnrollment,
 ) {
     /**
      * Dispatches the intent to the appropriate handler based on its action.
@@ -81,6 +84,7 @@ class AdbConfigHandler(
         applyDeviceSlug(intent)
         applyToolPermissions(intent)
         applyStorageLocationPermissions(intent)
+        applyArcTunnelEnroll(intent)
 
         Log.i(TAG, "ADB configuration applied successfully")
     }
@@ -316,6 +320,21 @@ class AdbConfigHandler(
         Log.i(TAG, "Free E2E tunnel certificate check updated to $value")
     }
 
+    /**
+     * `--ez arc_tunnel_enroll true`: enrolls (or resumes issuance) in the background with the settings just
+     * applied.
+     */
+    private suspend fun applyArcTunnelEnroll(intent: Intent) {
+        if (!intent.getBooleanExtra(EXTRA_ARC_TUNNEL_ENROLL, false)) return
+        if (isServerActive(McpServerService.serverStatus.value)) {
+            Log.w(TAG, "arc_tunnel_enroll ignored: stop the MCP server first")
+            return
+        }
+        val env = ArcTunnelEnv.from(settingsRepository.getServerConfig())
+        arcTunnelEnrollment.requestEnroll(env)
+        Log.i(TAG, "Free E2E tunnel enrollment requested for ${env.baseAddress}")
+    }
+
     private suspend fun applyFileSizeLimit(intent: Intent) {
         if (!intent.hasExtra(EXTRA_FILE_SIZE_LIMIT_MB)) return
         val value = intent.getIntExtra(EXTRA_FILE_SIZE_LIMIT_MB, -1)
@@ -442,6 +461,7 @@ class AdbConfigHandler(
         internal const val EXTRA_NGROK_DOMAIN = "ngrok_domain"
         internal const val EXTRA_ARC_TUNNEL_BASE_ADDRESS = "arc_tunnel_base_address"
         internal const val EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED = "arc_tunnel_ct_check_enabled"
+        internal const val EXTRA_ARC_TUNNEL_ENROLL = "arc_tunnel_enroll"
         internal const val EXTRA_FILE_SIZE_LIMIT_MB = "file_size_limit_mb"
         internal const val EXTRA_ALLOW_HTTP_DOWNLOADS = "allow_http_downloads"
         internal const val EXTRA_ALLOW_UNVERIFIED_HTTPS_CERTS = "allow_unverified_https_certs"
