@@ -364,6 +364,9 @@ dependencies {
     // Ktor Client (Event Channel dispatcher — no Logging plugin, it would expose auth token)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
+    // Raw OkHttp: the free E2E tunnel control stream is an HTTP/2 duplex request body (not expressible
+    // through the Ktor client), plus its /issue and Certificate Transparency calls.
+    implementation(libs.okhttp)
 
     // Force patched Netty: Ktor's server engine ships netty 4.2.9, which is vulnerable.
     // Covers the HTTP Request Smuggling / HTTP/2 CONTINUATION-flood CVEs (CVE-2026-33870,
@@ -450,6 +453,8 @@ dependencies {
     testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
     testImplementation(libs.ktor.sse)
+    testImplementation(libs.okhttp.mockwebserver3)
+    testImplementation(libs.okhttp.tls)
 }
 
 dependencies {
