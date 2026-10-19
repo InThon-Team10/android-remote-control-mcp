@@ -65,6 +65,8 @@ import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocatio
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.AndroidCloudflareBinaryResolver
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.CloudflaredBinaryResolver
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.AndroidArcTunnelKeyStore
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelKeyStore
 import com.danielealbano.androidremotecontrolmcp.services.update.AppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.BuildConfigAppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.GithubReleaseChecker
@@ -295,4 +297,9 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindUpdateNotifier(impl: UpdateNotifierImpl): UpdateNotifier
+
+    /** Binds the AndroidKeyStore-backed key store of the free E2E tunnel client. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelKeyStore(impl: AndroidArcTunnelKeyStore): ArcTunnelKeyStore
 }
