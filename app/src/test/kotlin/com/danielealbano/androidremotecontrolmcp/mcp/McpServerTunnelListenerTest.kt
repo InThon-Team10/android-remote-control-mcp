@@ -130,8 +130,9 @@ class McpServerTunnelListenerTest {
 
             val error = assertThrows<IllegalStateException> { server.startTlsListener(material, blocker.localPort) {} }
 
+            val elapsedMs = (System.nanoTime() - startedAt) / NANOS_PER_MS
             assertTrue(error.cause is IOException, "cause ${error.cause}")
-            assertTrue((System.nanoTime() - startedAt) / NANOS_PER_MS < FIXED_PORT_BUDGET_MS)
+            assertTrue(elapsedMs < FIXED_PORT_BUDGET_MS, "took $elapsedMs ms")
         }
     }
 

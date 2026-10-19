@@ -28,6 +28,8 @@ import io.ktor.server.routing.routing
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.security.KeyStore
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
@@ -179,15 +181,20 @@ class McpServer(
         var lastError: IOException? = null
         repeat(attempts) { attempt ->
             val candidate = port ?: tunnelPortChooser()
-            val engine = createTunnelListener(keyStore, candidate, onRequest)
+            var engine: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
             try {
+                // Probe with a plain socket first: on a failed bind Ktor's Netty engine shuts its event loops down
+                // with a 2 s quiet period (twice), so a held port would cost seconds per attempt. A port taken
+                // between the probe and the engine bind still fails through the engine below.
+                ServerSocket().use { it.bind(InetSocketAddress(LOOPBACK, candidate)) }
+                engine = createTunnelListener(keyStore, candidate, onRequest)
                 engine.start(wait = false)
                 tunnelListener = engine
                 Log.i(TAG, "Tunnel listener started on 127.0.0.1:$candidate")
                 return candidate
             } catch (e: IOException) {
                 lastError = e
-                engine.stop(0, 0)
+                engine?.stop(0, 0)
                 Log.w(TAG, "Tunnel listener port $candidate unavailable (attempt ${attempt + 1})")
                 if (port != null && attempt < attempts - 1) Thread.sleep(TUNNEL_PORT_RETRY_MS)
             }
