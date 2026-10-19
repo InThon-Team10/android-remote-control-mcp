@@ -490,6 +490,16 @@ androidComponents {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // AboutLegalNoticesTest reads these files; declare them so a change re-runs the tests instead of being served
+    // FROM-CACHE / UP-TO-DATE. RELATIVE path sensitivity keeps the cache key independent of the checkout location.
+    inputs
+        .files(
+            rootProject.file("LICENSE.md"),
+            rootProject.file("THIRD_PARTY_LICENSES.md"),
+            file("src/main/res/values/strings.xml"),
+        )
+        .withPropertyName("legalNoticeFiles")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     maxHeapSize = "3g"
     // Distribute tests across all available CPU cores for faster execution.
     maxParallelForks = (Runtime.getRuntime().availableProcessors()).coerceAtLeast(1)
