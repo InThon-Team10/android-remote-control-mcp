@@ -7407,14 +7407,14 @@ Acceptance criteria:
 - [ ] The user confirmed the production base address (D3), the debug-signer allowlist (D13) and whether the phone is attached BEFORE any gate ran.
 - [ ] `make lint`, `make test-unit`, `make build` and `make test-e2e` pass with their output captured; the `code-reviewer` (plan compliance mode) is clean; the PR exists.
 
-### [ ] Task 12.1 — Confirmations with the user (ASK, do not assume)
+### [x] Task 12.1 — Confirmations with the user (ASK, do not assume)
 
-- [ ] D3: "Is `arc-tunnel.io` the production base address to ship as the default?" If not: change `ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS`, `E2EArcTunnelDeviceTest.PRODUCTION_BASE_ADDRESS`, the `ARCHITECTURE.md` diagram label, the README and PROJECT.md mentions in one commit.
-- [ ] D13: "Is the local debug signer's SHA-256 allowlisted on the production server?" and "Is the phone attached (plain `adb devices` shows it)?" — if either is "no", the device-gated test is expected to be skipped (no phone) or to FAIL (phone attached, signer not allowlisted): in the latter case STOP and ask.
-- [ ] Device test side effects: "The device test stops a running MCP server on the phone, replaces the DEBUG app's bearer token with a random one (it cannot be read back) and restores the tunnel settings afterwards — OK?" and "Is the phone unlocked with the screen on for the whole run?" (the stop/enroll commands start foreground services, which need the activity visible).
+- [x] D3: "Is `arc-tunnel.io` the production base address to ship as the default?" If not: change `ServerConfig.DEFAULT_ARC_TUNNEL_BASE_ADDRESS`, `E2EArcTunnelDeviceTest.PRODUCTION_BASE_ADDRESS`, the `ARCHITECTURE.md` diagram label, the README and PROJECT.md mentions in one commit.
+- [x] D13: "Is the local debug signer's SHA-256 allowlisted on the production server?" and "Is the phone attached (plain `adb devices` shows it)?" — if either is "no", the device-gated test is expected to be skipped (no phone) or to FAIL (phone attached, signer not allowlisted): in the latter case STOP and ask.
+- [x] Device test side effects: "The device test stops a running MCP server on the phone, replaces the DEBUG app's bearer token with a random one (it cannot be read back) and restores the tunnel settings afterwards — OK?" and "Is the phone unlocked with the screen on for the whole run?" (the stop/enroll commands start foreground services, which need the activity visible).
 
 Definition of Done:
-- [ ] All Task 12.1 confirmations obtained and recorded in this plan (checkmarks) before any gate ran.
+- [x] All Task 12.1 confirmations obtained and recorded in this plan (checkmarks) before any gate ran.
 
 ### [ ] Task 12.2 — Quality gates (ALL captured with `tee`, inspected from the log, never re-run to grep)
 
