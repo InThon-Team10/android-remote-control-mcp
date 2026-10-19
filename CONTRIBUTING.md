@@ -40,7 +40,8 @@ See [docs/PROJECT.md](docs/PROJECT.md) for the complete project conventions.
 - **Android NDK** (for cross-compiling native binaries; install via SDK Manager: `sdkmanager "ndk;<version>"`)
 - **Gradle** 8.x (wrapper included, no global install needed)
 - **Go** (for compiling cloudflared tunnel binary; install from [go.dev/dl](https://go.dev/dl/))
-- **Rust/cargo** (for compiling ngrok native library; install from [rustup.rs](https://rustup.rs/))
+- **Rust/cargo 1.85 or newer** (for compiling the ngrok native library: ngrok 0.19 uses Rust edition 2024 and a
+  format-4 `Cargo.lock`; install from [rustup.rs](https://rustup.rs/))
 - **Maven** (for compiling ngrok Java library; install from [maven.apache.org](https://maven.apache.org/install.html))
 
 ### For Running
