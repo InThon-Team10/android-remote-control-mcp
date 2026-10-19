@@ -10,8 +10,11 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthRouteDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.installOAuthRoutes
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelListenerHost
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMaterial
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
@@ -24,7 +27,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.io.IOException
 import java.security.KeyStore
+import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** TLS material for the HTTPS listener; null when HTTPS is disabled or no certificate is loaded. */
@@ -56,9 +61,15 @@ class McpServer(
     private val ephemeralFileLinkService: EphemeralFileLinkService,
     private val oauth: OAuthServerDeps,
     private val serverLog: ServerLogRepository,
-) {
+) : TunnelListenerHost {
     @Volatile
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
+
+    @Volatile
+    private var tunnelListener: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
+
+    /** Test seam: the random loopback port source of the tunnel listener. */
+    internal var tunnelPortChooser: () -> Int = ::randomPort
     private val running = AtomicBoolean(false)
 
     private val accessValidator = OAuthAccessValidator(oauth.jwtTokenService, oauth.oauthClientRepository, serverLog)
@@ -118,6 +129,7 @@ class McpServer(
         }
         server?.stop(gracePeriodMillis, timeoutMillis)
         server = null
+        stopTlsListener()
         Log.i(TAG, "MCP server stopped")
     }
 
@@ -149,6 +161,71 @@ class McpServer(
             module = { configureApplication() },
         )
     }
+
+    @Synchronized
+    override fun startTlsListener(
+        material: TunnelTlsMaterial,
+        port: Int?,
+        onRequest: () -> Unit,
+    ): Int {
+        check(running.get()) { "MCP server is not running" }
+        check(tunnelListener == null) { "Tunnel listener is already running" }
+        val keyStore =
+            KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                load(null, null)
+                setKeyEntry(TUNNEL_KEY_ALIAS, material.privateKey, TUNNEL_KEY_PASSWORD, material.chain.toTypedArray())
+            }
+        val attempts = if (port == null) TUNNEL_RANDOM_PORT_ATTEMPTS else TUNNEL_FIXED_PORT_ATTEMPTS
+        var lastError: IOException? = null
+        repeat(attempts) { attempt ->
+            val candidate = port ?: tunnelPortChooser()
+            val engine = createTunnelListener(keyStore, candidate, onRequest)
+            try {
+                engine.start(wait = false)
+                tunnelListener = engine
+                Log.i(TAG, "Tunnel listener started on 127.0.0.1:$candidate")
+                return candidate
+            } catch (e: IOException) {
+                lastError = e
+                engine.stop(0, 0)
+                Log.w(TAG, "Tunnel listener port $candidate unavailable (attempt ${attempt + 1})")
+                if (port != null && attempt < attempts - 1) Thread.sleep(TUNNEL_PORT_RETRY_MS)
+            }
+        }
+        throw IllegalStateException("No loopback port for the tunnel listener after $attempts attempts", lastError)
+    }
+
+    @Synchronized
+    override fun stopTlsListener() {
+        tunnelListener?.stop(TUNNEL_STOP_GRACE_MS, TUNNEL_STOP_TIMEOUT_MS)
+        tunnelListener = null
+    }
+
+    private fun randomPort(): Int = SecureRandom().nextInt(TUNNEL_PORT_MAX - TUNNEL_PORT_MIN + 1) + TUNNEL_PORT_MIN
+
+    private fun createTunnelListener(
+        keyStore: KeyStore,
+        port: Int,
+        onRequest: () -> Unit,
+    ): EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> =
+        embeddedServer(
+            factory = Netty,
+            configure = {
+                sslConnector(
+                    keyStore = keyStore,
+                    keyAlias = TUNNEL_KEY_ALIAS,
+                    keyStorePassword = { TUNNEL_KEY_PASSWORD },
+                    privateKeyPassword = { TUNNEL_KEY_PASSWORD },
+                ) {
+                    host = LOOPBACK
+                    this.port = port
+                }
+            },
+            module = {
+                configureApplication()
+                intercept(ApplicationCallPipeline.Monitoring) { onRequest() }
+            },
+        )
 
     private fun io.ktor.server.application.Application.configureApplication() {
         // Base plugins in the canonical order (ContentNegotiation → CORS → auth). CORS MUST precede
@@ -219,5 +296,15 @@ class McpServer(
         private const val TAG = "MCP:McpServer"
         private const val DEFAULT_GRACE_PERIOD_MS = 1000L
         private const val DEFAULT_TIMEOUT_MS = 5000L
+        private const val LOOPBACK = "127.0.0.1"
+        private const val TUNNEL_KEY_ALIAS = "tunnel"
+        private val TUNNEL_KEY_PASSWORD = CharArray(0)
+        private const val TUNNEL_PORT_MIN = 49152
+        private const val TUNNEL_PORT_MAX = 65535
+        private const val TUNNEL_RANDOM_PORT_ATTEMPTS = 20
+        private const val TUNNEL_FIXED_PORT_ATTEMPTS = 4
+        private const val TUNNEL_PORT_RETRY_MS = 250L
+        private const val TUNNEL_STOP_GRACE_MS = 100L
+        private const val TUNNEL_STOP_TIMEOUT_MS = 500L
     }
 }
