@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollService
 
 /**
  * Invisible trampoline [Activity] that starts or stops [McpServerService] from ADB
@@ -35,6 +36,11 @@ import android.util.Log
  * adb shell am start \
  *   -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
  *   --es action stop
+ *
+ * # Enroll the free E2E tunnel (or resume a failed certificate issuance) with the saved settings
+ * adb shell am start \
+ *   -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
+ *   --es action enroll-tunnel
  * ```
  *
  * Where `<app-id>` is:
@@ -44,10 +50,13 @@ import android.util.Log
 class AdbServiceTrampolineActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handle(intent.getStringExtra(EXTRA_ACTION))
+        finish()
+    }
 
-        val action = intent.getStringExtra(EXTRA_ACTION)
+    /** Dispatches one trampoline action (internal so the JVM tests can call it on a spy). */
+    internal fun handle(action: String?) {
         Log.i(TAG, "Trampoline launched with action: $action")
-
         when (action) {
             ACTION_VALUE_START -> {
                 Log.i(TAG, "Starting McpServerService via trampoline")
@@ -67,12 +76,19 @@ class AdbServiceTrampolineActivity : Activity() {
                 startForegroundService(serviceIntent)
             }
 
+            ACTION_VALUE_ENROLL_TUNNEL -> {
+                if (isServerActive(McpServerService.serverStatus.value)) {
+                    Log.w(TAG, "enroll-tunnel ignored: stop the MCP server first")
+                } else {
+                    Log.i(TAG, "Starting ArcTunnelEnrollService via trampoline")
+                    ArcTunnelEnrollService.start(this, env = null, rotate = false)
+                }
+            }
+
             else -> {
-                Log.w(TAG, "Unknown or missing action: '$action' (expected 'start' or 'stop')")
+                Log.w(TAG, "Unknown or missing action: '$action' (expected 'start', 'stop' or 'enroll-tunnel')")
             }
         }
-
-        finish()
     }
 
     companion object {
@@ -80,5 +96,6 @@ class AdbServiceTrampolineActivity : Activity() {
         internal const val EXTRA_ACTION = "action"
         internal const val ACTION_VALUE_START = "start"
         internal const val ACTION_VALUE_STOP = "stop"
+        internal const val ACTION_VALUE_ENROLL_TUNNEL = "enroll-tunnel"
     }
 }
