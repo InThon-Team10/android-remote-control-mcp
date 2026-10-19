@@ -49,7 +49,8 @@ class E2EConfigReceiverTest {
         // The Hilt-generated base class has a volatile boolean `injected` field
         // that gates the inject(context) call in onReceive(). Setting it to true
         // prevents the Hilt injection from running, so our manually-set mocks are used.
-        val injectedField = receiver.javaClass.superclass.getDeclaredField("injected")
+        val hiltBaseClass = checkNotNull(receiver.javaClass.superclass) { "E2EConfigReceiver has no Hilt base class" }
+        val injectedField = hiltBaseClass.getDeclaredField("injected")
         injectedField.isAccessible = true
         injectedField.setBoolean(receiver, true)
     }

@@ -41,17 +41,17 @@
     <!-- About Screen -->
     <string name="about_author_section">Author</string>
     <string name="about_author_name">Daniele Salvatore Albano</string>
-    <string name="about_author_email">d.albano@gmail.com</string>
     <string name="about_author_linkedin">linkedin.com/in/danielesalvatorealbano</string>
     <string name="about_author_x">x.com/daniele_dll</string>
     <string name="about_links_section">Links</string>
     <string name="about_link_github">GitHub Repository</string>
-    <string name="about_link_license">MIT License</string>
+    <string name="about_link_license">GNU GPLv3 or later</string>
+    <string name="about_link_third_party_licenses">Third-party licenses</string>
     <string name="about_link_issues">Report an Issue</string>
     <string name="about_attributions_section">Attributions</string>
     <string name="about_attribution_dbip">IP geolocation data by DB-IP (db-ip.com), licensed under CC BY 4.0.</string>
     <string name="about_attribution_privacy_model">Privacy Mode PII detection model by Ai4Privacy (MIT license). Built with Llama.</string>
-    <string name="about_footer">Open Source, MIT License</string>
+    <string name="about_footer">Copyright 2026–2027 Daniele Salvatore Albano. Licensed under GPLv3 or later, without warranty.</string>
 
     <!-- Clipboard -->
     <string name="copied_to_clipboard">Copied to clipboard</string>
