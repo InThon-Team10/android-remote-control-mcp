@@ -196,7 +196,7 @@ private fun LogEntryRow(
             )
             if (!entry?.message.isNullOrEmpty()) {
                 Text(
-                    text = entry?.message.orEmpty(),
+                    text = entry.message,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     maxLines = 2,
