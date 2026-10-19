@@ -75,6 +75,7 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentI
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.tunnelAllowedWithHttps
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
@@ -354,15 +355,15 @@ class McpServerService : Service() {
                 ),
             )
 
-            // Start tunnel if remote access is enabled. A tunnel always targets an
-            // http://localhost origin, so it MUST NOT run while the server serves HTTPS.
-            if (config.httpsEnabled) {
+            // Start tunnel if remote access is enabled. Cloudflare/ngrok target an http://localhost origin,
+            // so they MUST NOT run while the server serves HTTPS; the free E2E tunnel has its own TLS listener.
+            if (!tunnelAllowedWithHttps(config)) {
                 Log.i(TAG, "Remote access tunnel disabled while HTTPS is enabled")
                 tunnelManager.stop()
             } else {
                 @Suppress("TooGenericExceptionCaught")
                 try {
-                    tunnelManager.start(config.port)
+                    tunnelManager.start(config.port, requireNotNull(mcpServer))
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to start tunnel (server continues without tunnel)", e)
                 }
@@ -685,6 +686,13 @@ internal fun serverStatusLogMessage(status: ServerStatus): String =
         ServerStatus.Stopping -> "Server stopping"
         ServerStatus.Stopped -> "Server stopped"
         is ServerStatus.Error -> "Server error: ${status.message}"
+    }
+
+/** True while the server is starting or running (enrollment and rotation are refused then). */
+internal fun isServerActive(status: ServerStatus): Boolean =
+    when (status) {
+        is ServerStatus.Starting, is ServerStatus.Running -> true
+        else -> false
     }
 
 /** Server-log message for a Privacy Mode self-check result at server start. */
