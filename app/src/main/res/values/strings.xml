@@ -41,7 +41,6 @@
     <!-- About Screen -->
     <string name="about_author_section">Author</string>
     <string name="about_author_name">Daniele Salvatore Albano</string>
-    <string name="about_author_email">d.albano@gmail.com</string>
     <string name="about_author_linkedin">linkedin.com/in/danielesalvatorealbano</string>
     <string name="about_author_x">x.com/daniele_dll</string>
     <string name="about_links_section">Links</string>

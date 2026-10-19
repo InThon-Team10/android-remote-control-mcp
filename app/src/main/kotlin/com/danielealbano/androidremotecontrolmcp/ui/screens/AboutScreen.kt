@@ -142,21 +142,6 @@ fun AboutScreen(
             Spacer(Modifier.height(4.dp))
 
             Text(
-                text = stringResource(R.string.about_author_email),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier =
-                    Modifier.clickable {
-                        val intent =
-                            Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:d.albano@gmail.com")
-                            }
-                        runCatching { context.startActivity(intent) }
-                    },
-            )
-            Spacer(Modifier.height(4.dp))
-
-            Text(
                 text = stringResource(R.string.about_author_linkedin),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,

@@ -16,6 +16,7 @@ import javax.xml.parsers.DocumentBuilderFactory
  * Guards the GPLv3 "Appropriate Legal Notices" shown by the About screen: the links it opens point to files that
  * exist in the repository, `LICENSE.md` carries the GPL-3.0-or-later grant with the Play services additional
  * permission followed by the verbatim GPLv3 text, and the About strings carry copyright, license and no-warranty.
+ * It also guards that the About screen exposes no personal e-mail address: contact goes through the issues link.
  */
 @DisplayName("About screen legal notices")
 class AboutLegalNoticesTest {
@@ -89,6 +90,19 @@ class AboutLegalNoticesTest {
         }
     }
 
+    @Test
+    fun `about screen exposes no e-mail address`() {
+        val strings = stringsXml()
+
+        assertFalse(strings.containsKey("about_author_email")) { "about_author_email must not exist" }
+        strings.forEach { (name, value) ->
+            assertFalse(EMAIL_ADDRESS.containsMatchIn(value)) { "$name contains an e-mail address: $value" }
+        }
+        allLinks().forEach { link -> assertFalse(link.startsWith("mailto:")) { "$link is a mailto link" } }
+        val aboutScreenSource = sourceFile(ABOUT_SCREEN_KT).readText()
+        assertFalse(aboutScreenSource.contains("mailto:")) { "$ABOUT_SCREEN_KT opens a mailto link" }
+    }
+
     /** Every `const val` String of [AboutLinks], read by reflection so constants added later are covered too. */
     private fun allLinks(): List<String> {
         val fields = AboutLinks::class.java.declaredFields
@@ -103,11 +117,14 @@ class AboutLegalNoticesTest {
         listOf(File("..", name), File(name)).firstOrNull { it.isFile }
             ?: fail("$name not found from ${File(".").absolutePath}")
 
+    /** A file of the `:app` module; unit tests run with the module directory as CWD, else the repository root. */
+    private fun sourceFile(relativePath: String): File =
+        listOf(File(relativePath), File("app", relativePath)).firstOrNull { it.isFile }
+            ?: fail("$relativePath not found from ${File(".").absolutePath}")
+
     /** The `name` -> text map of `src/main/res/values/strings.xml`. */
     private fun stringsXml(): Map<String, String> {
-        val file =
-            listOf(File(STRINGS_XML), File("app", STRINGS_XML)).firstOrNull { it.isFile }
-                ?: fail("$STRINGS_XML not found from ${File(".").absolutePath}")
+        val file = sourceFile(STRINGS_XML)
         val document =
             DocumentBuilderFactory
                 .newInstance()
@@ -136,6 +153,9 @@ class AboutLegalNoticesTest {
         const val GPL_TEXT_SHA256 = "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
         const val STRINGS_XML = "src/main/res/values/strings.xml"
         const val MODEL_ATTRIBUTION = "about_attribution_privacy_model"
+        const val ABOUT_SCREEN_KT =
+            "src/main/kotlin/com/danielealbano/androidremotecontrolmcp/ui/screens/AboutScreen.kt"
         val MIT_WORD = Regex("\\bMIT\\b")
+        val EMAIL_ADDRESS = Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}")
     }
 }
