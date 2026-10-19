@@ -155,7 +155,9 @@ jobs:
 
   test-e2e:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    # Pinned OS image (not kernel): redroid needs binder_linux from linux-modules-extra-$(uname -r), which Ubuntu
+    # 24.04 publishes for its runner kernels; ubuntu-latest moved to a kernel without that package.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout
