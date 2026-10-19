@@ -65,9 +65,9 @@ Why: raw OkHttp (duplex bodies) in the app; `mockwebserver3` + `okhttp-tls` in u
 Acceptance criteria:
 - [ ] `gradle/libs.versions.toml` declares `okhttp = "5.5.0"` and the three OkHttp library aliases; both modules declare the dependencies below.
 
-### [ ] Task 1.1 — Version catalog and build files
+### [x] Task 1.1 — Version catalog and build files
 
-[ ] **Action 1.1.1** — modify `gradle/libs.versions.toml`:
+[x] **Action 1.1.1** — modify `gradle/libs.versions.toml`:
 
 ```toml
 # [versions] — after `bouncy-castle`
@@ -79,7 +79,7 @@ okhttp-mockwebserver3 = { group = "com.squareup.okhttp3", name = "mockwebserver3
 okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
 ```
 
-[ ] **Action 1.1.2** — modify `app/build.gradle.kts`:
+[x] **Action 1.1.2** — modify `app/build.gradle.kts`:
 
 ```kotlin
     // Ktor Client (Event Channel dispatcher — no Logging plugin, it would expose auth token)
@@ -95,7 +95,7 @@ and after `testImplementation(libs.ktor.sse)`:
     testImplementation(libs.okhttp.tls)
 ```
 
-[ ] **Action 1.1.3** — modify `e2e-tests/build.gradle.kts`, after `testImplementation(libs.ktor.sse)`:
+[x] **Action 1.1.3** — modify `e2e-tests/build.gradle.kts`, after `testImplementation(libs.ktor.sse)`:
 
 ```kotlin
     // Free E2E tunnel: OkHttp-backed Ktor client (SNI + DNS override to reach the tunnel edge), raw OkHttp for
@@ -107,7 +107,7 @@ and after `testImplementation(libs.ktor.sse)`:
 ```
 
 Definition of Done:
-- [ ] Actions 1.1.1–1.1.3 applied; no other dependency changed.
+- [x] Actions 1.1.1–1.1.3 applied; no other dependency changed.
 
 ---
 
@@ -121,9 +121,9 @@ Acceptance criteria:
 - [ ] An upgraded install with `tunnel_enabled` stored and no provider stored reads `CLOUDFLARE` after migration; a fresh install reads `ARC_TUNNEL`.
 - [ ] ADB accepts `tunnel_provider`, `arc_tunnel_base_address`, `arc_tunnel_ct_check_enabled`; `SettingsRepositoryImpl` stays under detekt's `LargeClass` limit (the new settings are a delegated slice).
 
-### [ ] Task 2.1 — Model
+### [x] Task 2.1 — Model
 
-[ ] **Action 2.1.1** — modify `A/data/model/TunnelProviderType.kt` (replace the file):
+[x] **Action 2.1.1** — modify `A/data/model/TunnelProviderType.kt` (replace the file):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.data.model
@@ -153,7 +153,7 @@ enum class TunnelProviderType(
 }
 ```
 
-[ ] **Action 2.1.2** — modify `A/data/model/ServerConfig.kt`:
+[x] **Action 2.1.2** — modify `A/data/model/ServerConfig.kt`:
 
 ```kotlin
 // KDoc: replace the tunnelProvider line and add four properties after cloudflareTunnelToken
@@ -180,11 +180,11 @@ enum class TunnelProviderType(
 ```
 
 Definition of Done:
-- [ ] `TunnelProviderType` and `ServerConfig` as written.
+- [x] `TunnelProviderType` and `ServerConfig` as written.
 
-### [ ] Task 2.2 — Hosts and environment
+### [x] Task 2.2 — Hosts and environment
 
-[ ] **Action 2.2.1** — create `arctunnel/ArcTunnelHosts.kt`:
+[x] **Action 2.2.1** — create `arctunnel/ArcTunnelHosts.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -226,7 +226,7 @@ data class ArcTunnelHosts(
 }
 ```
 
-[ ] **Action 2.2.2** — create `arctunnel/ArcTunnelEnv.kt`:
+[x] **Action 2.2.2** — create `arctunnel/ArcTunnelEnv.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -275,13 +275,13 @@ data class ArcTunnelEdgeOverride(
 ```
 
 Definition of Done:
-- [ ] `ArcTunnelHosts`, `ArcTunnelEnv` and `ArcTunnelEdgeOverride` as written.
+- [x] `ArcTunnelHosts`, `ArcTunnelEnv` and `ArcTunnelEdgeOverride` as written.
 
-### [ ] Task 2.3 — Settings repository and migration
+### [x] Task 2.3 — Settings repository and migration
 
 detekt counts `SettingsRepositoryImpl` at 599 of the 600 lines `LargeClass` allows, so the new settings live in a delegated slice like `EventChannelSettings`; the class gains three lines (constructor parameter, delegation clause, migration call) and loses three (`getBuiltinLocationPermissions` collapsed onto the existing top-level helper) = 599, unchanged.
 
-[ ] **Action 2.3.1** — create `A/data/repository/ArcTunnelSettings.kt`:
+[x] **Action 2.3.1** — create `A/data/repository/ArcTunnelSettings.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.data.repository
@@ -305,7 +305,7 @@ interface ArcTunnelSettings {
 }
 ```
 
-[ ] **Action 2.3.2** — create `A/data/repository/ArcTunnelSettingsImpl.kt` (the four keys are `internal` because `SettingsRepositoryImpl` reads them when mapping the configuration):
+[x] **Action 2.3.2** — create `A/data/repository/ArcTunnelSettingsImpl.kt` (the four keys are `internal` because `SettingsRepositoryImpl` reads them when mapping the configuration):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.data.repository
@@ -365,7 +365,7 @@ class ArcTunnelSettingsImpl
     }
 ```
 
-[ ] **Action 2.3.3** — modify `A/data/repository/SettingsRepository.kt`:
+[x] **Action 2.3.3** — modify `A/data/repository/SettingsRepository.kt`:
 
 ```kotlin
 // interface header
@@ -375,7 +375,7 @@ interface SettingsRepository :
 ```
 and extend the KDoc of `ensureAuthModelMigrated` with: "Also runs the one-time tunnel-provider migration (an install that ever wrote a tunnel setting without choosing a provider keeps Cloudflare)."
 
-[ ] **Action 2.3.4** — modify `A/data/repository/SettingsRepositoryImpl.kt`:
+[x] **Action 2.3.4** — modify `A/data/repository/SettingsRepositoryImpl.kt`:
 
 ```kotlin
 // imports (add)
@@ -443,7 +443,7 @@ class SettingsRepositoryImpl
             getBuiltinLocationPermissionsInternal(dataStore.data.first())
 ```
 
-[ ] **Action 2.3.5** — modify `A/di/AppModule.kt`: in `RepositoryModule`, after `bindEventChannelSettings`, add (plus the two imports):
+[x] **Action 2.3.5** — modify `A/di/AppModule.kt`: in `RepositoryModule`, after `bindEventChannelSettings`, add (plus the two imports):
 
 ```kotlin
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
@@ -456,11 +456,11 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettin
 ```
 
 Definition of Done:
-- [ ] Slice interface + implementation, delegation, keys and the one-time migration as written; `SettingsRepositoryImpl` at 599 lines of code as measured by detekt (`LargeClass` allows 600).
+- [x] Slice interface + implementation, delegation, keys and the one-time migration as written; `SettingsRepositoryImpl` at 599 lines of code as measured by detekt (`LargeClass` allows 600).
 
-### [ ] Task 2.4 — ADB configuration keys
+### [x] Task 2.4 — ADB configuration keys
 
-[ ] **Action 2.4.1** — modify `A/services/mcp/AdbConfigHandler.kt`:
+[x] **Action 2.4.1** — modify `A/services/mcp/AdbConfigHandler.kt`:
 
 ```kotlin
 // import (add)
@@ -512,9 +512,9 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 ```
 
 Definition of Done:
-- [ ] ADB keys applied; `tunnel_provider` resolves ADB values only.
+- [x] ADB keys applied; `tunnel_provider` resolves ADB values only.
 
-### [ ] Task 2.5 — Tests
+### [x] Task 2.5 — Tests
 
 **File**: `TA/ArcTunnelHostsTest.kt`
 
@@ -570,7 +570,7 @@ Definition of Done:
 | `handleConfigure runs the migration before any write` | `ensureAuthModelMigrated` verified before `updateTunnelEnabled` (order) |
 
 Definition of Done:
-- [ ] One test per row; every existing Cloudflare/ngrok test still describes the same behaviour.
+- [x] One test per row; every existing Cloudflare/ngrok test still describes the same behaviour.
 
 ---
 
@@ -581,9 +581,9 @@ Why: the phone terminates the tunnel's TLS on its own loopback listener serving 
 Acceptance criteria:
 - [ ] `McpServer` implements `TunnelListenerHost`: random port when none is requested, retry on bind failure, fixed port when requested (bounded retries), per-request hook, idempotent stop (100 ms grace / 500 ms timeout), stopped together with the server.
 
-### [ ] Task 3.1 — Interface
+### [x] Task 3.1 — Interface
 
-[ ] **Action 3.1.1** — create `A/services/tunnel/TunnelListenerHost.kt`:
+[x] **Action 3.1.1** — create `A/services/tunnel/TunnelListenerHost.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel
@@ -617,11 +617,11 @@ interface TunnelListenerHost {
 ```
 
 Definition of Done:
-- [ ] `TunnelListenerHost` and `TunnelTlsMaterial` as written.
+- [x] `TunnelListenerHost` and `TunnelTlsMaterial` as written.
 
-### [ ] Task 3.2 — McpServer
+### [x] Task 3.2 — McpServer
 
-[ ] **Action 3.2.1** — modify `A/mcp/McpServer.kt`:
+[x] **Action 3.2.1** — modify `A/mcp/McpServer.kt`:
 
 ```kotlin
 // imports (add)
@@ -727,9 +727,9 @@ import java.security.SecureRandom
 Context: a bind failure surfaces as `java.net.BindException` (JDK transport) or `io.netty.channel.unix.Errors.NativeIoException` (native transport), both `IOException`; Ktor rethrows the original. A fixed port is retried 4 × 250 ms (≤ 1 s) because the previous engine on that port may still be releasing it. On Android `KeyStore.getDefaultType()` is BKS, which keeps the opaque AndroidKeyStore key object in memory without encoding it (the reference app proves this on device); JVM tests use a real key. `tunnelPortChooser` is the test seam for the random-port retry.
 
 Definition of Done:
-- [ ] `McpServer` implements the interface as written (random port, retries, hook, bounded stop, test seam).
+- [x] `McpServer` implements the interface as written (random port, retries, hook, bounded stop, test seam).
 
-### [ ] Task 3.3 — Tests
+### [x] Task 3.3 — Tests
 
 **File**: `T/mcp/McpServerTunnelListenerTest.kt`
 
@@ -749,7 +749,7 @@ Definition of Done:
 | `stop() also stops the tunnel listener` | the listener port refuses connections afterwards |
 
 Definition of Done:
-- [ ] One test per row.
+- [x] One test per row.
 
 ---
 
@@ -760,9 +760,9 @@ Why: the phone side of PROTOCOL.md v2 as testable Kotlin with this project's sta
 Acceptance criteria:
 - [ ] The phone side of PROTOCOL.md v2 (enrollment, issuance, control stream, dial-back, splice, retries, watchdog) is implemented against the keystore interface and verified by JVM tests against the fake keystore.
 
-### [ ] Task 4.1 — Pure utilities: PEM, sockets, wire types, frames, CSRs, sessions
+### [x] Task 4.1 — Pure utilities: PEM, sockets, wire types, frames, CSRs, sessions
 
-[ ] **Action 4.1.1** — create `arctunnel/ArcTunnelPem.kt`:
+[x] **Action 4.1.1** — create `arctunnel/ArcTunnelPem.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -820,7 +820,7 @@ object ArcTunnelPem {
 }
 ```
 
-[ ] **Action 4.1.2** — create `arctunnel/ArcTunnelSockets.kt`:
+[x] **Action 4.1.2** — create `arctunnel/ArcTunnelSockets.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -842,7 +842,7 @@ object ArcTunnelSockets {
 }
 ```
 
-[ ] **Action 4.1.3** — create `arctunnel/ArcTunnelWire.kt` (JSON bodies of PROTOCOL.md §2–§4):
+[x] **Action 4.1.3** — create `arctunnel/ArcTunnelWire.kt` (JSON bodies of PROTOCOL.md §2–§4):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -923,7 +923,7 @@ class ArcTunnelApiException(
 ) : RuntimeException("tunnel service: $reason (status $status)")
 ```
 
-[ ] **Action 4.1.4** — create `arctunnel/ArcTunnelFrames.kt` (`[type:1][len:4 BE][json]`, 1 MiB cap):
+[x] **Action 4.1.4** — create `arctunnel/ArcTunnelFrames.kt` (`[type:1][len:4 BE][json]`, 1 MiB cap):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -952,7 +952,7 @@ object ArcTunnelFrames {
 }
 ```
 
-[ ] **Action 4.1.5** — create `arctunnel/ArcTunnelCsr.kt`:
+[x] **Action 4.1.5** — create `arctunnel/ArcTunnelCsr.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1025,7 +1025,7 @@ object ArcTunnelCsr {
 }
 ```
 
-[ ] **Action 4.1.6** — create `arctunnel/ArcTunnelSessions.kt`:
+[x] **Action 4.1.6** — create `arctunnel/ArcTunnelSessions.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1073,11 +1073,11 @@ class ArcTunnelSessions(
 ```
 
 Definition of Done:
-- [ ] The six files as written.
+- [x] The six files as written.
 
-### [ ] Task 4.2 — Keystore interface and Android implementation
+### [x] Task 4.2 — Keystore interface and Android implementation
 
-[ ] **Action 4.2.1** — create `arctunnel/ArcTunnelKeyStore.kt`:
+[x] **Action 4.2.1** — create `arctunnel/ArcTunnelKeyStore.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1108,7 +1108,7 @@ interface ArcTunnelKeyStore {
 }
 ```
 
-[ ] **Action 4.2.2** — create `arctunnel/AndroidArcTunnelKeyStore.kt` (the TLS key MUST authorize `DIGEST_NONE`: Conscrypt signs the TLS transcript pre-hashed):
+[x] **Action 4.2.2** — create `arctunnel/AndroidArcTunnelKeyStore.kt` (the TLS key MUST authorize `DIGEST_NONE`: Conscrypt signs the TLS transcript pre-hashed):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1180,7 +1180,7 @@ class AndroidArcTunnelKeyStore
     }
 ```
 
-[ ] **Action 4.2.3** — modify `A/di/AppModule.kt`: in `ServiceModule` (service bindings live there) add the binding and the two imports:
+[x] **Action 4.2.3** — modify `A/di/AppModule.kt`: in `ServiceModule` (service bindings live there) add the binding and the two imports:
 
 ```kotlin
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.AndroidArcTunnelKeyStore
@@ -1193,11 +1193,11 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 ```
 
 Definition of Done:
-- [ ] Interface, Android implementation and Hilt binding as written.
+- [x] Interface, Android implementation and Hilt binding as written.
 
-### [ ] Task 4.3 — Dial-back
+### [x] Task 4.3 — Dial-back
 
-[ ] **Action 4.3.1** — create `arctunnel/ArcTunnelDialBack.kt` (PROTOCOL.md §4; ONE deadline over connect + TLS + upgrade, enforced by a sibling coroutine closing the socket since blocking socket I/O is not cancellable; the raw socket is registered in the stream's [ArcTunnelSessions] so a stream end closes an in-flight dial-back too; hostname verification is done by the JSSE itself via `endpointIdentificationAlgorithm`, which works on the JVM and on Android):
+[x] **Action 4.3.1** — create `arctunnel/ArcTunnelDialBack.kt` (PROTOCOL.md §4; ONE deadline over connect + TLS + upgrade, enforced by a sibling coroutine closing the socket since blocking socket I/O is not cancellable; the raw socket is registered in the stream's [ArcTunnelSessions] so a stream end closes an in-flight dial-back too; hostname verification is done by the JSSE itself via `endpointIdentificationAlgorithm`, which works on the JVM and on Android):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1380,11 +1380,11 @@ class ArcTunnelDialBack(
 Context: `finish` subsumes the reference client's `FAILED` state: a failure before the deadline fires leaves `state == OPENING` and the original cause is rethrown; a failure caused by the deadline's close becomes a `SocketTimeoutException`; a success that lost the race to the deadline is closed and reported as timed out. A failed open leaves nothing in [sessions]; a successful one leaves `raw` registered until `ArcTunnelOpenHandler` releases it.
 
 Definition of Done:
-- [ ] `ArcTunnelDialBack` as written.
+- [x] `ArcTunnelDialBack` as written.
 
-### [ ] Task 4.4 — Identity + network layer (mutually dependent, one action), HTTP helper
+### [x] Task 4.4 — Identity + network layer (mutually dependent, one action), HTTP helper
 
-[ ] **Action 4.4.1** — create `arctunnel/ArcTunnelIdentity.kt` AND `arctunnel/ArcTunnelNet.kt` together (each references the other):
+[x] **Action 4.4.1** — create `arctunnel/ArcTunnelIdentity.kt` AND `arctunnel/ArcTunnelNet.kt` together (each references the other):
 
 `arctunnel/ArcTunnelIdentity.kt`:
 
@@ -1619,7 +1619,7 @@ class ArcTunnelNet(
 
 Context: OkHttp applies its read timeout to an HTTP/2 stream only once the request body is closed or finished (`Http2Stream.doReadTimeout` in 5.5.0); the duplex control body stays open, so the default would not fire — `controlClient` still sets it to 0 so the behaviour does not depend on that detail.
 
-[ ] **Action 4.4.2** — create `arctunnel/ArcTunnelHttp.kt` (`/issue` allows 400 s per PROTOCOL.md §3; `/enroll` 300 s as the reference client's `Enroll.kt` does; `callTimeout` bounds the whole exchange; every call is cancelled with its coroutine):
+[x] **Action 4.4.2** — create `arctunnel/ArcTunnelHttp.kt` (`/issue` allows 400 s per PROTOCOL.md §3; `/enroll` 300 s as the reference client's `Enroll.kt` does; `callTimeout` bounds the whole exchange; every call is cancelled with its coroutine):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1756,11 +1756,11 @@ object ArcTunnelHttp {
 ```
 
 Definition of Done:
-- [ ] `ArcTunnelIdentity`, `ArcTunnelNet` and `ArcTunnelHttp` as written.
+- [x] `ArcTunnelIdentity`, `ArcTunnelNet` and `ArcTunnelHttp` as written.
 
-### [ ] Task 4.5 — Retries and enroller
+### [x] Task 4.5 — Retries and enroller
 
-[ ] **Action 4.5.1** — create `arctunnel/ArcTunnelEnrollRetry.kt` (PROTOCOL.md §2: ≤ 3 retries; refusal → `retry_after_seconds` ≥ 1 s; network → 2 s; key generation (`ProviderException`) → 3 s over the SAME nonce; non-retryable stops):
+[x] **Action 4.5.1** — create `arctunnel/ArcTunnelEnrollRetry.kt` (PROTOCOL.md §2: ≤ 3 retries; refusal → `retry_after_seconds` ≥ 1 s; network → 2 s; key generation (`ProviderException`) → 3 s over the SAME nonce; non-retryable stops):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1808,7 +1808,7 @@ object ArcTunnelEnrollRetry {
 
 Context: `runCatching` also captures `CancellationException`; `waitMs` returns null for it, so it is rethrown at once.
 
-[ ] **Action 4.5.2** — create `arctunnel/ArcTunnelIssueRetry.kt` (PROTOCOL.md §3: ≤ 3 retries, each over a FRESH nonce, waits `retry_after_seconds` else 5/10/15 s; a `ProviderException` re-generates over the SAME nonce ≤ 5 times, 2 s apart, without spending a retry):
+[x] **Action 4.5.2** — create `arctunnel/ArcTunnelIssueRetry.kt` (PROTOCOL.md §3: ≤ 3 retries, each over a FRESH nonce, waits `retry_after_seconds` else 5/10/15 s; a `ProviderException` re-generates over the SAME nonce ≤ 5 times, 2 s apart, without spending a retry):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -1873,7 +1873,7 @@ object ArcTunnelIssueRetry {
 }
 ```
 
-[ ] **Action 4.5.3** — create `arctunnel/ArcTunnelEnroller.kt`:
+[x] **Action 4.5.3** — create `arctunnel/ArcTunnelEnroller.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2031,11 +2031,11 @@ class ArcTunnelEnroller(
 ```
 
 Definition of Done:
-- [ ] Both retry objects and the enroller as written.
+- [x] Both retry objects and the enroller as written.
 
-### [ ] Task 4.6 — Identity store
+### [x] Task 4.6 — Identity store
 
-[ ] **Action 4.6.1** — create `arctunnel/ArcTunnelIdentityStore.kt` (one JSON file per environment under `filesDir/arc-tunnel/`, atomic rename on save; also the CT cursor, the flagged keys and the undismissed-alert key of D10; an unreadable file is logged and treated as absent):
+[x] **Action 4.6.1** — create `arctunnel/ArcTunnelIdentityStore.kt` (one JSON file per environment under `filesDir/arc-tunnel/`, atomic rename on save; also the CT cursor, the flagged keys and the undismissed-alert key of D10; an unreadable file is logged and treated as absent):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2168,11 +2168,11 @@ class ArcTunnelIdentityStore(
 ```
 
 Definition of Done:
-- [ ] Store as written (atomic write, tolerant load, CT fields incl. the check time).
+- [x] Store as written (atomic write, tolerant load, CT fields incl. the check time).
 
-### [ ] Task 4.7 — Backoff, local connect, splice, watchdog, events, OPEN handler, control loop
+### [x] Task 4.7 — Backoff, local connect, splice, watchdog, events, OPEN handler, control loop
 
-[ ] **Action 4.7.1** — create `arctunnel/ArcTunnelBackoff.kt` (D9):
+[x] **Action 4.7.1** — create `arctunnel/ArcTunnelBackoff.kt` (D9):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2199,7 +2199,7 @@ class ArcTunnelBackoff {
 }
 ```
 
-[ ] **Action 4.7.2** — create `arctunnel/ArcTunnelLocalConnect.kt` (D6: a listener restarting for a certificate swap is retried for up to 10 s):
+[x] **Action 4.7.2** — create `arctunnel/ArcTunnelLocalConnect.kt` (D6: a listener restarting for a certificate swap is retried for up to 10 s):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2262,7 +2262,7 @@ object ArcTunnelLocalConnect {
 }
 ```
 
-[ ] **Action 4.7.3** — create `arctunnel/ArcTunnelSplice.kt` (16 KiB buffers; either side ending closes both; two `Dispatchers.IO` copies under one `coroutineScope`):
+[x] **Action 4.7.3** — create `arctunnel/ArcTunnelSplice.kt` (16 KiB buffers; either side ending closes both; two `Dispatchers.IO` copies under one `coroutineScope`):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2336,7 +2336,7 @@ object ArcTunnelSplice {
 }
 ```
 
-[ ] **Action 4.7.4** — create `arctunnel/ArcTunnelWatchdog.kt` (PROTOCOL.md §3: 90 s without ANY control frame → drop the CONNECTION; the clock is injectable for tests):
+[x] **Action 4.7.4** — create `arctunnel/ArcTunnelWatchdog.kt` (PROTOCOL.md §3: 90 s without ANY control frame → drop the CONNECTION; the clock is injectable for tests):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2372,7 +2372,7 @@ object ArcTunnelWatchdog {
 }
 ```
 
-[ ] **Action 4.7.5** — create `arctunnel/ArcTunnelControlEvents.kt`:
+[x] **Action 4.7.5** — create `arctunnel/ArcTunnelControlEvents.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2390,7 +2390,7 @@ interface ArcTunnelControlEvents {
 }
 ```
 
-[ ] **Action 4.7.6** — create `arctunnel/ArcTunnelOpenHandler.kt` (one OPEN: dial back FIRST, then connect locally, then splice — D9):
+[x] **Action 4.7.6** — create `arctunnel/ArcTunnelOpenHandler.kt` (one OPEN: dial back FIRST, then connect locally, then splice — D9):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2497,7 +2497,7 @@ class ArcTunnelOpenHandler(
 }
 ```
 
-[ ] **Action 4.7.7** — create `arctunnel/ArcTunnelControl.kt`:
+[x] **Action 4.7.7** — create `arctunnel/ArcTunnelControl.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2732,11 +2732,11 @@ class ArcTunnelControl(
 Context: `dispatch` runs on the IO thread that reads the stream; OPEN and renewal children are launched on the `run()` supervisor scope and end when `sessions.closeAll()` closes their sockets at stream end (an in-flight dial-back socket is registered by `ArcTunnelDialBack.open`). The `client` passed in is `ArcTunnelNet.controlClient(identity)`. The scope running `run()` MUST carry a `CoroutineExceptionHandler` (the provider's does) for the supervised children.
 
 Definition of Done:
-- [ ] The seven files as written.
+- [x] The seven files as written.
 
-### [ ] Task 4.8 — Shared test infrastructure
+### [x] Task 4.8 — Shared test infrastructure
 
-[ ] **Action 4.8.1** — create `TA/FakeArcTunnelKeyStore.kt` (JVM keys; the "attestation chain" is a self-signed cert of the key, which is all the client code needs):
+[x] **Action 4.8.1** — create `TA/FakeArcTunnelKeyStore.kt` (JVM keys; the "attestation chain" is a self-signed cert of the key, which is all the client code needs):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2793,7 +2793,7 @@ class FakeArcTunnelKeyStore : ArcTunnelKeyStore {
 }
 ```
 
-[ ] **Action 4.8.2** — create `TA/ArcTunnelTestServer.kt` (a TLS `MockWebServer` whose certificate covers the enroll host, the control host and every tunnel name; `answer` drives one raw HTTP/2 stream per request; `hold` keeps a stream open until the client leaves):
+[x] **Action 4.8.2** — create `TA/ArcTunnelTestServer.kt` (a TLS `MockWebServer` whose certificate covers the enroll host, the control host and every tunnel name; `answer` drives one raw HTTP/2 stream per request; `hold` keeps a stream open until the client leaves):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -2888,7 +2888,7 @@ object ArcTunnelTestServer {
 }
 ```
 
-[ ] **Action 4.8.3** — create `TA/ArcTunnelTestPeers.kt` (recording events + loopback peers for the dial-back and the local listener; the peers use plain threads on purpose — they stand in for external processes in JUnit, not for app code):
+[x] **Action 4.8.3** — create `TA/ArcTunnelTestPeers.kt` (recording events + loopback peers for the dial-back and the local listener; the peers use plain threads on purpose — they stand in for external processes in JUnit, not for app code):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3007,7 +3007,7 @@ class ArcTunnelTestPeers : AutoCloseable {
 }
 ```
 
-[ ] **Action 4.8.4** — create `TA/ArcTunnelTestIdentity.kt` (an identity with JVM keys and `HeldCertificate` chains for the enroller/store/provider tests):
+[x] **Action 4.8.4** — create `TA/ArcTunnelTestIdentity.kt` (an identity with JVM keys and `HeldCertificate` chains for the enroller/store/provider tests):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3059,7 +3059,7 @@ object ArcTunnelTestIdentity {
 }
 ```
 
-[ ] **Action 4.8.5** — create `TA/ZeroRandom.kt`:
+[x] **Action 4.8.5** — create `TA/ZeroRandom.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3073,9 +3073,9 @@ object ZeroRandom : Random() {
 ```
 
 Definition of Done:
-- [ ] The five test helpers as written.
+- [x] The five test helpers as written.
 
-### [ ] Task 4.9 — Tests
+### [x] Task 4.9 — Tests
 
 **File**: `TA/ArcTunnelWireTest.kt`
 
@@ -3268,7 +3268,7 @@ Definition of Done:
 | `cancelling the scope cancels the in-flight call` | server holds the stream; `job.cancelAndJoin()` (no `stop()`) completes within 2 s |
 
 Definition of Done:
-- [ ] One test per row in every table.
+- [x] One test per row in every table.
 
 ---
 
@@ -3281,9 +3281,9 @@ Acceptance criteria:
 - [ ] Requests run inside `ArcTunnelEnrollService`, a short-lived foreground service, so the process is never frozen half-way; a refused foreground start (app in the background on Android 12+) is reported as `Failed`.
 - [ ] `execute` is idempotent: an identity with a valid certificate is left alone (same name, no network), a certificate-less or expired one only issues (same name, D4), nothing saved enrolls; only `rotate` changes the name. `readyIdentity` waits for an in-flight request. A renewal after a `forget` saves nothing. `savedUrl` is null until a certificate is saved.
 
-### [ ] Task 5.1 — Strings and notification channel
+### [x] Task 5.1 — Strings and notification channel
 
-[ ] **Action 5.1.1** — modify `app/src/main/res/values/strings.xml`:
+[x] **Action 5.1.1** — modify `app/src/main/res/values/strings.xml`:
 
 ```xml
     <!-- settings_tunnel_subtitle: replace the value -->
@@ -3330,7 +3330,7 @@ Acceptance criteria:
     <string name="notification_arc_tunnel_enroll_body">Getting a name and a certificate for this device…</string>
 ```
 
-[ ] **Action 5.1.2** — modify `A/McpApplication.kt`:
+[x] **Action 5.1.2** — modify `A/McpApplication.kt`:
 
 ```kotlin
 // createNotificationChannels(): after updateChannel
@@ -3350,11 +3350,11 @@ Acceptance criteria:
 ```
 
 Definition of Done:
-- [ ] Strings and the notification channel as written.
+- [x] Strings and the notification channel as written.
 
-### [ ] Task 5.2 — Interface
+### [x] Task 5.2 — Interface
 
-[ ] **Action 5.2.1** — create `arctunnel/ArcTunnelEnrollment.kt`:
+[x] **Action 5.2.1** — create `arctunnel/ArcTunnelEnrollment.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3431,11 +3431,11 @@ interface ArcTunnelEnrollment {
 ```
 
 Definition of Done:
-- [ ] Interface as written.
+- [x] Interface as written.
 
-### [ ] Task 5.3 — Implementation, foreground service and binding
+### [x] Task 5.3 — Implementation, foreground service and binding
 
-[ ] **Action 5.3.1** — create `arctunnel/ArcTunnelEnrollmentFlow.kt` (the workflows of the service; the caller holds the service mutex):
+[x] **Action 5.3.1** — create `arctunnel/ArcTunnelEnrollmentFlow.kt` (the workflows of the service; the caller holds the service mutex):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3527,7 +3527,7 @@ internal class ArcTunnelEnrollmentFlow(
 }
 ```
 
-[ ] **Action 5.3.2** — create `arctunnel/ArcTunnelStartTracker.kt`:
+[x] **Action 5.3.2** — create `arctunnel/ArcTunnelStartTracker.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3554,7 +3554,7 @@ internal class ArcTunnelStartTracker {
 }
 ```
 
-[ ] **Action 5.3.3** — create `arctunnel/ArcTunnelEnrollService.kt` (`NOTIFICATION_ID = 1005`; 1001–1004 are taken):
+[x] **Action 5.3.3** — create `arctunnel/ArcTunnelEnrollService.kt` (`NOTIFICATION_ID = 1005`; 1001–1004 are taken):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3694,7 +3694,7 @@ class ArcTunnelEnrollService : Service() {
 
 Context: the trusted CA PEM travels as an intent extra (a few KB at most).
 
-[ ] **Action 5.3.4** — modify `app/src/main/AndroidManifest.xml`:
+[x] **Action 5.3.4** — modify `app/src/main/AndroidManifest.xml`:
 
 ```xml
 <!-- after the FOREGROUND_SERVICE_SPECIAL_USE permission -->
@@ -3708,7 +3708,7 @@ Context: the trusted CA PEM travels as an intent extra (a few KB at most).
             android:foregroundServiceType="dataSync" />
 ```
 
-[ ] **Action 5.3.5** — create `arctunnel/ArcTunnelEnrollmentImpl.kt`:
+[x] **Action 5.3.5** — create `arctunnel/ArcTunnelEnrollmentImpl.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3851,7 +3851,7 @@ class ArcTunnelEnrollmentImpl
 
 Context: `ArcTunnelEnrollmentImpl` has 10 functions. `renew`, `execute` and `readyIdentity` share the mutex: a rotation can only start once a renewal ends, the `holds` check makes a late save a no-op, and a provider start waits for an in-flight enrollment instead of failing with "not enrolled". `execute` ignores a second request while one runs (the UI disables the buttons meanwhile). The service cannot reach `McpServerService` here; the callers (UI buttons disabled while running; the ADB handler, the trampoline and the E2E receiver through `isServerActive`) refuse requests while the server runs.
 
-[ ] **Action 5.3.6** — modify `A/di/AppModule.kt`: in `ServiceModule` add
+[x] **Action 5.3.6** — modify `A/di/AppModule.kt`: in `ServiceModule` add
 
 ```kotlin
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
@@ -3864,9 +3864,9 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 ```
 
 Definition of Done:
-- [ ] Flow, implementation, foreground service, manifest entries and Hilt binding as written.
+- [x] Flow, implementation, foreground service, manifest entries and Hilt binding as written.
 
-### [ ] Task 5.4 — Tests
+### [x] Task 5.4 — Tests
 
 **File**: `TA/ArcTunnelEnrollmentImplTest.kt` (`@TempDir` as `filesDir` through a MockK `Context` that also records `startForegroundService(intent)` calls; `FakeArcTunnelKeyStore`; the TLS `ArcTunnelTestServer` with a `Dispatcher` for `/api/v1/enroll/nonce`, `/api/v1/enroll`, `/api/v1/issue` (JSON bodies built from `HeldCertificate` chains); the env `ArcTunnelEnv("example.test", "127.0.0.1:<port>", ArcTunnelTestServer.certPem)`; `RecordingServerLogRepository`; `runBlocking`; requests are exercised through `execute(env, rotate)` directly)
 
@@ -3912,7 +3912,7 @@ Definition of Done:
 2. `adb shell am start -n <app-id>/…AdbServiceTrampolineActivity --es action enroll-tunnel` on a phone whose app is not open: the same notification shows and the URL is set (verified with the Server tab afterwards).
 
 Definition of Done:
-- [ ] One test per row; the Manual QA Steps recorded in the PR description.
+- [x] One test per row; the Manual QA Steps recorded in the PR description.
 
 ---
 
@@ -3924,9 +3924,9 @@ Acceptance criteria:
 - [ ] On 1 % of requests, at most every 30 minutes, never concurrently, the monitor queries Cert Spotter for `<name>.d.<base>` (wildcards included) after the saved cursor and compares `pubkey_sha256` with the TLS public key.
 - [ ] An unknown key raises a notification and a dismissible alert state; a flagged key is never re-alerted; the cursor and the last check time are persisted; an undismissed alert is restorable (`restore` sets the state without a notification).
 
-### [ ] Task 6.1 — Alerts
+### [x] Task 6.1 — Alerts
 
-[ ] **Action 6.1.1** — create `arctunnel/ArcTunnelCtNotifier.kt` (`NOTIFICATION_ID = 1004`; 1001–1003 are taken by the service, OAuth and update notifiers, 1005 by the enrollment service):
+[x] **Action 6.1.1** — create `arctunnel/ArcTunnelCtNotifier.kt` (`NOTIFICATION_ID = 1004`; 1001–1003 are taken by the service, OAuth and update notifiers, 1005 by the enrollment service):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -3982,7 +3982,7 @@ object ArcTunnelCtNotifier {
 }
 ```
 
-[ ] **Action 6.1.2** — create `arctunnel/ArcTunnelCtAlerts.kt` (`ArcTunnelCtAlert` is the data class of US5):
+[x] **Action 6.1.2** — create `arctunnel/ArcTunnelCtAlerts.kt` (`ArcTunnelCtAlert` is the data class of US5):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -4032,7 +4032,7 @@ class ArcTunnelCtAlertsImpl
     }
 ```
 
-[ ] **Action 6.1.3** — modify `A/di/AppModule.kt`: in `ServiceModule` add
+[x] **Action 6.1.3** — modify `A/di/AppModule.kt`: in `ServiceModule` add
 
 ```kotlin
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelCtAlerts
@@ -4045,11 +4045,11 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 ```
 
 Definition of Done:
-- [ ] Notifier, alerts interface + implementation and binding as written.
+- [x] Notifier, alerts interface + implementation and binding as written.
 
-### [ ] Task 6.2 — Monitor
+### [x] Task 6.2 — Monitor
 
-[ ] **Action 6.2.1** — create `arctunnel/ArcTunnelCtMonitor.kt`:
+[x] **Action 6.2.1** — create `arctunnel/ArcTunnelCtMonitor.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -4219,9 +4219,9 @@ class ArcTunnelCtMonitor(
 ```
 
 Definition of Done:
-- [ ] Monitor as written.
+- [x] Monitor as written.
 
-### [ ] Task 6.3 — Tests
+### [x] Task 6.3 — Tests
 
 **File**: `TA/ArcTunnelCtTriggerTest.kt`
 
@@ -4267,7 +4267,7 @@ Definition of Done:
 | `onRequest does nothing when disabled` | |
 
 Definition of Done:
-- [ ] One test per row.
+- [x] One test per row.
 
 ---
 
@@ -4280,9 +4280,9 @@ Acceptance criteria:
 - [ ] A control drop reports `Connecting` and keeps reconnecting; a `RENEW_NUDGE` renews, then the listener restarts on the same port per D8; `stop` completes within 2 s even while a renewal, a CT check or a dial-back is blocked.
 - [ ] `TunnelManager.start(localPort, listenerHost)` selects the provider for `ARC_TUNNEL` and keeps refusing Cloudflare/ngrok while HTTPS is on; `--ez arc_tunnel_enroll true` over ADB enrolls.
 
-### [ ] Task 7.1 — Certificate swap policy
+### [x] Task 7.1 — Certificate swap policy
 
-[ ] **Action 7.1.1** — create `arctunnel/ArcTunnelCertSwap.kt`:
+[x] **Action 7.1.1** — create `arctunnel/ArcTunnelCertSwap.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -4330,11 +4330,11 @@ class ArcTunnelCertSwap(
 ```
 
 Definition of Done:
-- [ ] `ArcTunnelCertSwap` as written.
+- [x] `ArcTunnelCertSwap` as written.
 
-### [ ] Task 7.2 — Provider
+### [x] Task 7.2 — Provider
 
-[ ] **Action 7.2.1** — create `arctunnel/ArcTunnelProvider.kt`:
+[x] **Action 7.2.1** — create `arctunnel/ArcTunnelProvider.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
@@ -4625,7 +4625,7 @@ class ArcTunnelProvider
 
 Context: `start` only launches so the manager's mutex and the service's start path return at once; a bootstrap that fails after the listener started stops it again; the session object stays until `stop()` disposes it (the service always stops the tunnel before restarting). The stop budget: control call cancelled, dial-backs closed through the stream's sessions, HTTP calls cancelled with their coroutines, join capped at 1 s, listener stop ≤ 0.6 s — under the service's 3 s. Status transitions are logged by the service's tunnel-status observer. The renewal catch is the D18 boundary; the `CoroutineExceptionHandler` lambda is not a catch.
 
-[ ] **Action 7.2.2** — modify `A/services/tunnel/TunnelProvider.kt` (KDoc of `start` only):
+[x] **Action 7.2.2** — modify `A/services/tunnel/TunnelProvider.kt` (KDoc of `start` only):
 
 ```kotlin
     /**
@@ -4646,11 +4646,11 @@ Context: `start` only launches so the manager's mutex and the service's start pa
 ```
 
 Definition of Done:
-- [ ] Provider and the `TunnelProvider` KDoc as written.
+- [x] Provider and the `TunnelProvider` KDoc as written.
 
-### [ ] Task 7.3 — Manager, service and ADB wiring
+### [x] Task 7.3 — Manager, service and ADB wiring
 
-[ ] **Action 7.3.1** — create `A/services/tunnel/TunnelHttpsGuard.kt` (shared by the manager and the service; lives in `services/tunnel` so no package cycle):
+[x] **Action 7.3.1** — create `A/services/tunnel/TunnelHttpsGuard.kt` (shared by the manager and the service; lives in `services/tunnel` so no package cycle):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.services.tunnel
@@ -4663,7 +4663,7 @@ internal fun tunnelAllowedWithHttps(config: ServerConfig): Boolean =
     !config.httpsEnabled || config.tunnelProvider == TunnelProviderType.ARC_TUNNEL
 ```
 
-[ ] **Action 7.3.2** — modify `A/services/tunnel/TunnelManager.kt`:
+[x] **Action 7.3.2** — modify `A/services/tunnel/TunnelManager.kt`:
 
 ```kotlin
 // imports (add)
@@ -4695,7 +4695,7 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
                 // … the rest of start() is unchanged …
 ```
 
-[ ] **Action 7.3.3** — modify `A/services/mcp/McpServerService.kt` (tunnel start block in `startServer`, plus one top-level function next to `serverStatusLogMessage`; add `import com.danielealbano.androidremotecontrolmcp.services.tunnel.tunnelAllowedWithHttps`):
+[x] **Action 7.3.3** — modify `A/services/mcp/McpServerService.kt` (tunnel start block in `startServer`, plus one top-level function next to `serverStatusLogMessage`; add `import com.danielealbano.androidremotecontrolmcp.services.tunnel.tunnelAllowedWithHttps`):
 
 ```kotlin
             // Start tunnel if remote access is enabled. Cloudflare/ngrok target an http://localhost origin,
@@ -4721,7 +4721,7 @@ internal fun isServerActive(status: ServerStatus): Boolean =
     }
 ```
 
-[ ] **Action 7.3.4** — modify `A/services/mcp/AdbConfigHandler.kt` and `A/services/mcp/AdbConfigReceiver.kt` (D20):
+[x] **Action 7.3.4** — modify `A/services/mcp/AdbConfigHandler.kt` and `A/services/mcp/AdbConfigReceiver.kt` (D20):
 
 ```kotlin
 // AdbConfigHandler: imports (add)
@@ -4771,7 +4771,7 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 
 Context: on Android 12+ a receiver cannot start a foreground service from the background, so `--ez arc_tunnel_enroll true` works when the app is visible (or on a device that allows it) and otherwise ends in `Failed(START_REFUSED)`; the trampoline action below is the headless way (same mechanism the README already prescribes for starting the server).
 
-[ ] **Action 7.3.5** — modify `A/services/mcp/AdbServiceTrampolineActivity.kt` (D20, headless enrollment with the activity's foreground exemption):
+[x] **Action 7.3.5** — modify `A/services/mcp/AdbServiceTrampolineActivity.kt` (D20, headless enrollment with the activity's foreground exemption):
 
 ```kotlin
 // imports (add)
@@ -4832,9 +4832,9 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 ```
 
 Definition of Done:
-- [ ] Manager, service guard functions, ADB handler/receiver and trampoline as written.
+- [x] Manager, service guard functions, ADB handler/receiver and trampoline as written.
 
-### [ ] Task 7.4 — Tests
+### [x] Task 7.4 — Tests
 
 **File**: `TA/ArcTunnelCertSwapTest.kt`
 
@@ -4901,7 +4901,7 @@ Definition of Done:
 | `handle unknown action does nothing` | |
 
 Definition of Done:
-- [ ] One test per row (new and modified test files).
+- [x] One test per row (new and modified test files).
 
 ---
 
@@ -4914,9 +4914,9 @@ Acceptance criteria:
 - [ ] Turning Remote Access on with this provider (toggle or home button) opens the enrollment dialog exactly once; Cancel/outside tap turns Remote Access off; Continue enrolls; an enabled-but-not-enrolled state shows "Set up tunnel"; a failure shows the reason with Retry (issuance resumes, D4); the dialog never reappears for an enrolled user or while typing a base address.
 - [ ] The home card offers "Enable free E2E tunnel" / "Enable Wi-Fi access" / "Other tunnels"; a CT alert shows a dismissible banner with "Change name"; a persisted undismissed alert is shown again after a process restart.
 
-### [ ] Task 8.1 — ViewModel
+### [x] Task 8.1 — ViewModel
 
-[ ] **Action 8.1.1** — create `A/ui/viewmodels/ArcTunnelViewModel.kt`:
+[x] **Action 8.1.1** — create `A/ui/viewmodels/ArcTunnelViewModel.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.ui.viewmodels
@@ -5104,11 +5104,11 @@ class ArcTunnelViewModel
 Context: `ArcTunnelEnv` is a data class whose `hosts` is derived from `baseAddress`, so `env.copy(baseAddress = typed)` carries the typed base with the current debug overrides. `savedUrl` is null until a certificate is saved (US5), so a failed issuance shows "Set up tunnel"/Retry, never a URL.
 
 Definition of Done:
-- [ ] ViewModel as written.
+- [x] ViewModel as written.
 
-### [ ] Task 8.2 — Settings section and screen
+### [x] Task 8.2 — Settings section and screen
 
-[ ] **Action 8.2.1** — create `A/ui/screens/settings/ArcTunnelSettingsSection.kt`:
+[x] **Action 8.2.1** — create `A/ui/screens/settings/ArcTunnelSettingsSection.kt`:
 
 ```kotlin
 @file:Suppress("FunctionNaming", "LongMethod")
@@ -5402,7 +5402,7 @@ private fun ConfirmDialog(
 }
 ```
 
-[ ] **Action 8.2.2** — modify `A/ui/screens/settings/TunnelSettingsScreen.kt`:
+[x] **Action 8.2.2** — modify `A/ui/screens/settings/TunnelSettingsScreen.kt`:
 
 ```kotlin
 // imports (add)
@@ -5505,11 +5505,11 @@ private fun providerDescription(provider: TunnelProviderType): String =
 Context: the Cloudflare and ngrok rows keep their side-by-side layout (D2); only the new row wraps its long description.
 
 Definition of Done:
-- [ ] Settings section file and `TunnelSettingsScreen` changes as written; `sectionEnabled` is gone.
+- [x] Settings section file and `TunnelSettingsScreen` changes as written; `sectionEnabled` is gone.
 
-### [ ] Task 8.3 — Home card and CT banner
+### [x] Task 8.3 — Home card and CT banner
 
-[ ] **Action 8.3.1** — modify `A/ui/components/CalloutCard.kt` (an optional body paragraph under the title; the actions row stays right-aligned for buttons):
+[x] **Action 8.3.1** — modify `A/ui/components/CalloutCard.kt` (an optional body paragraph under the title; the actions row stays right-aligned for buttons):
 
 ```kotlin
 // KDoc: replace with
@@ -5532,7 +5532,7 @@ Definition of Done:
             }
 ```
 
-[ ] **Action 8.3.2** — modify `A/ui/screens/ServerScreen.kt`:
+[x] **Action 8.3.2** — modify `A/ui/screens/ServerScreen.kt`:
 
 ```kotlin
 // imports (add; `ServerStatus` only if not imported yet)
@@ -5625,11 +5625,11 @@ and remove `server_network_access_suggestion_tunnel` from `strings.xml` in the s
 Context: "Other tunnels" no longer turns Remote Access on (it previously did), so it never triggers the free-tunnel dialog. The home card is shown for `bindingAddress == LOCALHOST && !tunnelEnabled` only, so its button is never offered while a tunnel runs; the dialog itself additionally requires `enabled` (server stopped).
 
 Definition of Done:
-- [ ] `CalloutCard` body slot and `ServerScreen` changes as written; `server_network_access_suggestion_tunnel` removed from `strings.xml`.
+- [x] `CalloutCard` body slot and `ServerScreen` changes as written; `server_network_access_suggestion_tunnel` removed from `strings.xml`.
 
-### [ ] Task 8.4 — ViewModel threading through the screens (leaf screens first)
+### [x] Task 8.4 — ViewModel threading through the screens (leaf screens first)
 
-[ ] **Action 8.4.1** — modify `A/ui/screens/ServerTabScreen.kt`:
+[x] **Action 8.4.1** — modify `A/ui/screens/ServerTabScreen.kt`:
 
 ```kotlin
 // imports (add)
@@ -5642,7 +5642,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewMode
                 arcTunnelViewModel = arcTunnelViewModel,
 ```
 
-[ ] **Action 8.4.2** — modify `A/ui/screens/SettingsScreen.kt`:
+[x] **Action 8.4.2** — modify `A/ui/screens/SettingsScreen.kt`:
 
 ```kotlin
 // imports (add)
@@ -5661,7 +5661,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewMode
         }
 ```
 
-[ ] **Action 8.4.3** — modify `A/ui/screens/MainScreen.kt`:
+[x] **Action 8.4.3** — modify `A/ui/screens/MainScreen.kt`:
 
 ```kotlin
 // imports (add)
@@ -5679,9 +5679,9 @@ import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewMode
 Context: `MainScreen` is the root composable of `MainActivity`, so `hiltViewModel()` there is activity-scoped (exactly how `viewModel: MainViewModel` is shared today); the nested NavHosts receive the same instance explicitly instead of creating their own.
 
 Definition of Done:
-- [ ] The three screens pass one activity-scoped `ArcTunnelViewModel`; the provider list order is ARC_TUNNEL, CLOUDFLARE, NGROK.
+- [x] The three screens pass one activity-scoped `ArcTunnelViewModel`; the provider list order is ARC_TUNNEL, CLOUDFLARE, NGROK.
 
-### [ ] Task 8.5 — Tests
+### [x] Task 8.5 — Tests
 
 **File**: `T/ui/viewmodels/ArcTunnelViewModelTest.kt` (MockK repository with a `MutableStateFlow<ServerConfig>` as `serverConfig`; MockK `ArcTunnelEnrollment` with a `MutableStateFlow` state; MockK `ArcTunnelCtAlerts` with a `MutableStateFlow` alert; `StandardTestDispatcher` + `runTest`)
 
@@ -5733,7 +5733,7 @@ Definition of Done:
 8. Refresh icon → confirmation dialog; Cancel/outside tap keeps the name; Continue produces a new URL and new keys (the old URL stops answering).
 
 Definition of Done:
-- [ ] One test per row; the Manual QA Steps recorded in the PR description.
+- [x] One test per row; the Manual QA Steps recorded in the PR description.
 
 ---
 
@@ -5746,9 +5746,9 @@ Acceptance criteria:
 - [ ] `E2E_STOP_SERVER`, `E2E_ARC_TUNNEL_ENROLL` and `E2E_ARC_TUNNEL_QUERY` exist; the query returns Base64 JSON of `E2EArcTunnelStatus` as the broadcast result data.
 - [ ] `E2EConfigReceiver` keeps ≤ 11 functions.
 
-### [ ] Task 9.1 — Status DTO, labels and receiver
+### [x] Task 9.1 — Status DTO, labels and receiver
 
-[ ] **Action 9.1.1** — create `app/src/debug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EArcTunnelStatus.kt`:
+[x] **Action 9.1.1** — create `app/src/debug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EArcTunnelStatus.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.debug
@@ -5777,7 +5777,7 @@ data class E2EArcTunnelStatus(
 )
 ```
 
-[ ] **Action 9.1.2** — create `app/src/debug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EArcTunnelLabels.kt`:
+[x] **Action 9.1.2** — create `app/src/debug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EArcTunnelLabels.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.debug
@@ -5811,7 +5811,7 @@ internal fun serverLabel(status: ServerStatus): String =
     }
 ```
 
-[ ] **Action 9.1.3** — modify `app/src/debug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EConfigReceiver.kt`:
+[x] **Action 9.1.3** — modify `app/src/debug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EConfigReceiver.kt`:
 
 ```kotlin
 // imports (add)
@@ -5981,9 +5981,9 @@ import kotlinx.serialization.json.Json
 Context: the receiver is debug-only and DUMP-gated (see its KDoc); no manifest change (every broadcast names the component). The enroll request starts `ArcTunnelEnrollService`; the e2e brings the app to the foreground (`am start` of the main activity) right before the broadcast, so the foreground start is allowed.
 
 Definition of Done:
-- [ ] DTO, labels and receiver as written; the receiver keeps ≤ 11 functions.
+- [x] DTO, labels and receiver as written; the receiver keeps ≤ 11 functions.
 
-### [ ] Task 9.2 — Tests
+### [x] Task 9.2 — Tests
 
 **File**: `app/src/testDebug/kotlin/com/danielealbano/androidremotecontrolmcp/debug/E2EConfigReceiverTest.kt` (modify). The existing tests keep passing unchanged: the relaxed `Intent` mock returns `""` for every string extra and the receiver treats empty strings as absent. **Setup additions**: `receiver.tunnelManager = mockk { every { tunnelStatus } returns MutableStateFlow(TunnelStatus.Disconnected) }`; `receiver.arcTunnelEnrollment = mockk(relaxed = true)`; `mockkStatic(android.util.Base64::class)` (the mockable jar returns null); `mockkObject(McpServerService.Companion)` with `every { McpServerService.serverStatus } returns MutableStateFlow(<status>)`; the query test uses `spyk(receiver)` with `every { goAsync() } returns mockk<BroadcastReceiver.PendingResult>(relaxed = true)`.
 
@@ -6002,7 +6002,7 @@ Definition of Done:
 | `query answers Base64 JSON in the result data` | `Base64.encodeToString` stubbed to a marker → `setResultData(marker)` then `finish()`; the JSON passed to the encoder contains `"tunnel_provider":"android-remote-control-mcp-tunneld"` and `"bearer_token_enabled"` |
 
 Definition of Done:
-- [ ] One test per row; the existing rows of the file still pass unchanged.
+- [x] One test per row; the existing rows of the file still pass unchanged.
 
 ---
 
@@ -6015,9 +6015,9 @@ Acceptance criteria:
 - [ ] `E2EArcTunnelDeviceTest` is skipped (`Assumptions`) when no phone is attached — a phone is an `adb devices` entry in state `device` that is neither `emulator-*` nor a redroid container (`getprop ro.boot.redroid_width` empty); USB and `adb connect` phones both count — and otherwise enrolls against production with a per-run random bearer token, observes `Connected` and lists tools at `https://<name>.d.<base>/mcp` with system trust.
 - [ ] The CI e2e job needs no change (the stack images are pulled by Testcontainers; the server image is `always pull`).
 
-### [ ] Task 10.1 — Shared helpers
+### [x] Task 10.1 — Shared helpers
 
-[ ] **Action 10.1.1** — modify `E/McpClient.kt` (injectable HTTP client, so the tunnel tests supply an OkHttp-backed one):
+[x] **Action 10.1.1** — modify `E/McpClient.kt` (injectable HTTP client, so the tunnel tests supply an OkHttp-backed one):
 
 ```kotlin
 // imports (add)
@@ -6068,7 +6068,7 @@ class McpClient(
 ```
 The `connect`, `listTools`, `callTool`, `close` functions and `TrustAllX509TrustManager` are unchanged.
 
-[ ] **Action 10.1.2** — create `E/E2EArcTunnelStatus.kt`:
+[x] **Action 10.1.2** — create `E/E2EArcTunnelStatus.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -6120,7 +6120,7 @@ data class ArcTunnelE2ESettings(
 }
 ```
 
-[ ] **Action 10.1.3** — modify `E/AndroidContainerSetup.kt`:
+[x] **Action 10.1.3** — modify `E/AndroidContainerSetup.kt`:
 
 ```kotlin
 // imports (add)
@@ -6280,7 +6280,7 @@ import java.util.Base64
     internal fun runProcess(
 ```
 
-[ ] **Action 10.1.4** — modify `E/FixtureHttpServer.kt`: replace the body of `containerReachableBaseUrl()` with
+[x] **Action 10.1.4** — modify `E/FixtureHttpServer.kt`: replace the body of `containerReachableBaseUrl()` with
 
 ```kotlin
     fun containerReachableBaseUrl(): String = "http://${AndroidContainerSetup.containerGatewayIp()}:$FIXTURE_HTTP_PORT"
@@ -6288,11 +6288,11 @@ import java.util.Base64
 keeping its KDoc.
 
 Definition of Done:
-- [ ] `McpClient`, the status DTO/settings, the `AndroidContainerSetup` additions and `FixtureHttpServer` as written.
+- [x] `McpClient`, the status DTO/settings, the `AndroidContainerSetup` additions and `FixtureHttpServer` as written.
 
-### [ ] Task 10.2 — The tunnel stack
+### [x] Task 10.2 — The tunnel stack
 
-[ ] **Action 10.2.1** — create `E/ArcTunnelTestCa.kt` (the server's INTERNAL CA for identity certs, like `writeCA` in the server e2e):
+[x] **Action 10.2.1** — create `E/ArcTunnelTestCa.kt` (the server's INTERNAL CA for identity certs, like `writeCA` in the server e2e):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -6353,7 +6353,7 @@ object ArcTunnelTestCa {
 }
 ```
 
-[ ] **Action 10.2.2** — create `E/ArcTunnelS3.kt` (bucket creation with a hand-rolled SigV4 `PUT`, the server e2e's `EnsureS3Bucket` without the AWS SDK):
+[x] **Action 10.2.2** — create `E/ArcTunnelS3.kt` (bucket creation with a hand-rolled SigV4 `PUT`, the server e2e's `EnsureS3Bucket` without the AWS SDK):
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -6445,7 +6445,7 @@ object ArcTunnelS3 {
 }
 ```
 
-[ ] **Action 10.2.3** — create `E/ArcTunnelHostRelay.kt`:
+[x] **Action 10.2.3** — create `E/ArcTunnelHostRelay.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -6531,7 +6531,7 @@ class ArcTunnelHostRelay(
 }
 ```
 
-[ ] **Action 10.2.4** — create `E/ArcTunnelStack.kt`:
+[x] **Action 10.2.4** — create `E/ArcTunnelStack.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -6907,7 +6907,7 @@ class ArcTunnelStack(
 
 Context: the server e2e registers Pebble as all three CAs (LE + a GTS account it registers over ACME + ZeroSSL without EAB, which the server then skips); here only LE points at Pebble (no `--acme-gts-account` = no GTS, no ZeroSSL EAB = no ZeroSSL), one issuing chain is enough. `LEGO_CA_CERTIFICATES` makes the server's ACME client trust Pebble's management/ACME TLS (minica), as the server e2e does. The dial-back `addr` the server advertises is `<gateway>:18443` = the relay; everything from the phone (enroll, control, dial-back) and from the JVM (public side) goes through the relay to the mapped edge port.
 
-[ ] **Action 10.2.5** — create `E/ArcTunnelPublicClient.kt`:
+[x] **Action 10.2.5** — create `E/ArcTunnelPublicClient.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -6967,11 +6967,11 @@ object ArcTunnelPublicClient {
 ```
 
 Definition of Done:
-- [ ] Test CA, S3 helper, relay, stack and public client as written.
+- [x] Test CA, S3 helper, relay, stack and public client as written.
 
-### [ ] Task 10.3 — The tests
+### [x] Task 10.3 — The tests
 
-[ ] **Action 10.3.1** — create `E/E2EArcTunnelTest.kt`:
+[x] **Action 10.3.1** — create `E/E2EArcTunnelTest.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -7087,7 +7087,7 @@ class E2EArcTunnelTest {
 
 Context: `stopMcpServer` before reconfiguring because the provider is chosen at service start (the service ignores `ACTION_START` while active). The accessibility service survives the stop/start (no force-stop here).
 
-[ ] **Action 10.3.2** — create `E/DeviceAdb.kt`:
+[x] **Action 10.3.2** — create `E/DeviceAdb.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -7127,7 +7127,7 @@ object DeviceAdb {
 }
 ```
 
-[ ] **Action 10.3.3** — create `E/E2EArcTunnelDeviceTest.kt`:
+[x] **Action 10.3.3** — create `E/E2EArcTunnelDeviceTest.kt`:
 
 ```kotlin
 package com.danielealbano.androidremotecontrolmcp.e2e
@@ -7241,7 +7241,7 @@ class E2EArcTunnelDeviceTest {
 Context: the device has no port-forwarded base URL, so stops go through `stopMcpServerOn` (status query). On an already-enrolled phone `enrolled && Idle` holds at once and the enroll request is a no-op (US5), so no name is burnt per run. The `assembleGmsDebug` APK is already a dependency of the e2e task.
 
 Definition of Done:
-- [ ] Both tests and `DeviceAdb` as written.
+- [x] Both tests and `DeviceAdb` as written.
 
 ---
 
@@ -7252,9 +7252,9 @@ Why: `docs/PROJECT.md`, `docs/ARCHITECTURE.md` and `README.md` describe the tunn
 Acceptance criteria:
 - [ ] The four documents (`docs/PROJECT.md`, `docs/ARCHITECTURE.md`, `README.md`, `docs/PERMISSIONS.md`) describe the free E2E tunnel (provider, defaults, migration, ADB keys incl. `arc_tunnel_enroll`, the enrollment foreground service and its permission, e2e stack); the architecture diagram renders with `mmdc`.
 
-### [ ] Task 11.1 — PROJECT.md
+### [x] Task 11.1 — PROJECT.md
 
-[ ] **Action 11.1.1** — modify `docs/PROJECT.md`:
+[x] **Action 11.1.1** — modify `docs/PROJECT.md`:
 
 ```markdown
 <!-- Tech Stack: add after the Kotlinx Coroutines bullet -->
@@ -7301,11 +7301,11 @@ Acceptance criteria:
 ```
 
 Definition of Done:
-- [ ] Edits applied as written.
+- [x] Edits applied as written.
 
-### [ ] Task 11.2 — ARCHITECTURE.md
+### [x] Task 11.2 — ARCHITECTURE.md
 
-[ ] **Action 11.2.1** — modify `docs/ARCHITECTURE.md`:
+[x] **Action 11.2.1** — modify `docs/ARCHITECTURE.md`:
 
 ```markdown
 <!-- diagram: replace the Tunnel subgraph -->
@@ -7338,11 +7338,11 @@ Definition of Done:
 Validate: extract the diagram to a file in the session scratchpad directory and run `mmdc -i <file>.mmd -o <file>.svg` (load nvm first if `mmdc` is missing: `. "$NVM_DIR/nvm.sh"`); fix until it renders.
 
 Definition of Done:
-- [ ] Edits applied as written; `mmdc` renders the diagram.
+- [x] Edits applied as written; `mmdc` renders the diagram.
 
-### [ ] Task 11.3 — README.md
+### [x] Task 11.3 — README.md
 
-[ ] **Action 11.3.1** — modify `README.md`:
+[x] **Action 11.3.1** — modify `README.md`:
 
 ~~~markdown
 <!-- Features bullets: replace -->
@@ -7392,10 +7392,10 @@ adb shell am start \
 | `arc_tunnel_enroll` | boolean | `true` enrolls the free E2E tunnel (or resumes a failed certificate issuance) with the settings in the same broadcast, while the app is visible and the server is stopped; headless, use the trampoline action `enroll-tunnel` below. The public URL appears in the Server tab |
 ~~~
 
-[ ] **Action 11.3.2** — modify `docs/PERMISSIONS.md` ("Permission categories", the **Normal** bullet): add `FOREGROUND_SERVICE_DATA_SYNC` after `FOREGROUND_SERVICE_LOCATION`.
+[x] **Action 11.3.2** — modify `docs/PERMISSIONS.md` ("Permission categories", the **Normal** bullet): add `FOREGROUND_SERVICE_DATA_SYNC` after `FOREGROUND_SERVICE_LOCATION`.
 
 Definition of Done:
-- [ ] Edits applied as written.
+- [x] Edits applied as written.
 
 ---
 
