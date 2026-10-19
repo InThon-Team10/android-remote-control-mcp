@@ -45,7 +45,7 @@ class ArcTunnelDialBackTest {
     }
 
     private fun dialBack(
-        timeoutMs: Long = TIMEOUT_MS,
+        timeoutMs: Long = OPEN_TIMEOUT_MS,
         allowLocal: Boolean = true,
     ) = ArcTunnelDialBack(ArcTunnelTestServer.CONTROL_HOST, clientTls, clientTls, allowLocal, timeoutMs)
 
@@ -163,7 +163,8 @@ class ArcTunnelDialBackTest {
                 }
                 val startedAt = System.nanoTime()
 
-                val error = failureOf { dialBack().open(target("127.0.0.1:${full.localPort}"), sessions) }
+                val stalled = target("127.0.0.1:${full.localPort}")
+                val error = failureOf { dialBack(timeoutMs = DEADLINE_MS).open(stalled, sessions) }
 
                 assertTrue(error is SocketTimeoutException, "error $error")
                 assertTrue((System.nanoTime() - startedAt) / NANOS_PER_MS < BUDGET_MS)
@@ -185,7 +186,7 @@ class ArcTunnelDialBackTest {
                 }
             }
 
-            val error = failureOf { dialBack().open(target(), sessions) }
+            val error = failureOf { dialBack(timeoutMs = DEADLINE_MS).open(target(), sessions) }
 
             assertTrue(error is SocketTimeoutException, "error $error")
             assertEquals(0, sessions.size())
@@ -297,7 +298,8 @@ class ArcTunnelDialBackTest {
 
     private companion object {
         const val BACKLOG = 50
-        const val TIMEOUT_MS = 500L
+        const val DEADLINE_MS = 500L
+        const val OPEN_TIMEOUT_MS = 10_000L
         const val BUDGET_MS = 2_000L
         const val NANOS_PER_MS = 1_000_000L
         const val TRICKLE_MS = 100L
