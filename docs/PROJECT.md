@@ -156,7 +156,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - `e2e-tests/` — E2E tests (redroid/Podman, JVM-only module)
 - `gradle/libs.versions.toml` — Gradle version catalog
 - `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`
-- `Makefile`, `CLAUDE.md`, `README.md`, `LICENSE`
+- `Makefile`, `CLAUDE.md`, `README.md`, `LICENSE.md`, `THIRD_PARTY_LICENSES.md`
 - `.github/workflows/ci.yml` — GitHub Actions CI workflow
 
 ---

@@ -1,7 +1,7 @@
 # Android Remote Control MCP
 
 [![CI](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3 or later](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](LICENSE.md)
 
 An Android application that runs as an **MCP (Model Context Protocol) server**, enabling AI models to **fully control an Android device** remotely using accessibility services and screenshot capture.
 
@@ -580,4 +580,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for build requirements, testing, architec
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
+This project is licensed under the GNU General Public License, version 3 or (at your option) any later version,
+with an additional permission under GPLv3 section 7 for combining it with the Google Play services client libraries.
+See [LICENSE.md](LICENSE.md) for the full text.
+
+Third-party components bundled with the app and their licenses are listed in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
