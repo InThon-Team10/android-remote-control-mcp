@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.components
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType.ARC_TUNNEL
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType.CLOUDFLARE
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -303,5 +304,25 @@ class ConnectionInfoCardTest {
                 tunnelStatus = TunnelStatus.Error("boom"),
             )
         assertEquals(TunnelRowContent.Failed("boom"), result)
+    }
+
+    @Test
+    fun `tunnelRowContent and connection string carry the free E2E tunnel endpoint`() {
+        val url = "https://name.d.arc-tunnel.io"
+        val result =
+            tunnelRowContent(
+                tunnelEnabled = true,
+                serverStatus = running,
+                tunnelStatus = TunnelStatus.Connected(listOf(ep(url)), ARC_TUNNEL),
+            )
+        val connectionString =
+            buildConnectionString(
+                serverUrl = "https://127.0.0.1:8080/mcp",
+                tunnelEndpoints = listOf(ep(url)),
+                bearerToken = "",
+            )
+
+        assertEquals(TunnelRowContent.Connected(listOf(ep(url))), result)
+        assertEquals("URL: https://127.0.0.1:8080/mcp\nTunnel: $url/mcp", connectionString)
     }
 }
