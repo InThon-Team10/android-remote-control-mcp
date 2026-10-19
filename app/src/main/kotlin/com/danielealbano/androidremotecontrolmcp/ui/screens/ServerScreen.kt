@@ -48,6 +48,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelCtAlert
 import com.danielealbano.androidremotecontrolmcp.ui.ApprovalActivity
 import com.danielealbano.androidremotecontrolmcp.ui.components.BatteryOptimizationCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.CalloutCard
@@ -55,6 +58,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCar
 import com.danielealbano.androidremotecontrolmcp.ui.components.PrivacyModeCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.LogsViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
@@ -74,6 +78,7 @@ fun ServerScreen(
     viewModel: MainViewModel = hiltViewModel(),
     channelViewModel: ChannelViewModel = hiltViewModel(),
     privacyViewModel: PrivacyViewModel = hiltViewModel(),
+    arcTunnelViewModel: ArcTunnelViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -93,6 +98,7 @@ fun ServerScreen(
 
     val channelConfig by channelViewModel.eventChannelConfig.collectAsStateWithLifecycle()
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
+    val ctAlert by arcTunnelViewModel.ctAlert.collectAsStateWithLifecycle()
 
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) ?: "N/A" }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
@@ -135,14 +141,25 @@ fun ServerScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
+            ArcTunnelCtAlertCard(
+                alert = ctAlert,
+                onChangeName = onNavigateToTunnelSettings,
+                onDismiss = { arcTunnelViewModel.dismissCtAlert() },
+            )
+
             if (serverConfig.bindingAddress == BindingAddress.LOCALHOST && !serverConfig.tunnelEnabled) {
                 NetworkAccessSuggestionCard(
+                    enabled = serverStatus is ServerStatus.Stopped,
+                    onEnableFreeTunnel = {
+                        arcTunnelViewModel.enableFreeTunnel()
+                        onNavigateToTunnelSettings()
+                    },
                     onEnableWifi = {
                         viewModel.updateBindingAddress(BindingAddress.NETWORK)
                         onNavigateToNetworkSettings()
                     },
-                    onSetUpTunnel = {
-                        viewModel.updateTunnelEnabled(true)
+                    onOtherTunnels = {
+                        viewModel.updateTunnelProvider(TunnelProviderType.CLOUDFLARE)
                         onNavigateToTunnelSettings()
                     },
                 )
@@ -234,20 +251,48 @@ private fun NoAuthWarningCard() {
 
 @Composable
 private fun NetworkAccessSuggestionCard(
+    enabled: Boolean,
+    onEnableFreeTunnel: () -> Unit,
     onEnableWifi: () -> Unit,
-    onSetUpTunnel: () -> Unit,
+    onOtherTunnels: () -> Unit,
 ) {
     CalloutCard(
         icon = Icons.Default.Info,
         title = stringResource(R.string.server_network_access_suggestion_title),
     ) {
-        TextButton(onClick = onEnableWifi) {
+        TextButton(onClick = onEnableFreeTunnel, enabled = enabled) {
+            Text(stringResource(R.string.server_network_access_suggestion_arc_tunnel))
+        }
+        TextButton(onClick = onEnableWifi, enabled = enabled) {
             Text(stringResource(R.string.server_network_access_suggestion_wifi))
         }
-        TextButton(onClick = onSetUpTunnel) {
-            Text(stringResource(R.string.server_network_access_suggestion_tunnel))
+        TextButton(onClick = onOtherTunnels, enabled = enabled) {
+            Text(stringResource(R.string.server_network_access_suggestion_other_tunnels))
         }
     }
+}
+
+/** The Certificate Transparency banner; nothing when there is no alert. */
+@Composable
+private fun ArcTunnelCtAlertCard(
+    alert: ArcTunnelCtAlert?,
+    onChangeName: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (alert == null) return
+    CalloutCard(
+        icon = Icons.Default.Warning,
+        title = stringResource(R.string.server_arc_tunnel_ct_alert_title),
+        body = stringResource(R.string.server_arc_tunnel_ct_alert_body, alert.fqdn),
+    ) {
+        TextButton(onClick = onChangeName) {
+            Text(stringResource(R.string.server_arc_tunnel_ct_alert_change_name))
+        }
+        TextButton(onClick = onDismiss) {
+            Text(stringResource(R.string.server_arc_tunnel_ct_alert_dismiss))
+        }
+    }
+    Spacer(Modifier.height(16.dp))
 }
 
 @Composable

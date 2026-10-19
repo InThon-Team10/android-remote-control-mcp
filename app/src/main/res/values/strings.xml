@@ -136,7 +136,6 @@
     <!-- Network Access Suggestion (main screen: localhost-only bind with no tunnel) -->
     <string name="server_network_access_suggestion_title">Reachable from this device only</string>
     <string name="server_network_access_suggestion_wifi">Enable Wi-Fi access</string>
-    <string name="server_network_access_suggestion_tunnel">Set up tunnel</string>
     <string name="server_network_access_suggestion_arc_tunnel">Enable free E2E tunnel</string>
     <string name="server_network_access_suggestion_other_tunnels">Other tunnels</string>
     <string name="server_arc_tunnel_ct_alert_title">Certificate issued to another key</string>
