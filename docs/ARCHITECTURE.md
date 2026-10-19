@@ -53,14 +53,19 @@ graph TB
                 Auth["BearerTokenAuth (global)"]
                 SDK["SDK Server → Server.addTool()"]
                 HTTP --> StreamHTTP --> Auth --> SDK
+                TLSL["Loopback TLS listener\n(TunnelListenerHost, free E2E tunnel)"]
+                TLSL --> StreamHTTP
             end
             subgraph Tunnel["TunnelManager (optional)"]
+                Arc["ArcTunnelProvider\n(free E2E tunnel, in-process)"]
                 CF["CloudflareTunnelProvider\n(process-based)"]
                 Ngrok["NgrokTunnelProvider\n(in-process JNI)"]
-                PubURL["Public HTTPS URL\n(*.trycloudflare.com / ngrok)"]
+                PubURL["Public HTTPS URL\n(*.d.arc-tunnel.io / *.trycloudflare.com / ngrok)"]
+                Arc --> PubURL
                 CF --> PubURL
                 Ngrok --> PubURL
             end
+            Arc -. "dial-back splice" .-> TLSL
         end
 
         MainAct -->|"StateFlow (status)"| McpServerSvc
@@ -91,7 +96,7 @@ graph TB
      d. Creates `McpServer` with config, keystore, and SDK `Server` (MCP Kotlin SDK)
      e. Starts Ktor server (HTTP by default, HTTPS if enabled)
      f. Updates `ServerStatus.Running` via companion-level StateFlow
-     g. If tunnel enabled: starts `TunnelManager` (connects to Cloudflare or ngrok)
+     g. If tunnel enabled: starts `TunnelManager` with the `McpServer` as `TunnelListenerHost` (free E2E tunnel: resumes the saved identity, issues a missing certificate, opens the loopback TLS listener and the control stream; Cloudflare/ngrok: as before)
      h. Tunnel status and URL logged to UI via `serverLogEvents` SharedFlow
 
 ### Shutdown Sequence
@@ -145,6 +150,8 @@ graph TB
 | MainViewModel         | `viewModelScope`          | ViewModel lifecycle          |
 | McpServerService      | Custom `CoroutineScope`   | Service onCreate to onDestroy|
 | McpAccessibilityService| Custom `CoroutineScope`  | Service lifecycle            |
+| ArcTunnelEnrollService | Custom `CoroutineScope` (IO) | Service start to the end of the last request |
+| ArcTunnelProvider session | Custom `CoroutineScope` (IO + handler) | Tunnel start to stop (per session) |
 
 ### Thread Safety
 
@@ -265,6 +272,7 @@ running requires a restart (UI disables config editing when server is running).
 |--------------------------|---------------|------------------------------------|---------------------------|
 | INTERNET                 | Normal        | Auto-granted (manifest)            | HTTP server               |
 | FOREGROUND_SERVICE       | Normal        | Auto-granted (manifest)            | Foreground services       |
+| FOREGROUND_SERVICE_DATA_SYNC | Normal    | Auto-granted (manifest)            | Free E2E tunnel enrollment service |
 | RECEIVE_BOOT_COMPLETED   | Normal        | Auto-granted (manifest)            | Auto-start on boot        |
 | QUERY_ALL_PACKAGES       | Normal        | Auto-granted (manifest)            | Listing installed apps    |
 | KILL_BACKGROUND_PROCESSES| Normal        | Auto-granted (manifest)            | Closing background apps   |
