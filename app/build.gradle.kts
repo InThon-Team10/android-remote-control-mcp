@@ -403,7 +403,7 @@ dependencies {
 
     // OAuth (JWT signing/verification)
     // The Jackson BOM aligns java-jwt's transitive jackson-core/jackson-databind to a patched
-    // release, closing the CVE alerts on the 2.21.3 versions the library would otherwise pull in.
+    // release, closing the CVE alerts on the 2.22.0 versions the library would otherwise pull in.
     implementation(platform(libs.jackson.bom))
     implementation(libs.java.jwt)
 
