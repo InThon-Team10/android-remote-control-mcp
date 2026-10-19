@@ -121,11 +121,15 @@ class AboutLegalNoticesTest {
     }
 
     /** CRLF normalised to LF, so a `core.autocrlf` checkout does not change the hash. */
-    private fun lf(bytes: ByteArray): ByteArray =
-        String(bytes, Charsets.UTF_8).replace("\r\n", "\n").toByteArray(Charsets.UTF_8)
+    private fun lf(bytes: ByteArray): ByteArray {
+        val text = String(bytes, Charsets.UTF_8)
+        return text.replace("\r\n", "\n").toByteArray(Charsets.UTF_8)
+    }
 
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    private fun sha256(bytes: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+        return digest.joinToString("") { "%02x".format(it) }
+    }
 
     private companion object {
         const val GPL_TEXT_SIZE = 35149

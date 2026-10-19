@@ -497,8 +497,7 @@ tasks.withType<Test> {
             rootProject.file("LICENSE.md"),
             rootProject.file("THIRD_PARTY_LICENSES.md"),
             file("src/main/res/values/strings.xml"),
-        )
-        .withPropertyName("legalNoticeFiles")
+        ).withPropertyName("legalNoticeFiles")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     maxHeapSize = "3g"
     // Distribute tests across all available CPU cores for faster execution.
