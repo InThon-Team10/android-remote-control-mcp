@@ -41,10 +41,9 @@ dependencies {
     testImplementation(libs.ktor.client.cio)
     testImplementation(libs.ktor.sse)
 
-    // Free E2E tunnel: OkHttp-backed Ktor client (SNI + DNS override to reach the tunnel edge), raw OkHttp for
-    // the engine config, BouncyCastle for the test internal CA.
+    // Free E2E tunnel: OkHttp-backed Ktor client (system trust for the production tunnel), BouncyCastle for the
+    // test internal CA.
     testImplementation(libs.ktor.client.okhttp)
-    testImplementation(libs.okhttp)
     testImplementation(libs.bouncy.castle.pkix)
     testImplementation(libs.bouncy.castle.prov)
 
