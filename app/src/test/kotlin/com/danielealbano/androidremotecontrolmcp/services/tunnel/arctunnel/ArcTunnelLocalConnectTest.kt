@@ -5,18 +5,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.net.ConnectException
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 
 @DisplayName("ArcTunnelLocalConnect")
 class ArcTunnelLocalConnectTest {
-    private val loopback = InetAddress.getLoopbackAddress()
+    // The tunnel listener's bind address (never getLoopbackAddress(): it is ::1 on Android).
+    private val loopback = InetAddress.getByName("127.0.0.1")
 
     private fun freePort(): Int = ServerSocket(0, BACKLOG, loopback).use { it.localPort }
 
@@ -27,6 +30,18 @@ class ArcTunnelLocalConnectTest {
                 ArcTunnelLocalConnect.open(server.localPort, WINDOW_MS).use { socket ->
                     assertTrue(socket.isConnected)
                     assertTrue(socket.tcpNoDelay)
+                }
+            }
+        }
+
+    @Test
+    fun `dials the IPv4 loopback the tunnel listener binds`() =
+        runBlocking {
+            ServerSocket(0, BACKLOG, loopback).use { server ->
+                ArcTunnelLocalConnect.open(server.localPort, WINDOW_MS).use { socket ->
+                    assertEquals("127.0.0.1", ArcTunnelLocalConnect.HOST)
+                    assertTrue(socket.inetAddress is Inet4Address, "dialled ${socket.inetAddress}")
+                    assertEquals(loopback, socket.inetAddress)
                 }
             }
         }

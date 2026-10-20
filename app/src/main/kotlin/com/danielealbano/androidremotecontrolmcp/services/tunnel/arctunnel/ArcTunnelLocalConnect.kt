@@ -7,12 +7,16 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.net.ConnectException
-import java.net.InetAddress
 import java.net.Socket
 import java.net.SocketException
 import kotlin.coroutines.coroutineContext
 
 object ArcTunnelLocalConnect {
+    /**
+     * The address the tunnel listener binds (`TunnelListenerHost`). Never `InetAddress.getLoopbackAddress()`:
+     * on Android that is `::1`, which the IPv4-only listener refuses.
+     */
+    const val HOST = "127.0.0.1"
     const val WINDOW_MS = 10_000L
     private const val RETRY_MS = 50L
     private const val NANOS_PER_MS = 1_000_000L
@@ -28,7 +32,7 @@ object ArcTunnelLocalConnect {
             // discard a connected socket; cancellation is honoured right after it instead.
             val attempt =
                 withContext(NonCancellable + Dispatchers.IO) {
-                    runCatching { Socket(InetAddress.getLoopbackAddress(), port).apply { configure() } }
+                    runCatching { Socket(HOST, port).apply { configure() } }
                 }
             val socket = attempt.getOrNull()
             if (socket != null) {
