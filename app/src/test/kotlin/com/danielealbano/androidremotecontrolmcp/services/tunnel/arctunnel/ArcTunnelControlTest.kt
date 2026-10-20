@@ -264,6 +264,8 @@ class ArcTunnelControlTest {
             stream.outgoing += nudge("0b")
             stream.outgoing += ArcTunnelTestServer.frame(ArcTunnelFrames.PING)
             stream.read(5)
+            // The renewal runs in its own coroutine: wait for it, the in-flight flag already refused "0b".
+            awaitThat { events.nudges.isNotEmpty() }
             assertEquals(listOf("0a"), events.nudges.toList())
 
             gate.complete(Unit)
