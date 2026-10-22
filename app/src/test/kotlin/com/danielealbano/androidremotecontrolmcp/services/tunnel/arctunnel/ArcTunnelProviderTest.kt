@@ -23,8 +23,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
+import okhttp3.tls.HeldCertificate
 import okio.buffer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -39,6 +42,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.security.KeyPair
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -125,6 +129,24 @@ class ArcTunnelProviderTest {
 
     private suspend fun awaitThat(condition: () -> Boolean) {
         withTimeout(BUDGET_MS) { while (!condition()) delay(POLL_MS) }
+    }
+
+    /** A saved identity whose public certificate expired yesterday. */
+    private fun expiredIdentity(): ArcTunnelIdentity {
+        val keyStore = FakeArcTunnelKeyStore()
+        val base = ArcTunnelTestIdentity.create(keyStore, identity.net)
+        val state = base.state()
+        val now = System.currentTimeMillis()
+        val leaf =
+            HeldCertificate
+                .Builder()
+                .keyPair(KeyPair(keyStore.publicKey(state.tlsAlias), keyStore.privateKey(state.tlsAlias)))
+                .commonName(base.fqdn())
+                .addSubjectAlternativeName(base.fqdn())
+                .validityInterval(now - 2 * DAY_MS, now - DAY_MS)
+                .build()
+        val expiredState = state.copy(publicChain = listOf(leaf.certificate))
+        return ArcTunnelIdentity(base.net, keyStore, base.name, base.hosts, expiredState)
     }
 
     private fun logged(text: String): Int = serverLog.entries.count { it.message.contains(text) }
@@ -270,15 +292,28 @@ class ArcTunnelProviderTest {
     @Test
     fun `a bind after the bind timeout fired restores Connected`() =
         runBlocking {
-            provider.bindTimeoutMs = 0
-            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bindTimeoutMs = SHORT_BIND_TIMEOUT_MS
+            // The first control request is answered only once the timeout has turned the status into the error.
+            val release = CountDownLatch(1)
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun peek(): MockResponse = ArcTunnelTestServer.hold()
+
+                    override fun dispatch(request: RecordedRequest): MockResponse {
+                        release.await(BUDGET_MS, TimeUnit.MILLISECONDS)
+                        return ArcTunnelTestServer.hold()
+                    }
+                }
             provider.bind(host)
 
             provider.start(LOCAL_PORT, config)
-            awaitConnected()
-            delay(RECONNECT_WINDOW_MS)
+            try {
+                assertTrue(awaitError().message.startsWith("Not connected after"))
+            } finally {
+                release.countDown()
+            }
 
-            assertTrue(provider.status.value is TunnelStatus.Connected, "${provider.status.value}")
+            assertEquals(TunnelProviderType.ARC_TUNNEL, awaitConnected().providerType)
         }
 
     @Test
@@ -325,6 +360,23 @@ class ArcTunnelProviderTest {
 
             coVerifyOrder {
                 renewals.renewForStart(bare)
+                host.startTlsListener(any(), null, any())
+            }
+        }
+
+    @Test
+    fun `an expired certificate is renewed before the listener starts`() =
+        runBlocking {
+            val expired = expiredIdentity()
+            coEvery { enrollment.readyIdentity(any()) } returns expired
+            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitConnected()
+
+            coVerifyOrder {
+                renewals.renewForStart(expired)
                 host.startTlsListener(any(), null, any())
             }
         }
@@ -554,6 +606,7 @@ class ArcTunnelProviderTest {
         const val STOP_BUDGET_MS = 2_000L
         const val BLOCKED_MS = 10_000L
         const val RECONNECT_WINDOW_MS = 1_500L
+        const val DAY_MS = 86_400_000L
         const val SWAP_POLL_MS = 200L
         const val SHORT_BIND_TIMEOUT_MS = 300L
         const val POLL_MS = 20L
