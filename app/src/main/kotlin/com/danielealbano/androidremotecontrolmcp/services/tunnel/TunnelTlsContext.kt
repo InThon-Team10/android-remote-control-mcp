@@ -23,8 +23,12 @@ import javax.net.ssl.X509ExtendedKeyManager
  * ciphers are the HTTP/2-safe ones Ktor's `sslConnector` uses.
  */
 object TunnelTlsContext {
-    /** Pipeline name of the TLS handler (a repeated pipeline hook never adds a second one). */
-    const val HANDLER_NAME = "tunnel-tls"
+    /**
+     * Pipeline name of the TLS handler (a repeated pipeline hook never adds a second one). It MUST be `ssl`:
+     * Ktor reports an HTTP/1.1 request as `https` only when the pipeline holds a handler of that name, and the
+     * OAuth metadata, the token audience and the share links are built from that scheme.
+     */
+    const val HANDLER_NAME = "ssl"
     private const val ALIAS = "tunnel"
     private val PROTOCOLS = arrayOf(ApplicationProtocolNames.HTTP_2, ApplicationProtocolNames.HTTP_1_1)
 

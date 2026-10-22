@@ -13,9 +13,10 @@ import org.junit.jupiter.api.TestInstance
 /**
  * E2E: the free E2E tunnel against a local tunnel server stack ([ArcTunnelStack]). The redroid phone enrolls
  * (attestation optional on the server: redroid's AndroidKeyStore is a software KeyMint), the MCP server starts
- * with the tunnel, and the JVM reaches `/health` (HTTP/2 over ALPN, and HTTP/1.1 from a client without ALPN) and
- * `tools/list` THROUGH the tunnel with the Pebble root as trust anchor. The shared container is restored (tunnel
- * off, server restarted, client refreshed) afterwards.
+ * with the tunnel, and the JVM reaches `/health` (HTTP/2 over ALPN, and HTTP/1.1 from a client without ALPN), the
+ * OAuth metadata (which must name the `https` URL over HTTP/1.1 too) and `tools/list` THROUGH the tunnel with the
+ * Pebble root as trust anchor. The shared container is restored (tunnel off, server restarted, client refreshed)
+ * afterwards.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class E2EArcTunnelTest {
@@ -78,9 +79,16 @@ class E2EArcTunnelTest {
 
     @Test
     fun `health is served through the tunnel to a client without ALPN`() {
-        val response = ArcTunnelPublicClient.health(stack, fqdn())
+        val response = ArcTunnelPublicClient.get(stack, fqdn(), HEALTH)
         assertTrue(response.startsWith("HTTP/1.1 200"), response)
         assertTrue(response.contains("\"status\""), response)
+    }
+
+    @Test
+    fun `OAuth metadata served over HTTP-1-1 names the https URL`() {
+        val response = ArcTunnelPublicClient.get(stack, fqdn(), PROTECTED_RESOURCE)
+        assertTrue(response.startsWith("HTTP/1.1 200"), response)
+        assertTrue(response.contains("\"resource\":\"https://${fqdn()}/mcp\""), response)
     }
 
     @Test
@@ -88,7 +96,7 @@ class E2EArcTunnelTest {
         val request =
             Request
                 .Builder()
-                .url("${ArcTunnelPublicClient.stackUrl(fqdn())}/health")
+                .url("${ArcTunnelPublicClient.stackUrl(fqdn())}$HEALTH")
                 .build()
 
         ArcTunnelPublicClient.stackOkHttp(stack).newCall(request).execute().use {
@@ -112,8 +120,8 @@ class E2EArcTunnelTest {
 
     @Test
     fun `a second connection reuses the bound control stream`() {
-        val first = ArcTunnelPublicClient.health(stack, fqdn())
-        val second = ArcTunnelPublicClient.health(stack, fqdn())
+        val first = ArcTunnelPublicClient.get(stack, fqdn(), HEALTH)
+        val second = ArcTunnelPublicClient.get(stack, fqdn(), HEALTH)
         assertTrue(first.startsWith("HTTP/1.1 200") && second.startsWith("HTTP/1.1 200"), "$first\n$second")
         assertEquals("Connected", AndroidContainerSetup.queryArcTunnel().tunnel)
     }
@@ -123,5 +131,7 @@ class E2EArcTunnelTest {
     companion object {
         private const val ENROLL_TIMEOUT_MS = 180_000L
         private const val CONNECT_TIMEOUT_MS = 120_000L
+        private const val HEALTH = "/health"
+        private const val PROTECTED_RESOURCE = "/.well-known/oauth-protected-resource"
     }
 }

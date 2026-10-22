@@ -14,16 +14,17 @@ object ArcTunnelPublicClient {
     private const val READ_LIMIT = 64 * 1024
 
     /**
-     * `GET /health` through the edge over one raw TLS connection that offers no ALPN; returns the HTTP status
+     * `GET [path]` through the edge over one raw TLS connection that offers no ALPN; returns the HTTP status
      * line + body.
      */
-    fun health(
+    fun get(
         stack: ArcTunnelStack,
         fqdn: String,
+        path: String,
     ): String {
         val socket: SSLSocket = stack.connectTls(fqdn)
         socket.use {
-            it.outputStream.write("GET /health HTTP/1.1\r\nHost: $fqdn\r\nConnection: close\r\n\r\n".toByteArray())
+            it.outputStream.write("GET $path HTTP/1.1\r\nHost: $fqdn\r\nConnection: close\r\n\r\n".toByteArray())
             it.outputStream.flush()
             return it.inputStream.readNBytes(READ_LIMIT).decodeToString()
         }

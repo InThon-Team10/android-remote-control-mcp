@@ -184,7 +184,7 @@ class McpServerTunnelListenerTest {
         server.start()
         val port = server.startTlsListener(material, null) {}
 
-        okHttpHealth(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)).use {
+        okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), HEALTH).use {
             assertEquals(200, it.code)
             assertEquals(Protocol.HTTP_2, it.protocol)
         }
@@ -195,7 +195,7 @@ class McpServerTunnelListenerTest {
         server.start()
         val port = server.startTlsListener(material, null) {}
 
-        okHttpHealth(port, listOf(Protocol.HTTP_1_1)).use {
+        okHttpGet(port, listOf(Protocol.HTTP_1_1), HEALTH).use {
             assertEquals(200, it.code)
             assertEquals(Protocol.HTTP_1_1, it.protocol)
         }
@@ -206,16 +206,43 @@ class McpServerTunnelListenerTest {
         server.start()
         val port = server.startTlsListener(material, null) {}
 
-        val response =
-            (trustAllContext().socketFactory.createSocket(LOOPBACK, port) as SSLSocket).use { socket ->
-                socket.soTimeout = TIMEOUT_MS
-                val request = "GET /health HTTP/1.1\r\nHost: $LOOPBACK\r\nConnection: close\r\n\r\n"
-                socket.outputStream.write(request.toByteArray())
-                socket.outputStream.flush()
-                socket.inputStream.readNBytes(READ_LIMIT).decodeToString()
-            }
+        val response = rawGet(port, HEALTH)
 
         assertTrue(response.startsWith("HTTP/1.1 200"), response)
+    }
+
+    @Test
+    fun `HTTP-2 requests see the https scheme`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val body =
+            okHttpGet(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1), PROTECTED_RESOURCE).use {
+                assertEquals(Protocol.HTTP_2, it.protocol)
+                it.body.string()
+            }
+
+        assertTrue(body.contains("\"resource\":\"https://$LOOPBACK:$port/mcp\""), body)
+    }
+
+    @Test
+    fun `HTTP-1-1 requests see the https scheme`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val body = okHttpGet(port, listOf(Protocol.HTTP_1_1), PROTECTED_RESOURCE).use { it.body.string() }
+
+        assertTrue(body.contains("\"resource\":\"https://$LOOPBACK:$port/mcp\""), body)
+    }
+
+    @Test
+    fun `requests without ALPN see the https scheme`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val response = rawGet(port, PROTECTED_RESOURCE)
+
+        assertTrue(response.contains("\"resource\":\"https://$LOOPBACK:$port/mcp\""), response)
     }
 
     @Test
@@ -229,9 +256,10 @@ class McpServerTunnelListenerTest {
         assertEquals(200, healthStatus(port))
     }
 
-    private fun okHttpHealth(
+    private fun okHttpGet(
         port: Int,
         protocols: List<Protocol>,
+        path: String,
     ): Response {
         val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
         val client =
@@ -244,10 +272,23 @@ class McpServerTunnelListenerTest {
         val request =
             Request
                 .Builder()
-                .url("https://$LOOPBACK:$port/health")
+                .url("https://$LOOPBACK:$port$path")
                 .build()
         return client.newCall(request).execute()
     }
+
+    /** One HTTP/1.1 GET over a TLS socket that offers no ALPN; returns the raw response. */
+    private fun rawGet(
+        port: Int,
+        path: String,
+    ): String =
+        (trustAllContext().socketFactory.createSocket(LOOPBACK, port) as SSLSocket).use { socket ->
+            socket.soTimeout = TIMEOUT_MS
+            val request = "GET $path HTTP/1.1\r\nHost: $LOOPBACK:$port\r\nConnection: close\r\n\r\n"
+            socket.outputStream.write(request.toByteArray())
+            socket.outputStream.flush()
+            socket.inputStream.readNBytes(READ_LIMIT).decodeToString()
+        }
 
     private fun healthStatus(port: Int): Int {
         val connection = URI("https://127.0.0.1:$port/health").toURL().openConnection() as HttpsURLConnection
@@ -313,6 +354,8 @@ class McpServerTunnelListenerTest {
         const val FIXED_PORT_BUDGET_MS = 2_000L
         const val NANOS_PER_MS = 1_000_000L
         const val READ_LIMIT = 4096
+        const val HEALTH = "/health"
+        const val PROTECTED_RESOURCE = "/.well-known/oauth-protected-resource"
         val RANDOM_PORT_RANGE = 49152..65535
     }
 }
