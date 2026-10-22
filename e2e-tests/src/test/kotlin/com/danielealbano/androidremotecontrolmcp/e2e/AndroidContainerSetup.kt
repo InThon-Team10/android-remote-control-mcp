@@ -776,8 +776,7 @@ object AndroidContainerSetup {
         timeoutMs: Long = DEFAULT_SERVER_READY_TIMEOUT_MS,
     ) {
         println("[E2E Setup] Stopping MCP server...")
-        execAdbOn(serial, "shell", "am", "start", "-n", MAIN_COMPONENT)
-        Thread.sleep(2_000)
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
         execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_STOP_ACTION, "-n", E2E_RECEIVER_COMPONENT)
         val startTime = System.currentTimeMillis()
         while (System.currentTimeMillis() - startTime < timeoutMs) {
@@ -800,18 +799,15 @@ object AndroidContainerSetup {
 
     /** Stops the server on a device without a reachable base URL; awaits `server == "Stopped"` through the query. */
     fun stopMcpServerOn(serial: String) {
-        execAdbOn(serial, "shell", "am", "start", "-n", MAIN_COMPONENT)
-        Thread.sleep(2_000)
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
         execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_STOP_ACTION, "-n", E2E_RECEIVER_COMPONENT)
         awaitArcTunnel(serial = serial, timeoutMs = 30_000L) { it.server == "Stopped" }
     }
 
     /** Starts the server on [serial] (activity + debug receiver), like [startMcpServer] but for any device. */
     fun startMcpServerOn(serial: String) {
-        execAdbOn(serial, "shell", "am", "start", "-n", MAIN_COMPONENT)
-        Thread.sleep(5_000)
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
         execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_START_ACTION, "-n", E2E_RECEIVER_COMPONENT)
-        Thread.sleep(5_000)
     }
 
     /**
@@ -850,8 +846,7 @@ object AndroidContainerSetup {
 
     /** Brings the app to the foreground first: the enrollment foreground service cannot start from the background. */
     fun enrollArcTunnel(serial: String = adbSerial) {
-        execAdbOn(serial, "shell", "am", "start", "-n", MAIN_COMPONENT)
-        Thread.sleep(2_000)
+        execAdbOn(serial, "shell", "am", "start", "-W", "-n", MAIN_COMPONENT)
         execAdbOn(serial, "shell", "am", "broadcast", "-a", E2E_ARC_ENROLL_ACTION, "-n", E2E_RECEIVER_COMPONENT)
     }
 
