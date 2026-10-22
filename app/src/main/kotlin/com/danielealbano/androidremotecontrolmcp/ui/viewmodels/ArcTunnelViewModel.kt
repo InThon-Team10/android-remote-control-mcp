@@ -12,6 +12,8 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelHosts
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,7 @@ class ArcTunnelViewModel
     constructor(
         private val settingsRepository: SettingsRepository,
         private val enrollment: ArcTunnelEnrollment,
+        private val renewals: ArcTunnelRenewals,
         private val ctAlerts: ArcTunnelCtAlerts,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
@@ -98,6 +101,14 @@ class ArcTunnelViewModel
                 enrollment.state.collect { state ->
                     // Leaving Enrolling, or a failure cleared by a later renewal, may have saved a URL.
                     if (previous !is ArcTunnelEnrollmentState.Idle) refreshUrl()
+                    previous = state
+                }
+            }
+            viewModelScope.launch(ioDispatcher) {
+                var previous: ArcTunnelRenewalState = ArcTunnelRenewalState.Idle
+                renewals.state.collect { state ->
+                    // A tunnel-start renewal that ended may have saved the certificate (and so the URL).
+                    if (previous is ArcTunnelRenewalState.Renewing) refreshUrl()
                     previous = state
                 }
             }

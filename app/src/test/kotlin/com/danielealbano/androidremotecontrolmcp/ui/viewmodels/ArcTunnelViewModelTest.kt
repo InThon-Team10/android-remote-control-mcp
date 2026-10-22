@@ -8,6 +8,8 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -41,6 +43,8 @@ class ArcTunnelViewModelTest {
     private val repository = mockk<SettingsRepository>(relaxed = true)
     private val enrollment = mockk<ArcTunnelEnrollment>(relaxed = true)
     private val ctAlerts = mockk<ArcTunnelCtAlerts>(relaxed = true)
+    private val renewal = MutableStateFlow<ArcTunnelRenewalState>(ArcTunnelRenewalState.Idle)
+    private val renewals = mockk<ArcTunnelRenewals>(relaxed = true) { every { state } returns renewal }
     private var savedUrl: String? = null
     private lateinit var viewModel: ArcTunnelViewModel
 
@@ -60,7 +64,7 @@ class ArcTunnelViewModelTest {
     }
 
     private fun createViewModel(): ArcTunnelViewModel =
-        ArcTunnelViewModel(repository, enrollment, ctAlerts, dispatcher).also { viewModel = it }
+        ArcTunnelViewModel(repository, enrollment, renewals, ctAlerts, dispatcher).also { viewModel = it }
 
     private fun arc(tunnelEnabled: Boolean): ServerConfig =
         ServerConfig(tunnelEnabled = tunnelEnabled, tunnelProvider = TunnelProviderType.ARC_TUNNEL)
@@ -307,6 +311,21 @@ class ArcTunnelViewModelTest {
 
             savedUrl = URL
             enrollmentState.value = ArcTunnelEnrollmentState.Idle
+            advanceUntilIdle()
+
+            assertEquals(ArcTunnelUrlState.Enrolled(URL), viewModel.url.value)
+        }
+
+    @Test
+    fun `url refreshes when a tunnel-start renewal ends`() =
+        runTest(dispatcher) {
+            createViewModel()
+            renewal.value = ArcTunnelRenewalState.Renewing
+            advanceUntilIdle()
+            assertEquals(ArcTunnelUrlState.NotEnrolled, viewModel.url.value)
+
+            savedUrl = URL
+            renewal.value = ArcTunnelRenewalState.Idle
             advanceUntilIdle()
 
             assertEquals(ArcTunnelUrlState.Enrolled(URL), viewModel.url.value)
