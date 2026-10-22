@@ -58,7 +58,7 @@ the decisions below. Not ported: its `Server`, `Screen`, `Stats`, `MainActivity`
 
 ---
 
-## [ ] User Story 1 — Dependencies
+## [x] User Story 1 — Dependencies
 
 Why: raw OkHttp (duplex bodies) in the app; `mockwebserver3` + `okhttp-tls` in unit tests; an OkHttp-backed Ktor client and BouncyCastle in the e2e module.
 
@@ -111,7 +111,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 2 — Hosts, provider type, settings, migration, ADB keys
+## [x] User Story 2 — Hosts, provider type, settings, migration, ADB keys
 
 Why: every later story derives the service hosts from one base address and reads `ServerConfig.tunnelProvider == ARC_TUNNEL` plus the four new settings; existing installs must keep Cloudflare (D2).
 
@@ -574,7 +574,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 3 — Loopback TLS listener host
+## [x] User Story 3 — Loopback TLS listener host
 
 Why: the phone terminates the tunnel's TLS on its own loopback listener serving the same MCP application (D6); the provider needs a handle to start it on a random port, restart it on the same port, and hook every request.
 
@@ -753,7 +753,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 4 — Protocol client core (`arctunnel/`)
+## [x] User Story 4 — Protocol client core (`arctunnel/`)
 
 Why: the phone side of PROTOCOL.md v2 as testable Kotlin with this project's standards (D17): a keystore interface so the JVM tests run the real enrollment logic against a fake, suspend retries with `delay`, coroutine-scoped dial-backs and splices, no raw threads. D7 (fixed TLS key) and D9 (backoff, dial-back first) applied.
 
@@ -3272,7 +3272,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 5 — Strings and enrollment service
+## [x] User Story 5 — Strings and enrollment service
 
 Why: enrollment, re-enrollment, issuance resume and renewals must be usable from the settings UI (server stopped), from ADB (D20), from the e2e receiver and from the provider (server running) through one serialized, application-scoped entry point that owns the identity stores (D4: leaving a screen never cancels an enrollment); an interface keeps the UI and the provider unit-testable (CLAUDE.md §5).
 
@@ -3916,7 +3916,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 6 — Certificate Transparency check and alerts
+## [x] User Story 6 — Certificate Transparency check and alerts
 
 Why: D10 — the only way the user learns about a certificate for their name that they did not issue.
 
@@ -4271,7 +4271,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 7 — The provider and its wiring
+## [x] User Story 7 — The provider and its wiring
 
 Why: ties the enrollment service, the listener host, the control loop and the CT monitor together under the existing `TunnelProvider` contract, with the certificate swap policy of D8, structured concurrency (D17) and a bounded stop; the manager selects it, the HTTPS guard is lifted for it, and ADB can enroll headlessly (D20).
 
@@ -4905,7 +4905,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 8 — UI
+## [x] User Story 8 — UI
 
 Why: D1, D2, D4, D16, D19 — provider selection, enrollment dialog on the enable transition, "Set up tunnel" button, URL with refresh, CT toggle and alert banner, home card button. One activity-scoped `ArcTunnelViewModel` is threaded through the screens so the home button and the settings dialog share the same state.
 
@@ -5737,7 +5737,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 9 — Debug E2E receiver
+## [x] User Story 9 — Debug E2E receiver
 
 Why: D14 — the e2e drives enrollment headlessly and points the client at a local edge: the debug-only `E2EConfigReceiver` learns the tunnel settings (incl. the two debug-only overrides), a stop-server action, an enroll action and a status query whose answer travels back in the broadcast result (`am broadcast` prints it).
 
@@ -6006,7 +6006,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 10 — E2E tests
+## [x] User Story 10 — E2E tests
 
 Why: D14 — (a) the full tunnel stack in containers replicated from the tunnel server repo's own e2e (`internal/tunneltest/containers.go`, `e2e/e2e_test.go` at v0.5.2), the server from the `latest` ghcr image, ACME `tls-alpn-01` against Pebble; (b) a device-gated test against production on the attached phone. The phone in redroid reaches the edge through a HOST-side TCP relay bound on `0.0.0.0` (the one host-reachability mechanism this e2e has proven: `FixtureHttpServer` via the container's gateway IP), so no cross-network container routing is assumed.
 
@@ -7245,7 +7245,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 11 — Documentation
+## [x] User Story 11 — Documentation
 
 Why: `docs/PROJECT.md`, `docs/ARCHITECTURE.md` and `README.md` describe the tunnel providers, the defaults, the ADB keys and the e2e infrastructure; they must describe the third provider. Mermaid changes are validated with `mmdc`.
 
@@ -7399,7 +7399,7 @@ Definition of Done:
 
 ---
 
-## [ ] User Story 12 — Confirmations, quality gates, review, PR
+## [x] User Story 12 — Confirmations, quality gates, review, PR
 
 Why: D3 and D13 need the user's word before the gates; the gates run once at the end (CLAUDE.md); the plan-compliance review and the PR close the work.
 
@@ -7416,7 +7416,7 @@ Acceptance criteria:
 Definition of Done:
 - [x] All Task 12.1 confirmations obtained and recorded in this plan (checkmarks) before any gate ran.
 
-### [ ] Task 12.2 — Quality gates (ALL captured with `tee`, inspected from the log, never re-run to grep)
+### [x] Task 12.2 — Quality gates (ALL captured with `tee`, inspected from the log, never re-run to grep)
 
 - [x] `make lint 2>&1 | tee /tmp/plan66-lint.log | tail -20` → zero ktlint/detekt findings (fix root causes; no suppressions beyond D18).
 - [x] `make test-unit 2>&1 | tee /tmp/plan66-test-unit.log | tail -20` → all unit + JVM integration tests pass (`EventDispatcherImplTest` is known-flaky in the full suite: re-run ONCE before treating it as a regression).
@@ -7426,7 +7426,7 @@ Definition of Done:
 Definition of Done:
 - [x] All four gates green with their logs under `/tmp/`.
 
-### [ ] Task 12.3 — Review and PR
+### [x] Task 12.3 — Review and PR
 
 - [x] Spawn the `code-reviewer` subagent (model `opus`) in plan compliance mode over the ENTIRE implementation; fix ALL findings; re-run until clean.
 - [x] Commits: one logical commit per task at least, pushed after every user story; no `git add -A`; no plan file other than this one's checkmarks is touched.
