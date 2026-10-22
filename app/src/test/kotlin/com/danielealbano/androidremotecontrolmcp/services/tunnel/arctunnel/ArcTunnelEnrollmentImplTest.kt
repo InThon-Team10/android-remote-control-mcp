@@ -368,6 +368,42 @@ class ArcTunnelEnrollmentImplTest {
         }
 
     @Test
+    fun `renew clears a setup failure once the certificate is saved`() =
+        runBlocking {
+            service.enrollAnswer =
+                MockResponse
+                    .Builder()
+                    .code(401)
+                    .body("""{"reason":"denied","retryable":false}""")
+                    .build()
+            impl.execute(env, rotate = false)
+            assertTrue(failedMessage().contains("denied"), failedMessage())
+            val identity = saveIdentity(withPublicChain = false)
+
+            impl.renew(identity, null)
+
+            assertEquals(ArcTunnelEnrollmentState.Idle, impl.state.value)
+        }
+
+    @Test
+    fun `a failed renew leaves a setup failure shown`() =
+        runBlocking {
+            service.enrollAnswer =
+                MockResponse
+                    .Builder()
+                    .code(401)
+                    .body("""{"reason":"denied","retryable":false}""")
+                    .build()
+            impl.execute(env, rotate = false)
+            val identity = saveIdentity(withPublicChain = false)
+            impl.store(env).forget()
+
+            runCatching { impl.renew(identity, null) }
+
+            assertTrue(failedMessage().contains("denied"), failedMessage())
+        }
+
+    @Test
     fun `readyIdentity waits for an in-flight request`() =
         runBlocking {
             saveIdentity(withPublicChain = false)

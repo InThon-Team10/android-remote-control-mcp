@@ -298,6 +298,21 @@ class ArcTunnelViewModelTest {
         }
 
     @Test
+    fun `url refreshes when a setup failure is cleared`() =
+        runTest(dispatcher) {
+            createViewModel()
+            enrollmentState.value = ArcTunnelEnrollmentState.Failed("acme_failed")
+            advanceUntilIdle()
+            assertEquals(ArcTunnelUrlState.NotEnrolled, viewModel.url.value)
+
+            savedUrl = URL
+            enrollmentState.value = ArcTunnelEnrollmentState.Idle
+            advanceUntilIdle()
+
+            assertEquals(ArcTunnelUrlState.Enrolled(URL), viewModel.url.value)
+        }
+
+    @Test
     fun `cancelEnrollment clears the request and disables remote access`() =
         runTest(dispatcher) {
             createViewModel()

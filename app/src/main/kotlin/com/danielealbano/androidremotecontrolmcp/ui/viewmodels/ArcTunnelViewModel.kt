@@ -96,7 +96,8 @@ class ArcTunnelViewModel
             viewModelScope.launch(ioDispatcher) {
                 var previous: ArcTunnelEnrollmentState = ArcTunnelEnrollmentState.Idle
                 enrollment.state.collect { state ->
-                    if (previous is ArcTunnelEnrollmentState.Enrolling) refreshUrl()
+                    // Leaving Enrolling, or a failure cleared by a later renewal, may have saved a URL.
+                    if (previous !is ArcTunnelEnrollmentState.Idle) refreshUrl()
                     previous = state
                 }
             }
