@@ -104,23 +104,20 @@ class ArcTunnelEnrollmentImpl
             mutex.withLock {
                 val record = withContext(Dispatchers.IO) { store(env).load() } ?: return@withLock null
                 check(!identityCertificateExpired(record)) { "identity certificate expired; get a new name" }
-                val identity = restoreArcTunnelIdentity(env, record, keys, net(env))
-                if (certificateMissingOrExpired(identity)) {
-                    enroller.issue(identity, null)
-                    withContext(Dispatchers.IO) { store(env).save(identity) }
-                }
-                identity
+                restoreArcTunnelIdentity(env, record, keys, net(env))
             }
 
-        override suspend fun renew(
+        override suspend fun issueAndSave(
             identity: ArcTunnelIdentity,
             nonce: String?,
+            gate: ArcTunnelIssuanceGate,
         ) {
             mutex.withLock {
                 val store = store(ArcTunnelEnv(identity.hosts.baseAddress))
                 check(store.holds(identity)) { "identity ${identity.name} was forgotten; renewal skipped" }
-                enroller.issue(identity, nonce)
-                if (store.holds(identity)) withContext(Dispatchers.IO) { store.save(identity) }
+                enroller.issue(identity, nonce, gate) {
+                    if (store.holds(identity)) withContext(Dispatchers.IO) { store.save(identity) }
+                }
             }
         }
 

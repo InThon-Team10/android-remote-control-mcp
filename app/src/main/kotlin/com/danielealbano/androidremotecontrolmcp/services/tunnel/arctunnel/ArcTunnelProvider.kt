@@ -40,6 +40,7 @@ class ArcTunnelProvider
     @Inject
     constructor(
         private val enrollment: ArcTunnelEnrollment,
+        private val renewals: ArcTunnelRenewals,
         private val keys: ArcTunnelKeyStore,
         private val ctAlerts: ArcTunnelCtAlerts,
         private val serverLog: ServerLogRepository,
@@ -61,6 +62,12 @@ class ArcTunnelProvider
 
             @Volatile
             var lastFailure: String = ""
+
+            /** The error shown when the control stream did not bind within [timeoutMs]. */
+            fun notConnectedMessage(timeoutMs: Long): String {
+                val head = "Not connected after ${timeoutMs / MS_PER_S} s; still retrying"
+                return if (lastFailure.isEmpty()) head else "$head: $lastFailure"
+            }
 
             @Volatile
             var bindTimeout: Job? = null
@@ -146,12 +153,15 @@ class ArcTunnelProvider
 
         /**
          * The session's own start-up; any failure ends the session with an `Error` status (the next `stop`
-         * disposes it). `readyIdentity` waits for an in-flight enrollment and issues a missing certificate.
+         * disposes it). `readyIdentity` waits for an in-flight enrollment; a missing or expired certificate is
+         * renewed before the listener starts.
          */
         private suspend fun bootstrap(s: Session) {
             val outcome =
                 runCatching {
                     val identity = enrollment.readyIdentity(s.env) ?: error(NOT_ENROLLED_MESSAGE)
+                    renewals.resume()
+                    if (certificateMissingOrExpired(identity)) renewForStart(identity)
                     val net = identity.net
                     val monitor =
                         ArcTunnelCtMonitor(
@@ -181,6 +191,20 @@ class ArcTunnelProvider
                 _status.value = TunnelStatus.Error(it.message ?: it.javaClass.simpleName)
                 withContext(NonCancellable + Dispatchers.IO) { s.host.stopTlsListener() }
                 s.scope.cancel()
+            }
+        }
+
+        /**
+         * The tunnel-start renewal (the MCP server already serves locally): a failure shows its reason and waits for
+         * the user's Retry; a stop cancels the wait, never an issuance attempt in flight.
+         */
+        private suspend fun renewForStart(identity: ArcTunnelIdentity) {
+            while (true) {
+                val failure = runCatching { renewals.renewForStart(identity) }.exceptionOrNull() ?: return
+                if (failure is CancellationException) throw failure
+                _status.value = TunnelStatus.Error(failure.message ?: failure.javaClass.simpleName)
+                renewals.awaitRetry()
+                _status.value = TunnelStatus.Connecting
             }
         }
 
@@ -262,14 +286,9 @@ class ArcTunnelProvider
                     delay(bindTimeoutMs)
                     if (!s.connected.get()) {
                         s.bindTimedOut.set(true)
-                        _status.value = TunnelStatus.Error(notConnectedMessage(s))
+                        _status.value = TunnelStatus.Error(s.notConnectedMessage(bindTimeoutMs))
                     }
                 }
-        }
-
-        private fun notConnectedMessage(s: Session): String {
-            val head = "Not connected after ${bindTimeoutMs / MS_PER_S} s; still retrying"
-            return if (s.lastFailure.isEmpty()) head else "$head: ${s.lastFailure}"
         }
 
         private fun connectedStatus(s: Session): TunnelStatus.Connected =
@@ -299,7 +318,7 @@ class ArcTunnelProvider
             override fun onAttemptFailed(reason: String) {
                 s.lastFailure = reason
                 if (s.bindTimedOut.get() && !s.connected.get()) {
-                    _status.value = TunnelStatus.Error(notConnectedMessage(s))
+                    _status.value = TunnelStatus.Error(s.notConnectedMessage(bindTimeoutMs))
                 }
             }
 
@@ -307,7 +326,7 @@ class ArcTunnelProvider
             override suspend fun onRenewNudge(nonce: String) {
                 val identity = s.identity ?: return
                 try {
-                    enrollment.renew(identity, nonce)
+                    renewals.renew(identity, nonce)
                     s.certSwap.schedule()
                 } catch (e: CancellationException) {
                     throw e

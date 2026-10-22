@@ -345,21 +345,38 @@ class ArcTunnelEnrollmentImplTest {
         }
 
     @Test
-    fun `readyIdentity issues only when missing or expired`() =
+    fun `readyIdentity restores without issuing`() =
         runBlocking {
             saveIdentity(withPublicChain = false)
 
-            val issued = requireNotNull(impl.readyIdentity(env))
+            val restored = requireNotNull(impl.readyIdentity(env))
+
+            assertEquals(ArcTunnelTestIdentity.NAME, restored.name)
+            assertNull(restored.publicLeaf())
+            assertTrue(service.requests.isEmpty())
+        }
+
+    @Test
+    fun `issueAndSave issues and saves the public certificate`() =
+        runBlocking {
+            val identity = saveIdentity(withPublicChain = false)
+
+            impl.issueAndSave(identity, null, ArcTunnelIssuanceGate())
+
             assertEquals(1, service.count(ISSUE_PATH))
             assertTrue(requireNotNull(impl.store(env).load()).publicChain.isNotEmpty())
-            assertTrue(issued.publicLeaf() != null)
+        }
 
-            impl.readyIdentity(env)
-            assertEquals(1, service.count(ISSUE_PATH))
+    @Test
+    fun `issueAndSave through a stopped gate issues nothing`() =
+        runBlocking {
+            val identity = saveIdentity(withPublicChain = false)
+            val gate = ArcTunnelIssuanceGate().apply { stop() }
 
-            saveIdentity(withPublicChain = true) { it.copy(publicChain = expiredChain(it.tlsAlias, "pub")) }
-            impl.readyIdentity(env)
-            assertEquals(2, service.count(ISSUE_PATH))
+            val error = runCatching { impl.issueAndSave(identity, null, gate) }.exceptionOrNull()
+
+            assertEquals(ArcTunnelIssuanceGate.STOPPED, error?.message)
+            assertEquals(0, service.count(ISSUE_PATH))
         }
 
     @Test
@@ -383,12 +400,12 @@ class ArcTunnelEnrollmentImplTest {
         }
 
     @Test
-    fun `renew after forget throws and saves nothing`() =
+    fun `issueAndSave after forget throws and saves nothing`() =
         runBlocking {
             val identity = saveIdentity(withPublicChain = true)
             impl.store(env).forget()
 
-            val error = runCatching { impl.renew(identity, null) }.exceptionOrNull()
+            val error = runCatching { impl.issueAndSave(identity, null, ArcTunnelIssuanceGate()) }.exceptionOrNull()
 
             assertTrue(error is IllegalStateException, "error $error")
             assertNull(impl.store(env).load())

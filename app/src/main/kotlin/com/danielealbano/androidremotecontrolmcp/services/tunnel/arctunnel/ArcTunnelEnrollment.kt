@@ -55,15 +55,19 @@ interface ArcTunnelEnrollment {
     )
 
     /**
-     * The saved identity ready to serve: waits for an in-flight request, then issues the public certificate when
-     * none is saved or the saved one is expired. Null when nothing is saved.
+     * The saved identity, restored without network access after an in-flight request ends; null when nothing is
+     * saved. A missing or expired public certificate is renewed by the caller through [ArcTunnelRenewals].
      */
     suspend fun readyIdentity(env: ArcTunnelEnv): ArcTunnelIdentity?
 
-    /** One renewal (nudge nonce or fresh nonce), saved only while [identity] is still the saved one. */
-    suspend fun renew(
+    /**
+     * One issuance (the nudge nonce, or a fresh one when null) under the enrollment lock, each attempt run through
+     * [gate]; the result is saved only while [identity] is still the saved one.
+     */
+    suspend fun issueAndSave(
         identity: ArcTunnelIdentity,
         nonce: String?,
+        gate: ArcTunnelIssuanceGate,
     )
 
     /** Clears the persisted undismissed CT alert of the environment (the UI dismissed it). */

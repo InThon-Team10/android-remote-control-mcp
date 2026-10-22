@@ -10,6 +10,7 @@
     <string name="notification_channel_mcp_server_name">MCP Server</string>
     <!-- Notification Content -->
     <string name="notification_mcp_server_title">MCP Server Running</string>
+    <string name="notification_mcp_server_finishing_renewal">Finishing the tunnel certificate renewal…</string>
 
     <!-- App Bar -->
     <string name="app_bar_title">MCP Remote Control</string>
@@ -215,6 +216,9 @@
     <string name="remote_access_arc_tunnel_enrolling">Setting up the tunnel…</string>
     <string name="remote_access_arc_tunnel_enroll_failed">Setup failed: %1$s</string>
     <string name="remote_access_arc_tunnel_retry">Retry</string>
+    <string name="remote_access_arc_tunnel_renewing">Renewing the tunnel certificate…</string>
+    <string name="remote_access_arc_tunnel_renewal_failed">Certificate renewal failed: %1$s</string>
+    <string name="remote_access_arc_tunnel_renewal_cancel">Cancel and stop server</string>
     <string name="remote_access_https_note_arc_tunnel">HTTPS stays enabled for local clients; the free E2E tunnel uses its own certificate.</string>
 
     <!-- Connection Info -->

@@ -13,7 +13,6 @@ import com.danielealbano.androidremotecontrolmcp.data.model.OptionalToolPermissi
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
-import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
@@ -26,55 +25,18 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStor
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinator
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.ToolCallIndicator
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerGestureTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerIntentTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerLocationTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNodeActionTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerNotificationTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerScreenIntrospectionTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSharingTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
-import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyModeManager
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyModeStatus
-import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.privacy.PseudonymStore
 import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerCache
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityToolCallIndicator
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateSnapshotCache
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
-import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
-import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
-import com.danielealbano.androidremotecontrolmcp.services.location.LocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotRedactor
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
-import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInbox
-import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
-import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.tunnelAllowedWithHttps
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
@@ -116,49 +78,19 @@ class McpServerService : Service() {
 
     @Inject lateinit var certificateManager: CertificateManager
 
-    @Inject lateinit var actionExecutor: ActionExecutor
-
-    @Inject lateinit var accessibilityServiceProvider: AccessibilityServiceProvider
-
-    @Inject lateinit var screenCaptureProvider: ScreenCaptureProvider
-
-    @Inject lateinit var treeParser: AccessibilityTreeParser
-
-    @Inject lateinit var elementFinder: ElementFinder
-
-    @Inject lateinit var compactTreeFormatter: CompactTreeFormatter
-
-    @Inject lateinit var screenshotAnnotator: ScreenshotAnnotator
-
-    @Inject lateinit var screenshotEncoder: ScreenshotEncoder
-
     @Inject lateinit var tunnelManager: TunnelManager
 
-    @Inject lateinit var storageLocationProvider: StorageLocationProvider
+    @Inject lateinit var toolRegistration: McpToolRegistration
 
-    @Inject lateinit var fileOperationProvider: FileOperationProvider
-
-    @Inject lateinit var appManager: AppManager
-
-    @Inject lateinit var typeInputController: TypeInputController
-
-    @Inject lateinit var nodeCache: AccessibilityNodeCache
+    @Inject lateinit var arcTunnelRenewals: ArcTunnelRenewals
 
     @Inject lateinit var screenStateSnapshotCache: ScreenStateSnapshotCache
 
-    @Inject lateinit var webViewNodeMerger: WebViewNodeMerger
-
     @Inject lateinit var cameraProvider: CameraProvider
-
-    @Inject lateinit var intentDispatcher: IntentDispatcher
 
     @Inject lateinit var notificationProvider: NotificationProvider
 
-    @Inject lateinit var locationProvider: LocationProvider
-
     @Inject lateinit var ephemeralFileLinkService: EphemeralFileLinkService
-
-    @Inject lateinit var sharedContentInbox: SharedContentInbox
 
     @Inject lateinit var jwtTokenService: JwtTokenService
 
@@ -172,12 +104,6 @@ class McpServerService : Service() {
 
     @Inject lateinit var serverLogRepository: ServerLogRepository
 
-    @Inject lateinit var privacyToolGate: PrivacyToolGate
-
-    @Inject lateinit var placeholderSubstitutor: PlaceholderSubstitutor
-
-    @Inject lateinit var screenshotRedactor: ScreenshotRedactor
-
     @Inject lateinit var privacyModeManager: PrivacyModeManager
 
     @Inject lateinit var pseudonymStore: PseudonymStore
@@ -190,6 +116,8 @@ class McpServerService : Service() {
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverActive = AtomicBoolean(false)
+    private val serverTornDown = AtomicBoolean(false)
+    private val stopSequencer by lazy { ServerStopSequencer(arcTunnelRenewals, coroutineScope, Dispatchers.Main) }
     private var mcpServer: McpServer? = null
     private var tunnelObserverJob: Job? = null
     private var approvalObserverJob: Job? = null
@@ -220,16 +148,22 @@ class McpServerService : Service() {
             ACTION_STOP -> {
                 lastIntentWasStop = true
                 persistServerRunning(settingsRepository, false)
-                stopSelf()
+                stopSequencer.stop(
+                    teardown = ::teardownServer,
+                    showFinishing = ::showFinishingRenewal,
+                    stopService = { stopSelf() },
+                )
                 return START_NOT_STICKY
             }
 
             ACTION_START, null -> {
                 lastIntentWasStop = false
+                stopSequencer.cancelPendingStop()
                 persistServerRunning(settingsRepository, true)
                 if (!serverActive.compareAndSet(false, true)) {
                     Log.w(TAG, "Server already starting or running, ignoring duplicate start request")
                 } else {
+                    serverTornDown.set(false)
                     coroutineScope.launch {
                         startServer()
                     }
@@ -308,12 +242,13 @@ class McpServerService : Service() {
                 )
             val effectivePerms =
                 OptionalToolPermissions.effectivePermissions(config.toolPermissionsConfig, grantedOptionalPermissions)
-            registerAllTools(
+            toolRegistration.registerAll(
                 sdkServer,
                 toolNamePrefix,
                 effectivePerms,
                 config.fileSizeLimitMb,
                 config.toolCallIndicatorEnabled,
+                currentBaseUrl,
             )
 
             // Create and start the Ktor server
@@ -440,118 +375,6 @@ class McpServerService : Service() {
         }
     }
 
-    private fun registerAllTools(
-        server: Server,
-        toolNamePrefix: String,
-        perms: ToolPermissionsConfig,
-        fileSizeLimitMb: Int,
-        toolCallIndicatorEnabled: Boolean,
-    ) {
-        val toolCallIndicator = ReferenceCountedToolCallIndicator(AccessibilityToolCallIndicator())
-        toolCallIndicator.setEnabled(toolCallIndicatorEnabled)
-        val registrar =
-            LoggedToolRegistrar(
-                server,
-                serverLogRepository,
-                toolCallIndicator,
-            )
-        registerAccessibilityToolBundle(registrar, toolNamePrefix, perms)
-        registerFileTools(registrar, storageLocationProvider, fileOperationProvider, toolNamePrefix, perms)
-        registerAppManagementTools(registrar, appManager, privacyToolGate, toolNamePrefix, perms)
-        registerCameraTools(registrar, cameraProvider, fileOperationProvider, toolNamePrefix, perms)
-        registerIntentTools(registrar, intentDispatcher, toolNamePrefix, perms)
-        registerNotificationTools(
-            registrar,
-            notificationProvider,
-            privacyToolGate,
-            placeholderSubstitutor,
-            toolNamePrefix,
-            perms,
-        )
-        registerLocationTools(registrar, locationProvider, privacyToolGate, toolNamePrefix, perms)
-        registerSharingBundle(registrar, toolNamePrefix, perms, fileSizeLimitMb)
-    }
-
-    private fun registerAccessibilityToolBundle(
-        registrar: LoggedToolRegistrar,
-        toolNamePrefix: String,
-        perms: ToolPermissionsConfig,
-    ) {
-        registerScreenIntrospectionTools(
-            registrar,
-            treeParser,
-            accessibilityServiceProvider,
-            screenCaptureProvider,
-            compactTreeFormatter,
-            screenshotAnnotator,
-            screenshotEncoder,
-            nodeCache,
-            screenStateSnapshotCache,
-            webViewNodeMerger,
-            privacyToolGate,
-            screenshotRedactor,
-            toolNamePrefix,
-            perms,
-        )
-        registerSystemActionTools(registrar, actionExecutor, accessibilityServiceProvider, toolNamePrefix, perms)
-        registerTouchActionTools(registrar, actionExecutor, toolNamePrefix, perms)
-        registerGestureTools(registrar, actionExecutor, toolNamePrefix, perms)
-        registerNodeActionTools(
-            registrar,
-            treeParser,
-            elementFinder,
-            actionExecutor,
-            accessibilityServiceProvider,
-            nodeCache,
-            privacyToolGate,
-            placeholderSubstitutor,
-            toolNamePrefix,
-            perms,
-        )
-        registerTextInputTools(
-            registrar,
-            treeParser,
-            actionExecutor,
-            accessibilityServiceProvider,
-            typeInputController,
-            nodeCache,
-            privacyToolGate,
-            placeholderSubstitutor,
-            toolNamePrefix,
-            perms,
-        )
-        registerUtilityTools(
-            registrar,
-            treeParser,
-            elementFinder,
-            accessibilityServiceProvider,
-            nodeCache,
-            privacyToolGate,
-            placeholderSubstitutor,
-            toolNamePrefix,
-            perms,
-        )
-    }
-
-    private fun registerSharingBundle(
-        registrar: LoggedToolRegistrar,
-        toolNamePrefix: String,
-        perms: ToolPermissionsConfig,
-        fileSizeLimitMb: Int,
-    ) {
-        registerSharingTools(
-            registrar,
-            sharedContentInbox,
-            ephemeralFileLinkService,
-            fileOperationProvider,
-            fileSizeLimitMb,
-            currentBaseUrl,
-            privacyToolGate,
-            toolNamePrefix,
-            perms,
-        )
-    }
-
     override fun onDestroy() {
         screenStateSnapshotCache.clear()
         // Release the Privacy Mode model and clear session-scoped pseudonym/NER caches (never persisted).
@@ -559,7 +382,6 @@ class McpServerService : Service() {
         pseudonymStore.clear()
         nerCache.clear()
         Log.i(TAG, "McpServerService destroying")
-        updateStatus(ServerStatus.Stopping)
 
         // Second, later attempt to durably commit an explicit stop, in case the first bounded write in
         // onStartCommand timed out. Gated on lastIntentWasStop so an OEM/system kill (last action was a
@@ -567,6 +389,27 @@ class McpServerService : Service() {
         if (lastIntentWasStop) {
             persistServerRunning(settingsRepository, false)
         }
+
+        teardownServer()
+
+        // Cancel coroutine scope
+        coroutineScope.cancel()
+
+        // Clear singleton
+        instance = null
+
+        Log.i(TAG, "McpServerService destroyed")
+
+        super.onDestroy()
+    }
+
+    /**
+     * Stops the tunnel and the Ktor server; idempotent. Runs from [onDestroy], or at once on a stop that keeps the
+     * service alive until a tunnel certificate issuance in flight is saved ([ServerStopSequencer]).
+     */
+    private fun teardownServer() {
+        if (!serverTornDown.compareAndSet(false, true)) return
+        updateStatus(ServerStatus.Stopping)
 
         // Cancel tunnel status observer before stopping the tunnel
         tunnelObserverJob?.cancel()
@@ -606,17 +449,12 @@ class McpServerService : Service() {
         }
         mcpServer = null
         serverActive.set(false)
-
-        // Cancel coroutine scope
-        coroutineScope.cancel()
-
-        // Clear singleton
-        instance = null
-
         updateStatus(ServerStatus.Stopped)
-        Log.i(TAG, "McpServerService destroyed")
+    }
 
-        super.onDestroy()
+    private fun showFinishingRenewal() {
+        val text = getString(R.string.notification_mcp_server_finishing_renewal)
+        startForeground(NOTIFICATION_ID, createNotification(text))
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -626,7 +464,7 @@ class McpServerService : Service() {
         serverLogRepository.log(ServerLogEntry.Type.SERVER, serverStatusLogMessage(status))
     }
 
-    private fun createNotification(): Notification {
+    private fun createNotification(contentText: String? = null): Notification {
         val pendingIntent =
             PendingIntent.getActivity(
                 this,
@@ -638,6 +476,7 @@ class McpServerService : Service() {
         return NotificationCompat
             .Builder(this, McpApplication.MCP_SERVER_CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_mcp_server_title))
+            .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)

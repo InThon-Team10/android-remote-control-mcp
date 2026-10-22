@@ -71,6 +71,8 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentImpl
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelKeyStore
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalsImpl
 import com.danielealbano.androidremotecontrolmcp.services.update.AppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.BuildConfigAppVersionProvider
 import com.danielealbano.androidremotecontrolmcp.services.update.GithubReleaseChecker
@@ -311,6 +313,11 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindArcTunnelEnrollment(impl: ArcTunnelEnrollmentImpl): ArcTunnelEnrollment
+
+    /** Binds the certificate renewals of the free E2E tunnel. */
+    @Binds
+    @Singleton
+    abstract fun bindArcTunnelRenewals(impl: ArcTunnelRenewalsImpl): ArcTunnelRenewals
 
     /** Binds the Certificate Transparency alert state of the free E2E tunnel. */
     @Binds
