@@ -63,7 +63,7 @@ the decisions below. Not ported: its `Server`, `Screen`, `Stats`, `MainActivity`
 Why: raw OkHttp (duplex bodies) in the app; `mockwebserver3` + `okhttp-tls` in unit tests; an OkHttp-backed Ktor client and BouncyCastle in the e2e module.
 
 Acceptance criteria:
-- [ ] `gradle/libs.versions.toml` declares `okhttp = "5.5.0"` and the three OkHttp library aliases; both modules declare the dependencies below.
+- [x] `gradle/libs.versions.toml` declares `okhttp = "5.5.0"` and the three OkHttp library aliases; both modules declare the dependencies below.
 
 ### [x] Task 1.1 — Version catalog and build files
 
@@ -116,10 +116,10 @@ Definition of Done:
 Why: every later story derives the service hosts from one base address and reads `ServerConfig.tunnelProvider == ARC_TUNNEL` plus the four new settings; existing installs must keep Cloudflare (D2).
 
 Acceptance criteria:
-- [ ] `ArcTunnelHosts("arc-tunnel.io")` yields `enroll.arc-tunnel.io`, `connect.arc-tunnel.io`, `d.arc-tunnel.io`.
-- [ ] `TunnelProviderType.ARC_TUNNEL` is first and the default; `fromAdbValue("android-remote-control-mcp-tunneld")` resolves it; `"CLOUDFLARE"`/`"NGROK"` still resolve; `"ARC_TUNNEL"` does not.
-- [ ] An upgraded install with `tunnel_enabled` stored and no provider stored reads `CLOUDFLARE` after migration; a fresh install reads `ARC_TUNNEL`.
-- [ ] ADB accepts `tunnel_provider`, `arc_tunnel_base_address`, `arc_tunnel_ct_check_enabled`; `SettingsRepositoryImpl` stays under detekt's `LargeClass` limit (the new settings are a delegated slice).
+- [x] `ArcTunnelHosts("arc-tunnel.io")` yields `enroll.arc-tunnel.io`, `connect.arc-tunnel.io`, `d.arc-tunnel.io`.
+- [x] `TunnelProviderType.ARC_TUNNEL` is first and the default; `fromAdbValue("android-remote-control-mcp-tunneld")` resolves it; `"CLOUDFLARE"`/`"NGROK"` still resolve; `"ARC_TUNNEL"` does not.
+- [x] An upgraded install with `tunnel_enabled` stored and no provider stored reads `CLOUDFLARE` after migration; a fresh install reads `ARC_TUNNEL`.
+- [x] ADB accepts `tunnel_provider`, `arc_tunnel_base_address`, `arc_tunnel_ct_check_enabled`; `SettingsRepositoryImpl` stays under detekt's `LargeClass` limit (the new settings are a delegated slice).
 
 ### [x] Task 2.1 — Model
 
@@ -579,7 +579,7 @@ Definition of Done:
 Why: the phone terminates the tunnel's TLS on its own loopback listener serving the same MCP application (D6); the provider needs a handle to start it on a random port, restart it on the same port, and hook every request.
 
 Acceptance criteria:
-- [ ] `McpServer` implements `TunnelListenerHost`: random port when none is requested, retry on bind failure, fixed port when requested (bounded retries), per-request hook, idempotent stop (100 ms grace / 500 ms timeout), stopped together with the server.
+- [x] `McpServer` implements `TunnelListenerHost`: random port when none is requested, retry on bind failure, fixed port when requested (bounded retries), per-request hook, idempotent stop (100 ms grace / 500 ms timeout), stopped together with the server.
 
 ### [x] Task 3.1 — Interface
 
@@ -758,7 +758,7 @@ Definition of Done:
 Why: the phone side of PROTOCOL.md v2 as testable Kotlin with this project's standards (D17): a keystore interface so the JVM tests run the real enrollment logic against a fake, suspend retries with `delay`, coroutine-scoped dial-backs and splices, no raw threads. D7 (fixed TLS key) and D9 (backoff, dial-back first) applied.
 
 Acceptance criteria:
-- [ ] The phone side of PROTOCOL.md v2 (enrollment, issuance, control stream, dial-back, splice, retries, watchdog) is implemented against the keystore interface and verified by JVM tests against the fake keystore.
+- [x] The phone side of PROTOCOL.md v2 (enrollment, issuance, control stream, dial-back, splice, retries, watchdog) is implemented against the keystore interface and verified by JVM tests against the fake keystore.
 
 ### [x] Task 4.1 — Pure utilities: PEM, sockets, wire types, frames, CSRs, sessions
 
@@ -3277,9 +3277,9 @@ Definition of Done:
 Why: enrollment, re-enrollment, issuance resume and renewals must be usable from the settings UI (server stopped), from ADB (D20), from the e2e receiver and from the provider (server running) through one serialized, application-scoped entry point that owns the identity stores (D4: leaving a screen never cancels an enrollment); an interface keeps the UI and the provider unit-testable (CLAUDE.md §5).
 
 Acceptance criteria:
-- [ ] `ArcTunnelEnrollment` (interface) is bound to `ArcTunnelEnrollmentImpl` in Hilt and exposes `state`, `savedUrl`, `savedCtAlert`, `store`, `net`, `requestEnroll`, `requestRotate`, `execute`, `readyIdentity`, `renew`, `dismissCtAlert`.
-- [ ] Requests run inside `ArcTunnelEnrollService`, a short-lived foreground service, so the process is never frozen half-way; a refused foreground start (app in the background on Android 12+) is reported as `Failed`.
-- [ ] `execute` is idempotent: an identity with a valid certificate is left alone (same name, no network), a certificate-less or expired one only issues (same name, D4), nothing saved enrolls; only `rotate` changes the name. `readyIdentity` waits for an in-flight request. A renewal after a `forget` saves nothing. `savedUrl` is null until a certificate is saved.
+- [x] `ArcTunnelEnrollment` (interface) is bound to `ArcTunnelEnrollmentImpl` in Hilt and exposes `state`, `savedUrl`, `savedCtAlert`, `store`, `net`, `requestEnroll`, `requestRotate`, `execute`, `readyIdentity`, `renew`, `dismissCtAlert`.
+- [x] Requests run inside `ArcTunnelEnrollService`, a short-lived foreground service, so the process is never frozen half-way; a refused foreground start (app in the background on Android 12+) is reported as `Failed`.
+- [x] `execute` is idempotent: an identity with a valid certificate is left alone (same name, no network), a certificate-less or expired one only issues (same name, D4), nothing saved enrolls; only `rotate` changes the name. `readyIdentity` waits for an in-flight request. A renewal after a `forget` saves nothing. `savedUrl` is null until a certificate is saved.
 
 ### [x] Task 5.1 — Strings and notification channel
 
@@ -3921,8 +3921,8 @@ Definition of Done:
 Why: D10 — the only way the user learns about a certificate for their name that they did not issue.
 
 Acceptance criteria:
-- [ ] On 1 % of requests, at most every 30 minutes, never concurrently, the monitor queries Cert Spotter for `<name>.d.<base>` (wildcards included) after the saved cursor and compares `pubkey_sha256` with the TLS public key.
-- [ ] An unknown key raises a notification and a dismissible alert state; a flagged key is never re-alerted; the cursor and the last check time are persisted; an undismissed alert is restorable (`restore` sets the state without a notification).
+- [x] On 1 % of requests, at most every 30 minutes, never concurrently, the monitor queries Cert Spotter for `<name>.d.<base>` (wildcards included) after the saved cursor and compares `pubkey_sha256` with the TLS public key.
+- [x] An unknown key raises a notification and a dismissible alert state; a flagged key is never re-alerted; the cursor and the last check time are persisted; an undismissed alert is restorable (`restore` sets the state without a notification).
 
 ### [x] Task 6.1 — Alerts
 
@@ -4276,9 +4276,9 @@ Definition of Done:
 Why: ties the enrollment service, the listener host, the control loop and the CT monitor together under the existing `TunnelProvider` contract, with the certificate swap policy of D8, structured concurrency (D17) and a bounded stop; the manager selects it, the HTTPS guard is lifted for it, and ADB can enroll headlessly (D20).
 
 Acceptance criteria:
-- [ ] `ArcTunnelProvider.start` returns quickly with `Connecting`; its session then resumes the saved identity, issues a missing/expired certificate, starts the listener on a random port and the control loop; `Connected(https://<name>.d.<base>)` once the stream binds; `Error(reason)` for setup failures (not bound, not enrolled, missing key, listener failure).
-- [ ] A control drop reports `Connecting` and keeps reconnecting; a `RENEW_NUDGE` renews, then the listener restarts on the same port per D8; `stop` completes within 2 s even while a renewal, a CT check or a dial-back is blocked.
-- [ ] `TunnelManager.start(localPort, listenerHost)` selects the provider for `ARC_TUNNEL` and keeps refusing Cloudflare/ngrok while HTTPS is on; `--ez arc_tunnel_enroll true` over ADB enrolls.
+- [x] `ArcTunnelProvider.start` returns quickly with `Connecting`; its session then resumes the saved identity, issues a missing/expired certificate, starts the listener on a random port and the control loop; `Connected(https://<name>.d.<base>)` once the stream binds; `Error(reason)` for setup failures (not bound, not enrolled, missing key, listener failure).
+- [x] A control drop reports `Connecting` and keeps reconnecting; a `RENEW_NUDGE` renews, then the listener restarts on the same port per D8; `stop` completes within 2 s even while a renewal, a CT check or a dial-back is blocked.
+- [x] `TunnelManager.start(localPort, listenerHost)` selects the provider for `ARC_TUNNEL` and keeps refusing Cloudflare/ngrok while HTTPS is on; `--ez arc_tunnel_enroll true` over ADB enrolls.
 
 ### [x] Task 7.1 — Certificate swap policy
 
@@ -4910,9 +4910,9 @@ Definition of Done:
 Why: D1, D2, D4, D16, D19 — provider selection, enrollment dialog on the enable transition, "Set up tunnel" button, URL with refresh, CT toggle and alert banner, home card button. One activity-scoped `ArcTunnelViewModel` is threaded through the screens so the home button and the settings dialog share the same state.
 
 Acceptance criteria:
-- [ ] Settings → Tunnel lists "Free E2E tunnel" first with the D1 description; the provider list is visible and selectable whenever the server is stopped, also with Remote Access off (D19); HTTPS only disables the Cloudflare/ngrok fields; selecting the free tunnel shows the base address field, the CT switch and, once enrolled, the URL with a refresh icon; while the saved URL is being loaded no dialog can appear.
-- [ ] Turning Remote Access on with this provider (toggle or home button) opens the enrollment dialog exactly once; Cancel/outside tap turns Remote Access off; Continue enrolls; an enabled-but-not-enrolled state shows "Set up tunnel"; a failure shows the reason with Retry (issuance resumes, D4); the dialog never reappears for an enrolled user or while typing a base address.
-- [ ] The home card offers "Enable free E2E tunnel" / "Enable Wi-Fi access" / "Other tunnels"; a CT alert shows a dismissible banner with "Change name"; a persisted undismissed alert is shown again after a process restart.
+- [x] Settings → Tunnel lists "Free E2E tunnel" first with the D1 description; the provider list is visible and selectable whenever the server is stopped, also with Remote Access off (D19); HTTPS only disables the Cloudflare/ngrok fields; selecting the free tunnel shows the base address field, the CT switch and, once enrolled, the URL with a refresh icon; while the saved URL is being loaded no dialog can appear.
+- [x] Turning Remote Access on with this provider (toggle or home button) opens the enrollment dialog exactly once; Cancel/outside tap turns Remote Access off; Continue enrolls; an enabled-but-not-enrolled state shows "Set up tunnel"; a failure shows the reason with Retry (issuance resumes, D4); the dialog never reappears for an enrolled user or while typing a base address.
+- [x] The home card offers "Enable free E2E tunnel" / "Enable Wi-Fi access" / "Other tunnels"; a CT alert shows a dismissible banner with "Change name"; a persisted undismissed alert is shown again after a process restart.
 
 ### [x] Task 8.1 — ViewModel
 
@@ -5742,9 +5742,9 @@ Definition of Done:
 Why: D14 — the e2e drives enrollment headlessly and points the client at a local edge: the debug-only `E2EConfigReceiver` learns the tunnel settings (incl. the two debug-only overrides), a stop-server action, an enroll action and a status query whose answer travels back in the broadcast result (`am broadcast` prints it).
 
 Acceptance criteria:
-- [ ] `E2E_CONFIGURE` accepts `tunnel_enabled`, `tunnel_provider` (ADB value), `arc_tunnel_base_address`, `arc_tunnel_ct_check_enabled`, `arc_tunnel_edge_override`, `arc_tunnel_trusted_ca_pem_b64` (`-` = clear, since `am broadcast --es k ""` drops empty extras).
-- [ ] `E2E_STOP_SERVER`, `E2E_ARC_TUNNEL_ENROLL` and `E2E_ARC_TUNNEL_QUERY` exist; the query returns Base64 JSON of `E2EArcTunnelStatus` as the broadcast result data.
-- [ ] `E2EConfigReceiver` keeps ≤ 11 functions.
+- [x] `E2E_CONFIGURE` accepts `tunnel_enabled`, `tunnel_provider` (ADB value), `arc_tunnel_base_address`, `arc_tunnel_ct_check_enabled`, `arc_tunnel_edge_override`, `arc_tunnel_trusted_ca_pem_b64` (`-` = clear, since `am broadcast --es k ""` drops empty extras).
+- [x] `E2E_STOP_SERVER`, `E2E_ARC_TUNNEL_ENROLL` and `E2E_ARC_TUNNEL_QUERY` exist; the query returns Base64 JSON of `E2EArcTunnelStatus` as the broadcast result data.
+- [x] `E2EConfigReceiver` keeps ≤ 11 functions.
 
 ### [x] Task 9.1 — Status DTO, labels and receiver
 
@@ -6011,9 +6011,9 @@ Definition of Done:
 Why: D14 — (a) the full tunnel stack in containers replicated from the tunnel server repo's own e2e (`internal/tunneltest/containers.go`, `e2e/e2e_test.go` at v0.5.2), the server from the `latest` ghcr image, ACME `tls-alpn-01` against Pebble; (b) a device-gated test against production on the attached phone. The phone in redroid reaches the edge through a HOST-side TCP relay bound on `0.0.0.0` (the one host-reachability mechanism this e2e has proven: `FixtureHttpServer` via the container's gateway IP), so no cross-network container routing is assumed.
 
 Acceptance criteria:
-- [ ] `E2EArcTunnelTest` boots the stack (Valkey, MinIO, Pebble + challtestsrv, the server), enrolls the redroid phone, starts the server, observes `Connected`, reads `/health` through the tunnel with the Pebble root as trust anchor and SNI `<name>.d.example.test`, and lists MCP tools through the tunnel; it restores the shared container afterwards.
-- [ ] `E2EArcTunnelDeviceTest` is skipped (`Assumptions`) when no phone is attached — a phone is an `adb devices` entry in state `device` that is neither `emulator-*` nor a redroid container (`getprop ro.boot.redroid_width` empty); USB and `adb connect` phones both count — and otherwise enrolls against production with a per-run random bearer token, observes `Connected` and lists tools at `https://<name>.d.<base>/mcp` with system trust.
-- [ ] The CI e2e job needs no change (the stack images are pulled by Testcontainers; the server image is `always pull`).
+- [x] `E2EArcTunnelTest` boots the stack (Valkey, MinIO, Pebble + challtestsrv, the server), enrolls the redroid phone, starts the server, observes `Connected`, reads `/health` through the tunnel with the Pebble root as trust anchor and SNI `<name>.d.example.test`, and lists MCP tools through the tunnel; it restores the shared container afterwards.
+- [x] `E2EArcTunnelDeviceTest` is skipped (`Assumptions`) when no phone is attached — a phone is an `adb devices` entry in state `device` that is neither `emulator-*` nor a redroid container (`getprop ro.boot.redroid_width` empty); USB and `adb connect` phones both count — and otherwise enrolls against production with a per-run random bearer token, observes `Connected` and lists tools at `https://<name>.d.<base>/mcp` with system trust.
+- [x] The CI e2e job needs no change (the stack images are pulled by Testcontainers; the server image is `always pull`).
 
 ### [x] Task 10.1 — Shared helpers
 
@@ -7250,7 +7250,7 @@ Definition of Done:
 Why: `docs/PROJECT.md`, `docs/ARCHITECTURE.md` and `README.md` describe the tunnel providers, the defaults, the ADB keys and the e2e infrastructure; they must describe the third provider. Mermaid changes are validated with `mmdc`.
 
 Acceptance criteria:
-- [ ] The four documents (`docs/PROJECT.md`, `docs/ARCHITECTURE.md`, `README.md`, `docs/PERMISSIONS.md`) describe the free E2E tunnel (provider, defaults, migration, ADB keys incl. `arc_tunnel_enroll`, the enrollment foreground service and its permission, e2e stack); the architecture diagram renders with `mmdc`.
+- [x] The four documents (`docs/PROJECT.md`, `docs/ARCHITECTURE.md`, `README.md`, `docs/PERMISSIONS.md`) describe the free E2E tunnel (provider, defaults, migration, ADB keys incl. `arc_tunnel_enroll`, the enrollment foreground service and its permission, e2e stack); the architecture diagram renders with `mmdc`.
 
 ### [x] Task 11.1 — PROJECT.md
 
@@ -7404,8 +7404,8 @@ Definition of Done:
 Why: D3 and D13 need the user's word before the gates; the gates run once at the end (CLAUDE.md); the plan-compliance review and the PR close the work.
 
 Acceptance criteria:
-- [ ] The user confirmed the production base address (D3), the debug-signer allowlist (D13) and whether the phone is attached BEFORE any gate ran.
-- [ ] `make lint`, `make test-unit`, `make build` and `make test-e2e` pass with their output captured; the `code-reviewer` (plan compliance mode) is clean; the PR exists.
+- [x] The user confirmed the production base address (D3), the debug-signer allowlist (D13) and whether the phone is attached BEFORE any gate ran.
+- [x] `make lint`, `make test-unit`, `make build` and `make test-e2e` pass with their output captured; the `code-reviewer` (plan compliance mode) is clean; the PR exists.
 
 ### [x] Task 12.1 — Confirmations with the user (ASK, do not assume)
 
@@ -7418,19 +7418,19 @@ Definition of Done:
 
 ### [ ] Task 12.2 — Quality gates (ALL captured with `tee`, inspected from the log, never re-run to grep)
 
-- [ ] `make lint 2>&1 | tee /tmp/plan66-lint.log | tail -20` → zero ktlint/detekt findings (fix root causes; no suppressions beyond D18).
-- [ ] `make test-unit 2>&1 | tee /tmp/plan66-test-unit.log | tail -20` → all unit + JVM integration tests pass (`EventDispatcherImplTest` is known-flaky in the full suite: re-run ONCE before treating it as a regression).
-- [ ] `make build 2>&1 | tee /tmp/plan66-build.log | tail -20` and `make build-foss 2>&1 | tee /tmp/plan66-build-foss.log | tail -20` → no errors, no warnings (both flavors, D13).
-- [ ] `make test-e2e 2>&1 | tee /tmp/plan66-test-e2e.log | tail -40` → all e2e tests pass, `E2EArcTunnelTest` included; `E2EArcTunnelDeviceTest` passes with the phone attached (or is reported as skipped without one). `make test-e2e` targets the rootful podman socket (CI); locally, when `/run/podman/podman.sock` is not readable, run the same Gradle tasks against Docker Engine: `TESTCONTAINERS_RYUK_DISABLED=true DOCKER_HOST=unix:///var/run/docker.sock ./gradlew :e2e-tests:cleanTest :e2e-tests:test 2>&1 | tee /tmp/plan66-test-e2e.log | tail -40`.
+- [x] `make lint 2>&1 | tee /tmp/plan66-lint.log | tail -20` → zero ktlint/detekt findings (fix root causes; no suppressions beyond D18).
+- [x] `make test-unit 2>&1 | tee /tmp/plan66-test-unit.log | tail -20` → all unit + JVM integration tests pass (`EventDispatcherImplTest` is known-flaky in the full suite: re-run ONCE before treating it as a regression).
+- [x] `make build 2>&1 | tee /tmp/plan66-build.log | tail -20` and `make build-foss 2>&1 | tee /tmp/plan66-build-foss.log | tail -20` → no errors, no warnings (both flavors, D13).
+- [x] `make test-e2e 2>&1 | tee /tmp/plan66-test-e2e.log | tail -40` → all e2e tests pass, `E2EArcTunnelTest` included; `E2EArcTunnelDeviceTest` passes with the phone attached (or is reported as skipped without one). `make test-e2e` targets the rootful podman socket (CI); locally, when `/run/podman/podman.sock` is not readable, run the same Gradle tasks against Docker Engine: `TESTCONTAINERS_RYUK_DISABLED=true DOCKER_HOST=unix:///var/run/docker.sock ./gradlew :e2e-tests:cleanTest :e2e-tests:test 2>&1 | tee /tmp/plan66-test-e2e.log | tail -40`.
 
 Definition of Done:
-- [ ] All four gates green with their logs under `/tmp/`.
+- [x] All four gates green with their logs under `/tmp/`.
 
 ### [ ] Task 12.3 — Review and PR
 
-- [ ] Spawn the `code-reviewer` subagent (model `opus`) in plan compliance mode over the ENTIRE implementation; fix ALL findings; re-run until clean.
-- [ ] Commits: one logical commit per task at least, pushed after every user story; no `git add -A`; no plan file other than this one's checkmarks is touched.
-- [ ] `gh pr create --base main` following `docs/TOOLS.md` (title `Plan 66: free E2E tunnel provider (android-remote-control-mcp-tunneld)`), body with Summary, Plan Reference, Changes, Testing (incl. the **Manual QA Steps** of User Stories 5 and 8 and the gate log paths), Checklist. Report the PR URL.
+- [x] Spawn the `code-reviewer` subagent (model `opus`) in plan compliance mode over the ENTIRE implementation; fix ALL findings; re-run until clean.
+- [x] Commits: one logical commit per task at least, pushed after every user story; no `git add -A`; no plan file other than this one's checkmarks is touched.
+- [x] `gh pr create --base main` following `docs/TOOLS.md` (title `Plan 66: free E2E tunnel provider (android-remote-control-mcp-tunneld)`), body with Summary, Plan Reference, Changes, Testing (incl. the **Manual QA Steps** of User Stories 5 and 8 and the gate log paths), Checklist. Report the PR URL.
 
 Definition of Done:
-- [ ] Reviewer clean, commits pushed, PR URL reported.
+- [x] Reviewer clean, commits pushed, PR URL reported.
