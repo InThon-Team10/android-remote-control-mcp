@@ -364,7 +364,6 @@ class McpServerService : Service() {
         }
     }
 
-    @Suppress("TooGenericExceptionCaught", "LongMethod")
     override fun onDestroy() {
         screenStateSnapshotCache.clear()
         // Release the Privacy Mode model and clear session-scoped pseudonym/NER caches (never persisted).
@@ -397,21 +396,10 @@ class McpServerService : Service() {
         OAuthApprovalNotifier.cancel(this)
 
         // Stop tunnel first (with ANR-safe timeout).
-        // Worst-case blocking time: TUNNEL_STOP_TIMEOUT_MS (3s) + SHUTDOWN_GRACE_PERIOD_MS (1s)
-        // + SHUTDOWN_TIMEOUT_MS (5s) = ~9s total. This is well within the Android service
-        // onDestroy ANR threshold (~200s), so blocking the main thread here is acceptable.
-        @Suppress("TooGenericExceptionCaught")
-        try {
-            runBlocking {
-                withTimeout(TUNNEL_STOP_TIMEOUT_MS) {
-                    tunnelManager.stop()
-                }
-            }
-        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            Log.w(TAG, "Tunnel stop timed out after ${TUNNEL_STOP_TIMEOUT_MS}ms, proceeding with shutdown", e)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping tunnel", e)
-        }
+        // Worst-case blocking time: START_JOIN_TIMEOUT_MS (5s) + TUNNEL_STOP_TIMEOUT_MS (3s)
+        // + SHUTDOWN_GRACE_PERIOD_MS (1s) + SHUTDOWN_TIMEOUT_MS (5s) = ~14s total. This is well within the
+        // Android service onDestroy ANR threshold (~200s), so blocking the main thread here is acceptable.
+        stopTunnel()
 
         // Stop the Ktor server gracefully
         @Suppress("TooGenericExceptionCaught")
@@ -436,6 +424,22 @@ class McpServerService : Service() {
         Log.i(TAG, "McpServerService destroyed")
 
         super.onDestroy()
+    }
+
+    /** Stops the tunnel within [TUNNEL_STOP_TIMEOUT_MS]; a failure is logged and the shutdown goes on. */
+    private fun stopTunnel() {
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            runBlocking {
+                withTimeout(TUNNEL_STOP_TIMEOUT_MS) {
+                    tunnelManager.stop()
+                }
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            Log.w(TAG, "Tunnel stop timed out after ${TUNNEL_STOP_TIMEOUT_MS}ms, proceeding with shutdown", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping tunnel", e)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
