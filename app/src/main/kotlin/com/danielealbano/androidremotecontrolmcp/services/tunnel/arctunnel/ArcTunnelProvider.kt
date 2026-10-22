@@ -308,6 +308,8 @@ class ArcTunnelProvider
             override fun onBound(node: String) {
                 s.bindTimeout?.cancel()
                 s.bindTimedOut.set(false)
+                // A failure from before this bind does not explain a later outage.
+                s.lastFailure = ""
                 s.connected.set(true)
                 Log.i(TAG, "Free E2E tunnel control bound via $node")
                 _status.value = connectedStatus(s)

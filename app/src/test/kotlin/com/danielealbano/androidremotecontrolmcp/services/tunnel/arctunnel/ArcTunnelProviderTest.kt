@@ -303,6 +303,31 @@ class ArcTunnelProviderTest {
         }
 
     @Test
+    fun `the bind-timeout error never names a failure from before the last bind`() =
+        runBlocking {
+            provider.bindTimeoutMs = SHORT_BIND_TIMEOUT_MS
+            // Refused once, then bound and ended cleanly (no failure of its own); the next request is never answered.
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(503)
+                    .doNotReadRequestBody()
+                    .build(),
+            )
+            server.enqueue(ArcTunnelTestServer.answer(200) { socket -> socket.sink.close() })
+            val statuses = CopyOnWriteArrayList<TunnelStatus>()
+            val collector = launch(Dispatchers.Unconfined) { provider.status.collect { statuses += it } }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitThat { errorAfterConnected(statuses) != null }
+            collector.cancel()
+
+            val error = requireNotNull(errorAfterConnected(statuses))
+            assertEquals("Not connected after 0 s; still retrying", error.message)
+        }
+
+    @Test
     fun `a bind after the bind timeout fired restores Connected`() =
         runBlocking {
             provider.bindTimeoutMs = SHORT_BIND_TIMEOUT_MS
