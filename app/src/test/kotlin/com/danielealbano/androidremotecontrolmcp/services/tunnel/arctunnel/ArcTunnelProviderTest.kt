@@ -558,6 +558,44 @@ class ArcTunnelProviderTest {
         }
 
     @Test
+    fun `a failed swap while unbound leaves the reconnect status`() =
+        runBlocking {
+            provider.swapPollMs = SWAP_POLL_MS
+            every { host.startTlsListener(any(), any(), any()) } answers {
+                val n = listenerStarts.incrementAndGet()
+                onRequest.set(thirdArg())
+                check(n != 2) { "busy port" }
+                secondArg<Int?>() ?: LISTENER_PORT
+            }
+            // The stream delivers the nudge, then drops once the renewal asks for it; the renewal returns (and so
+            // schedules the swap) only after the provider reports the reconnect. The next request is never answered.
+            val drop = CountDownLatch(1)
+            server.enqueue(
+                ArcTunnelTestServer.answer(200) { socket ->
+                    val sink = socket.sink.buffer()
+                    sink.write(nudge())
+                    sink.flush()
+                    drop.await(BUDGET_MS, TimeUnit.MILLISECONDS)
+                    socket.cancel()
+                },
+            )
+            coEvery { enrollment.renew(any(), any()) } coAnswers {
+                drop.countDown()
+                awaitThat { provider.status.value == TunnelStatus.Connecting }
+            }
+            val statuses = CopyOnWriteArrayList<TunnelStatus>()
+            val collector = launch(Dispatchers.Unconfined) { provider.status.collect { statuses += it } }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitThat { listenerStarts.get() == 3 }
+            collector.cancel()
+
+            assertTrue(statuses.none { it is TunnelStatus.Error }, "statuses $statuses")
+            assertEquals(TunnelStatus.Connecting, provider.status.value)
+        }
+
+    @Test
     fun `restoreAlert re-raises a persisted alert at start`() =
         runBlocking {
             store.mergeCtCheck("", listOf("f00d"), "f00d", 1L)

@@ -271,9 +271,12 @@ class ArcTunnelProvider
             }
             result.onFailure {
                 if (it is CancellationException) throw it
-                // The listener is down until the next poll succeeds: say so instead of showing Connected.
+                // The listener is down until the next poll succeeds: say so instead of showing Connected. While
+                // unbound the status stays with the reconnect (Connecting, then the bind-timeout error).
                 Log.e(TAG, "Tunnel listener restart failed; retrying at the next poll", it)
-                _status.value = TunnelStatus.Error("Listener restart failed; retrying: ${it.message}")
+                if (s.connected.get()) {
+                    _status.value = TunnelStatus.Error("Listener restart failed; retrying: ${it.message}")
+                }
             }
         }
 
