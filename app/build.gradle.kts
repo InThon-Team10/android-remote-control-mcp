@@ -295,6 +295,12 @@ android {
             excludes += "/META-INF/io.netty.*"
             excludes += "/META-INF/LICENSE.md"
             excludes += "/META-INF/LICENSE-notice.md"
+            // Ktor 3.6.0's Netty engine depends on the HTTP/3 codec, which brings desktop QUIC binaries
+            // (Linux/macOS/Windows) Android cannot load; the app never enables HTTP/3. Their jars repeat the
+            // same license texts: keep one copy.
+            excludes += "/META-INF/native/*quiche*"
+            excludes += "/META-INF/native-image/io.netty/netty-codec-native-quic/**"
+            pickFirsts += "/META-INF/license/**"
         }
         jniLibs {
             useLegacyPackaging = true
