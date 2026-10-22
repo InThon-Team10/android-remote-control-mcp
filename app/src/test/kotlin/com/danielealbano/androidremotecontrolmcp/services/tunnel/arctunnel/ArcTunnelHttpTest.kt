@@ -98,7 +98,12 @@ class ArcTunnelHttpTest {
 
     @Test
     fun `an unexpected exception reaches the caller`() {
-        val failing = net.serverClient().newBuilder().addInterceptor { throw IllegalStateException("boom") }.build()
+        val failing =
+            net
+                .serverClient()
+                .newBuilder()
+                .addInterceptor { throw IllegalStateException("boom") }
+                .build()
         val url = net.url(ArcTunnelTestServer.ENROLL_HOST, "/api/v1/enroll/nonce")
 
         val error =
