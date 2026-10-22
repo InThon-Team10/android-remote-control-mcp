@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ServerStartTrackerTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val tracker = ServerStartTracker(scope, JOIN_TIMEOUT_MS)
+
+    /** Only for the timeout itself: every other test must not depend on how fast the start ends. */
+    private val impatientTracker = ServerStartTracker(scope, SHORT_JOIN_TIMEOUT_MS)
     private val entered = CountDownLatch(1)
 
     @AfterEach
@@ -66,20 +69,21 @@ class ServerStartTrackerTest {
     @Test
     fun `a start that does not end in time reports it`() {
         val release = CountDownLatch(1)
-        tracker.launch {
+        impatientTracker.launch {
             entered.countDown()
             release.await()
         }
         entered.await()
 
         try {
-            assertFalse(tracker.cancelAndAwait())
+            assertFalse(impatientTracker.cancelAndAwait())
         } finally {
             release.countDown()
         }
     }
 
     private companion object {
-        const val JOIN_TIMEOUT_MS = 200L
+        const val JOIN_TIMEOUT_MS = 5_000L
+        const val SHORT_JOIN_TIMEOUT_MS = 200L
     }
 }
