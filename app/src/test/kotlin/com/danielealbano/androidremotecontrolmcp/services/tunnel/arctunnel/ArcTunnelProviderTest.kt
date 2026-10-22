@@ -281,12 +281,18 @@ class ArcTunnelProviderTest {
             provider.bindTimeoutMs = SHORT_BIND_TIMEOUT_MS
             // Bound once, then dropped; the next control request is never answered.
             server.enqueue(ArcTunnelTestServer.answer(200) { socket -> socket.cancel() })
+            // Every status is recorded: the short-lived Connected is conflated away for a plain first { }.
+            val statuses = CopyOnWriteArrayList<TunnelStatus>()
+            val collector = launch(Dispatchers.Unconfined) { provider.status.collect { statuses += it } }
             provider.bind(host)
 
             provider.start(LOCAL_PORT, config)
-            awaitConnected()
+            val error = awaitError()
+            collector.cancel()
 
-            assertTrue(awaitError().message.startsWith("Not connected after"))
+            assertTrue(error.message.startsWith("Not connected after"), error.message)
+            val connectedAt = statuses.indexOfFirst { it is TunnelStatus.Connected }
+            assertTrue(connectedAt in 0 until statuses.indexOfFirst { it is TunnelStatus.Error }, "statuses $statuses")
         }
 
     @Test
