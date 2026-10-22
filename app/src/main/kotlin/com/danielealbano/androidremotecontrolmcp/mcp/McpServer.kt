@@ -230,7 +230,8 @@ class McpServer(
                 enableH2c = true
                 channelPipelineConfig = {
                     if (get(TunnelTlsContext.HANDLER_NAME) == null) {
-                        addFirst(TunnelTlsContext.HANDLER_NAME, sslContext.newHandler(channel().alloc()))
+                        val tls = TunnelTlsContext.newHandler(sslContext, channel().alloc())
+                        addFirst(TunnelTlsContext.HANDLER_NAME, tls)
                     }
                 }
             },

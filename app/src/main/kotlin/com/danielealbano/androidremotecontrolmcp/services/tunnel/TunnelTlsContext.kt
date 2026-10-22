@@ -1,10 +1,11 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel
 
+import io.netty.buffer.ByteBufAllocator
 import io.netty.handler.codec.http2.Http2SecurityUtil
-import io.netty.handler.ssl.ApplicationProtocolConfig
 import io.netty.handler.ssl.ApplicationProtocolNames
 import io.netty.handler.ssl.SslContext
 import io.netty.handler.ssl.SslContextBuilder
+import io.netty.handler.ssl.SslHandler
 import io.netty.handler.ssl.SslProvider
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import java.net.Socket
@@ -18,30 +19,34 @@ import javax.net.ssl.X509ExtendedKeyManager
  * Server TLS of the tunnel listener, built from a key manager that hands the key handle and the public chain
  * straight to the TLS stack. The key never goes into a `KeyStore`: an AndroidKeyStore key cannot be exported
  * (its format is null), which the default `KeyStore` type rejects on Android 13 and 14; the TLS stack signs
- * through AndroidKeyStore instead. Provider, ciphers and ALPN mirror Ktor's own `sslConnector` setup; the JDK
- * provider is used because OpenSSL would need the key material.
+ * through AndroidKeyStore instead. The JDK provider is used because OpenSSL would need the key material; the
+ * ciphers are the HTTP/2-safe ones Ktor's `sslConnector` uses.
  */
 object TunnelTlsContext {
     /** Pipeline name of the TLS handler (a repeated pipeline hook never adds a second one). */
     const val HANDLER_NAME = "tunnel-tls"
     private const val ALIAS = "tunnel"
+    private val PROTOCOLS = arrayOf(ApplicationProtocolNames.HTTP_2, ApplicationProtocolNames.HTTP_1_1)
 
-    fun create(material: TunnelTlsMaterial): SslContext {
-        val builder = SslContextBuilder.forServer(KeyManager(material)).sslProvider(SslProvider.JDK)
-        if (SslProvider.isAlpnSupported(SslProvider.JDK)) {
-            builder
-                .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
-                .applicationProtocolConfig(
-                    ApplicationProtocolConfig(
-                        ApplicationProtocolConfig.Protocol.ALPN,
-                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                        ApplicationProtocolNames.HTTP_2,
-                        ApplicationProtocolNames.HTTP_1_1,
-                    ),
-                )
-        }
-        return builder.build()
+    fun create(material: TunnelTlsMaterial): SslContext =
+        SslContextBuilder
+            .forServer(KeyManager(material))
+            .sslProvider(SslProvider.JDK)
+            .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+            .build()
+
+    /**
+     * A TLS handler offering `h2` and `http/1.1` through the engine's own ALPN parameters, not Netty's ALPN
+     * negotiator: on Android the negotiator fails a client that offers no ALPN (the engine reports no protocol as
+     * null), while the HTTP handler behind TLS detects the protocol from the bytes anyway.
+     */
+    fun newHandler(
+        context: SslContext,
+        allocator: ByteBufAllocator,
+    ): SslHandler {
+        val engine = context.newEngine(allocator)
+        engine.sslParameters = engine.sslParameters.apply { applicationProtocols = PROTOCOLS }
+        return SslHandler(engine)
     }
 
     /** Offers the one key for the handshake key types it can serve (`EC`, or `EC_EC` style on TLS 1.2). */
