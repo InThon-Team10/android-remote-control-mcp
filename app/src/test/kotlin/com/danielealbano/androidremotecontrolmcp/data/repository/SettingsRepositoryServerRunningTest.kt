@@ -56,6 +56,7 @@ class SettingsRepositoryServerRunningTest {
                 dataStore,
                 changeLogger,
                 EventChannelSettingsImpl(dataStore, changeLogger),
+                ArcTunnelSettingsImpl(dataStore, changeLogger),
             )
     }
 

@@ -295,6 +295,12 @@ android {
             excludes += "/META-INF/io.netty.*"
             excludes += "/META-INF/LICENSE.md"
             excludes += "/META-INF/LICENSE-notice.md"
+            // Ktor 3.6.0's Netty engine depends on the HTTP/3 codec, which brings desktop QUIC binaries
+            // (Linux/macOS/Windows) Android cannot load; the app never enables HTTP/3. Their jars repeat the
+            // same license texts: keep one copy.
+            excludes += "/META-INF/native/*quiche*"
+            excludes += "/META-INF/native-image/io.netty/netty-codec-native-quic/**"
+            pickFirsts += "/META-INF/license/**"
         }
         jniLibs {
             useLegacyPackaging = true
@@ -364,27 +370,37 @@ dependencies {
     // Ktor Client (Event Channel dispatcher — no Logging plugin, it would expose auth token)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
+    // Raw OkHttp: the free E2E tunnel control stream is an HTTP/2 duplex request body (not expressible
+    // through the Ktor client), plus its /issue and Certificate Transparency calls.
+    implementation(libs.okhttp)
 
-    // Force patched Netty: Ktor's server engine ships netty 4.2.9, which is vulnerable.
+    // Pin Netty to the latest 4.2.x patch release (Ktor 3.6.0's server engine ships 4.2.17); keeps the patched floor.
     // Covers the HTTP Request Smuggling / HTTP/2 CONTINUATION-flood CVEs (CVE-2026-33870,
     // CVE-2026-33871) plus the native-transport advisories that the engine also pulls onto the
     // release classpath: epoll DoS (GHSA-rwm7-x88c-3g2p) and the epoll/kqueue fd leak
     // (GHSA-w573-9ffj-6ff9). All netty modules are pinned to the same version to avoid skew.
     constraints {
-        implementation("io.netty:netty-codec-http:4.2.17.Final")
-        implementation("io.netty:netty-codec-http2:4.2.17.Final")
-        implementation("io.netty:netty-handler:4.2.17.Final")
-        implementation("io.netty:netty-common:4.2.17.Final")
-        implementation("io.netty:netty-buffer:4.2.17.Final")
-        implementation("io.netty:netty-transport:4.2.17.Final")
-        implementation("io.netty:netty-codec-base:4.2.17.Final")
-        implementation("io.netty:netty-codec-compression:4.2.17.Final")
-        implementation("io.netty:netty-resolver:4.2.17.Final")
-        implementation("io.netty:netty-transport-native-unix-common:4.2.17.Final")
-        implementation("io.netty:netty-transport-classes-epoll:4.2.17.Final")
-        implementation("io.netty:netty-transport-native-epoll:4.2.17.Final")
-        implementation("io.netty:netty-transport-classes-kqueue:4.2.17.Final")
-        implementation("io.netty:netty-transport-native-kqueue:4.2.17.Final")
+        implementation("io.netty:netty-codec-http:4.2.19.Final")
+        implementation("io.netty:netty-codec-http2:4.2.19.Final")
+        implementation("io.netty:netty-handler:4.2.19.Final")
+        implementation("io.netty:netty-common:4.2.19.Final")
+        implementation("io.netty:netty-buffer:4.2.19.Final")
+        implementation("io.netty:netty-transport:4.2.19.Final")
+        implementation("io.netty:netty-codec-base:4.2.19.Final")
+        implementation("io.netty:netty-codec-compression:4.2.19.Final")
+        implementation("io.netty:netty-resolver:4.2.19.Final")
+        implementation("io.netty:netty-transport-native-unix-common:4.2.19.Final")
+        implementation("io.netty:netty-transport-classes-epoll:4.2.19.Final")
+        implementation("io.netty:netty-transport-native-epoll:4.2.19.Final")
+        implementation("io.netty:netty-transport-classes-kqueue:4.2.19.Final")
+        implementation("io.netty:netty-transport-native-kqueue:4.2.19.Final")
+        // Pulled by ktor-server-netty 3.6.0 (HTTP/3 support): pinned with the rest to avoid skew.
+        implementation("io.netty:netty-codec:4.2.19.Final")
+        implementation("io.netty:netty-codec-classes-quic:4.2.19.Final")
+        implementation("io.netty:netty-codec-http3:4.2.19.Final")
+        implementation("io.netty:netty-codec-marshalling:4.2.19.Final")
+        implementation("io.netty:netty-codec-native-quic:4.2.19.Final")
+        implementation("io.netty:netty-codec-protobuf:4.2.19.Final")
     }
 
     // Certificate generation (Bouncy Castle for self-signed cert with SAN support)
@@ -450,6 +466,8 @@ dependencies {
     testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
     testImplementation(libs.ktor.sse)
+    testImplementation(libs.okhttp.mockwebserver3)
+    testImplementation(libs.okhttp.tls)
 }
 
 dependencies {

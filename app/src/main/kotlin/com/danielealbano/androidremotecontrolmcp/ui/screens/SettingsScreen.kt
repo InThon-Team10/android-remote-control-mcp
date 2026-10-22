@@ -24,6 +24,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.StorageSett
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.TunnelSettingsScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.WifiMonitorScreen
 import com.danielealbano.androidremotecontrolmcp.ui.screens.settings.geofenceDestinations
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
@@ -38,6 +39,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
     channelViewModel: ChannelViewModel = hiltViewModel(),
+    arcTunnelViewModel: ArcTunnelViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
 
@@ -77,7 +79,11 @@ fun SettingsScreen(
             PrivacySettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoute.Tunnel.route) {
-            TunnelSettingsScreen(onBack = { navController.popBackStack() }, viewModel = viewModel)
+            TunnelSettingsScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = viewModel,
+                arcViewModel = arcTunnelViewModel,
+            )
         }
         composable(SettingsRoute.McpTools.route) {
             McpToolsSettingsScreen(

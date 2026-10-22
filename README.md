@@ -57,7 +57,7 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Auto-generated self-signed TLS certificates (or custom certificate upload)
 - Configurable binding: localhost (127.0.0.1) or network (0.0.0.0)
 - Auto-start on boot
-- Remote access tunnels via Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
+- Remote access tunnels via the free end-to-end encrypted tunnel (no account), Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
 ### 57 MCP Tools across 14 Categories
 
@@ -73,7 +73,7 @@ See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full tool reference with inpu
 - Connection info display (IP, port, token, tunnel URL)
 - Per-tool and per-parameter permissions (enable/disable individual MCP tools)
 - Permission management (Accessibility, Notifications, Camera, Microphone)
-- Remote access tunnel configuration (Cloudflare / ngrok)
+- Remote access tunnel configuration (free E2E tunnel / Cloudflare / ngrok)
 - Storage location management (automatic locations + SAF authorization for file tools)
 - Server log viewer (MCP tool calls, tunnel events)
 - Headless setup via ADB (configure, grant permissions, start/stop server without UI)
@@ -239,7 +239,7 @@ Replace `DEVICE_IP`, `PORT`, and `YOUR_TOKEN` with the values shown in the app's
 Claude.ai (web) and Claude Desktop connect as a **custom connector** (remote MCP) using OAuth 2.1 — the app is its own OAuth Authorization Server, so no external account or pre-registration is needed. This requires the server to be reachable over a **public HTTPS URL**, so you must first enable a [remote access tunnel](#using-remote-access-tunnels) — a `localhost`/LAN address or `adb` port-forward will **not** work.
 
 1. **OAuth is enabled by default** — no action needed (if you previously disabled it, re-enable it under **Settings → Access**). The bearer token stays enabled too; both are accepted.
-2. Open **Settings → Tunnel**, enable **Remote Access** (Cloudflare Quick Tunnels needs no account), and start the server. Copy the public `https://…` URL from the Server tab and append `/mcp` (e.g. `https://your-tunnel.trycloudflare.com/mcp`).
+2. Open **Settings → Tunnel**, enable **Remote Access** (the default free E2E tunnel needs no account; the first setup takes about 10–30 seconds), and start the server. Copy the public `https://…` URL from the Server tab and append `/mcp` (e.g. `https://<name>.d.arc-tunnel.io/mcp`).
 3. In Claude, open **[Customize → Connectors → Add custom connector](https://claude.ai/customize/connectors?modal=add-custom-connector)**, paste the `https://…/mcp` URL, and **leave the OAuth Client ID and Client Secret blank** (the app uses Dynamic Client Registration). Click **Add**.
 4. Claude opens a browser approval page showing a **2-digit code**. On the device, tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — to open the approval screen, confirm the code matches, and **Approve**.
 5. Manage or revoke connected clients any time under **Settings → Access → Connected clients**. Revoking immediately invalidates that client's tokens.
@@ -336,7 +336,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | HTTPS | Disabled | Enable HTTPS with auto-generated self-signed certificate (configurable hostname) or upload custom .p12/.pfx |
 | Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
 | Device Slug | Empty | Optional device identifier for tool name prefix (e.g., `pixel7` makes tools `android_pixel7_tap`) |
-| Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (Cloudflare Quick Tunnels or ngrok) |
+| Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (free E2E tunnel by default; Cloudflare Quick Tunnels or ngrok) |
 | Tool Permissions | All enabled | Per-tool and per-parameter enable/disable (Settings > MCP Tools) |
 | File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
 | Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
@@ -371,8 +371,9 @@ When the server is bound to `0.0.0.0`:
 
 For connecting from outside the local network without port forwarding:
 
-1. **Cloudflare Quick Tunnels** (default, no account required): Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL.
-2. **ngrok** (account required): Supports optional custom domains. Requires an ngrok authtoken (free tier available). Available on arm64-v8a and x86_64 devices.
+1. **Free E2E tunnel** (default, no account required): end-to-end encrypted. The phone enrolls with hardware key attestation, gets a name under `d.arc-tunnel.io` and a public certificate (Let's Encrypt, Google Trust Services or ZeroSSL) issued to its own key, and terminates TLS itself — the tunnel service only relays ciphertext (unlike Cloudflare or ngrok, which read the traffic). The refresh icon next to the URL re-enrolls under a new name. A Certificate Transparency check (on by default) warns if a certificate for your name is ever issued to another key. Self-hosters change the base address.
+2. **Cloudflare Quick Tunnels** (no account required): Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL.
+3. **ngrok** (account required): Supports optional custom domains. Requires an ngrok authtoken (free tier available). Available on arm64-v8a and x86_64 devices.
 
 Enable the tunnel in the app's "Remote Access" section. The public URL is displayed in the connection info and server logs.
 
@@ -441,8 +442,10 @@ adb shell am broadcast \
   --ez https_enabled false \
   --es certificate_source "AUTO_GENERATED" \
   --es certificate_hostname "mcp.local" \
-  --ez tunnel_enabled false \
-  --es tunnel_provider "CLOUDFLARE" \
+  --ez tunnel_enabled true \
+  --es tunnel_provider "android-remote-control-mcp-tunneld" \
+  --es arc_tunnel_base_address "arc-tunnel.io" \
+  --ez arc_tunnel_ct_check_enabled true \
   --es cloudflare_tunnel_mode "TOKEN" \
   --es cloudflare_tunnel_token "your-cloudflare-tunnel-token" \
   --es cloudflare_tunnel_extra_args "--edge region1.v2.argotunnel.com:7844" \
@@ -481,7 +484,10 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 | `certificate_source` | string | `AUTO_GENERATED` or `CUSTOM` |
 | `certificate_hostname` | string | Hostname for auto-generated certificate |
 | `tunnel_enabled` | boolean | Enable remote access tunnel |
-| `tunnel_provider` | string | `CLOUDFLARE` or `NGROK` |
+| `tunnel_provider` | string | `android-remote-control-mcp-tunneld` (free E2E tunnel), `CLOUDFLARE` or `NGROK` |
+| `arc_tunnel_base_address` | string | Base address of the free E2E tunnel service (default `arc-tunnel.io`; hosts `enroll.`, `connect.` and `d.` are derived) |
+| `arc_tunnel_ct_check_enabled` | boolean | Certificate Transparency check for the free E2E tunnel (default `true`) |
+| `arc_tunnel_enroll` | boolean | `true` enrolls the free E2E tunnel (or resumes a failed certificate issuance) with the settings in the same broadcast, while the app is visible and the server is stopped; headless, use the trampoline action `enroll-tunnel` below. The public URL appears in the Server tab |
 | `cloudflare_tunnel_mode` | string | `FREE` (Quick Tunnel, random `*.trycloudflare.com` URL) or `TOKEN` (named tunnel with static hostname) |
 | `cloudflare_tunnel_token` | string | Cloudflare named-tunnel token (used when `cloudflare_tunnel_mode` is `TOKEN`) |
 | `cloudflare_tunnel_extra_args` | string | Optional extra arguments passed to cloudflared (e.g. `--edge region1.v2.argotunnel.com:7844`) |
@@ -515,6 +521,18 @@ adb shell am start \
   --es action stop
 ```
 
+#### Enroll the Free E2E Tunnel
+
+Enrollment (getting the device's name and certificate) runs in a short foreground service. Headless, use the same trampoline Activity as for starting the server; it also resumes a failed certificate issuance. Run it while the server is stopped.
+
+```bash
+adb shell am start \
+  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
+  --es action enroll-tunnel
+```
+
+`--ez arc_tunnel_enroll true` on the configuration broadcast does the same when the app is visible; from the background Android 12+ refuses the foreground service start and the app reports "background start refused".
+
 ---
 
 ## Permissions Reference
@@ -528,6 +546,7 @@ The app declares the permissions below. **Normal** permissions are granted autom
 | `FOREGROUND_SERVICE` | Normal | Run the MCP server as a foreground service |
 | `FOREGROUND_SERVICE_SPECIAL_USE` | Normal | Foreground service type for the MCP server |
 | `FOREGROUND_SERVICE_LOCATION` | Normal | Foreground service type for the Event Channel (geofence/WiFi) |
+| `FOREGROUND_SERVICE_DATA_SYNC` | Normal | Foreground service type for the free E2E tunnel enrollment (name + certificate) |
 | `RECEIVE_BOOT_COMPLETED` | Normal | Auto-start the server on device boot |
 | `QUERY_ALL_PACKAGES` | Normal | Enumerate installed apps for app-management tools |
 | `KILL_BACKGROUND_PROCESSES` | Normal | Stop background apps via app-management tools |

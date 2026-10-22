@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.Flow
  * and Services must not access DataStore directly.
  */
 @Suppress("TooManyFunctions")
-interface SettingsRepository : EventChannelSettings {
+interface SettingsRepository :
+    EventChannelSettings,
+    ArcTunnelSettings {
     /**
      * Observes the current server configuration. Emits a new [ServerConfig]
      * whenever any setting changes.
@@ -96,6 +98,9 @@ interface SettingsRepository : EventChannelSettings {
      *
      * Idempotent; MUST be invoked before the auth model is consumed by the server or the UI so a
      * previously-cleared-token user is not regressed into a token-required state.
+     *
+     * Also runs the one-time tunnel-provider migration (an install that ever wrote a tunnel setting without
+     * choosing a provider keeps Cloudflare).
      */
     suspend fun ensureAuthModelMigrated()
 

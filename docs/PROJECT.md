@@ -103,6 +103,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **SLF4J-Android**: Routes MCP SDK internal SLF4J logs to `android.util.Log`
 - **Kotlinx Serialization**: JSON serialization for MCP protocol
 - **Kotlinx Coroutines**: Async/concurrency
+- **OkHttp**: 5.5.0, the free E2E tunnel's HTTP/2 duplex control stream, `/issue` and Certificate Transparency calls (duplex request bodies are not expressible through the Ktor client)
 - **Android Log**: Logging (standard Android Log class)
 - **Accompanist**: Compose utilities (permissions handling)
 - **Google Play Services Location**: Device location via FusedLocationProviderClient
@@ -112,6 +113,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **JUnit 5**: Unit test framework
 - **MockK**: Mocking framework for Kotlin
 - **Turbine**: Flow testing library
+- **MockWebServer3 + okhttp-tls**: TLS/HTTP-2 mock server and test certificates for the free E2E tunnel client tests
 - **Compose UI Test**: Jetpack Compose testing
 - **Testcontainers Kotlin**: Container-based E2E tests
 - **MCP Kotlin SDK Client**: SDK `Client` + `StreamableHttpClientTransport` for E2E tests
@@ -134,23 +136,24 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/apps/` — `AppManager.kt`, `AppManagerImpl.kt`
   - `services/camera/` — `CameraProvider.kt`, `CameraProviderImpl.kt`, `ServiceLifecycleOwner.kt`
   - `services/location/` — `LocationProvider.kt`, `LocationProviderImpl.kt`
-  - `services/mcp/` — `McpServerService.kt`, `BootCompletedReceiver.kt`, `AdbConfigHandler.kt`, `AdbConfigReceiver.kt`, `AdbServiceTrampolineActivity.kt`
-  - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
+  - `services/mcp/` — `McpServerService.kt`, `McpToolRegistration.kt`, `McpToolDependencies.kt`, `ServerStartTracker.kt`, `BootCompletedReceiver.kt`, `AdbConfigHandler.kt`, `AdbConfigReceiver.kt`, `AdbServiceTrampolineActivity.kt`
+  - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `TunnelListenerHost.kt`, `TunnelTlsContext.kt`, `TunnelHttpsGuard.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
+  - `services/tunnel/arctunnel/` — free E2E tunnel client (`android-remote-control-mcp-tunneld` protocol v2): `ArcTunnelHosts.kt`, `ArcTunnelEnv.kt`, `ArcTunnelPem.kt`, `ArcTunnelSockets.kt`, `ArcTunnelWire.kt`, `ArcTunnelFrames.kt`, `ArcTunnelCsr.kt`, `ArcTunnelSessions.kt`, `ArcTunnelKeyStore.kt`, `AndroidArcTunnelKeyStore.kt`, `ArcTunnelIdentity.kt`, `ArcTunnelNet.kt`, `ArcTunnelHttp.kt`, `ArcTunnelDialBack.kt`, `ArcTunnelEnrollRetry.kt`, `ArcTunnelIssueRetry.kt`, `ArcTunnelEnroller.kt`, `ArcTunnelIdentityStore.kt`, `ArcTunnelBackoff.kt`, `ArcTunnelLocalConnect.kt`, `ArcTunnelSplice.kt`, `ArcTunnelWatchdog.kt`, `ArcTunnelControlEvents.kt`, `ArcTunnelOpenHandler.kt`, `ArcTunnelControl.kt`, `ArcTunnelEnrollment.kt`, `ArcTunnelEnrollmentFlow.kt`, `ArcTunnelStartTracker.kt`, `ArcTunnelEnrollmentImpl.kt`, `ArcTunnelEnrollService.kt`, `ArcTunnelRenewals.kt`, `ArcTunnelRenewalsImpl.kt`, `ArcTunnelCtNotifier.kt`, `ArcTunnelCtAlerts.kt`, `ArcTunnelCtMonitor.kt`, `ArcTunnelCertSwap.kt`, `ArcTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpStatelessTransport.kt`, `McpToolException.kt`, `CertificateManager.kt`
   - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
-  - `ui/screens/` — `HomeScreen.kt`
-  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`
-  - `ui/viewmodels/` — `MainViewModel.kt`
-  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`
+  - `ui/screens/` — `HomeScreen.kt`, `settings/ArcTunnelSettingsSection.kt`
+  - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`, `ArcTunnelRenewalBlock.kt`
+  - `ui/viewmodels/` — `MainViewModel.kt`, `ArcTunnelViewModel.kt`, `ArcTunnelRenewalViewModel.kt`
+  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `ArcTunnelSettings.kt`, `ArcTunnelSettingsImpl.kt`
   - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`, `LocationData.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`, `RecentsUtils.kt`
 - `app/src/main/res/` — `values/strings.xml`, `values/themes.xml`, `drawable/`, `mipmap/`, `xml/accessibility_service_config.xml`
 - `app/src/main/AndroidManifest.xml`
-- `app/src/debug/` — `AndroidManifest.xml` (debug overlay), `kotlin/.../debug/E2EConfigReceiver.kt`
+- `app/src/debug/` — `AndroidManifest.xml` (debug overlay), `kotlin/.../debug/E2EConfigReceiver.kt`, `E2EArcTunnelStatus.kt`, `E2EArcTunnelLabels.kt`
 - `app/src/test/kotlin/` — Unit tests and JVM-based integration tests
 - `app/src/test/kotlin/.../integration/` — Integration tests (Ktor `testApplication`, no emulator)
 - `e2e-tests/` — E2E tests (redroid/Podman, JVM-only module)
@@ -555,8 +558,8 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 ### E2E Tests
 
 - **Framework**: Testcontainers Kotlin (`redroid/redroid:14.0.0-latest`), JUnit 5, MCP Kotlin SDK Client
-- **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, node not found)
-- **Infrastructure**: `SharedAndroidContainer` singleton shares one container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` with trust-all TLS for self-signed certs; `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast`
+- **Scope**: Full MCP client → server → Android → action flow, Calculator app test (7 + 3 = 10), screenshot capture validation, error handling (auth, unknown tool, invalid params, node not found), the free E2E tunnel against a local tunnel server stack (`E2EArcTunnelTest`: enrollment, `/health` over HTTP/2 and over HTTP/1.1 without ALPN, the OAuth metadata naming the `https` URL over HTTP/1.1, and `tools/list` through the tunnel) and, when a phone is attached, against production (`E2EArcTunnelDeviceTest`, skipped otherwise)
+- **Infrastructure**: `SharedAndroidContainer` singleton shares one container across all test classes (avoids ~2-4 min boot per class); `McpClient` test utility wraps SDK `Client` + `StreamableHttpClientTransport` (trust-all CIO by default, or an injected OkHttp client for the tunnel tests); `E2EConfigReceiver` debug-only BroadcastReceiver injects test settings via `adb shell am broadcast` (incl. the tunnel edge override, trusted CA and a status query); `ArcTunnelStack` runs the tunnel server stack (Valkey, MinIO, Pebble + challtestsrv, `ghcr.io/danielealbano/android-remote-control-mcp-tunneld:latest`, always pulled, never built) with ACME `tls-alpn-01`, and `ArcTunnelHostRelay` exposes the edge to the phone through the container's gateway IP
 - **Run**: `make test-e2e` or `./gradlew :e2e-tests:test`
 - **Note**: E2E tests are slow (container startup, emulator boot). Run selectively during development, always in CI.
 
@@ -630,7 +633,7 @@ debug builds get a per-flavor suffix so both can be installed side by side.
 - **HTTP is the default and primary transport.** The server starts on plain HTTP. This is intentional and the recommended mode for most users.
 - **Why HTTP is the priority**: The MCP server runs on an Android device whose IP address changes frequently (WiFi reconnects, mobile data, different networks). Standard/public Certificate Authorities (CAs) cannot issue valid TLS certificates for bare IP addresses or dynamic IPs. Any HTTPS certificate the device can generate will be self-signed, meaning every MCP client would need to explicitly trust it or disable certificate verification. This makes HTTPS impractical as a default — it adds configuration friction with no real security benefit for the primary use case (localhost via ADB port forwarding, where traffic never leaves the USB cable).
 - **HTTPS is a nice-to-have, not a priority.** It exists for users who need encrypted transport over a local network (binding to `0.0.0.0`), but even then the certificate will be self-signed and clients must allow insecure/untrusted certificates. Users who enable HTTPS must understand this trade-off.
-- **Remote access tunnels**: The app integrates with **Cloudflare Quick Tunnels** (no account required, random `*.trycloudflare.com` URL) and **ngrok** (account required, optional custom domain) to expose the local MCP server via a public HTTPS URL with valid certificates. See the Remote Access / Tunnel section below.
+- **Remote access tunnels**: The app integrates with the **free E2E tunnel** (`android-remote-control-mcp-tunneld`: no account, end-to-end encrypted, a public certificate issued to the device, the relay sees ciphertext only), **Cloudflare Quick Tunnels** (no account required, random `*.trycloudflare.com` URL) and **ngrok** (account required, optional custom domain) to expose the local MCP server via a public HTTPS URL with valid certificates. See the Remote Access / Tunnel section below.
 - **When HTTPS is enabled** (user opt-in via UI toggle):
   - **Option 1 — Auto-Generated Self-Signed Certificate**: Generated on first enable using Bouncy Castle, configurable hostname (default "android-mcp.local"), valid for 1 year, stored in app-private storage, regeneratable. Clients must allow insecure/self-signed certificates.
   - **Option 2 — Custom Certificate Upload**: User uploads `.p12`/`.pfx` file with password, supports CA-signed certificates, stored in app-private storage.
@@ -639,13 +642,17 @@ debug builds get a per-flavor suffix so both can be installed side by side.
 
 The app supports exposing the local MCP server to the internet via tunnel providers. This allows MCP clients to connect from anywhere without port forwarding or VPN configuration.
 
-- **Cloudflare Quick Tunnels** (default): Runs the `cloudflared` binary as a child process. Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL. No account or configuration needed. The cloudflared binary is bundled as a native library (`libcloudflared.so`) via a git submodule in `vendor/cloudflared/`.
+- **Free E2E tunnel** (default for fresh installs): speaks the `android-remote-control-mcp-tunneld` wire protocol v2. Enrollment is a two-phase attested handshake (AndroidKeyStore P-256 keys with hardware attestation replace an account); the server assigns `<name>.d.<base>` and a WebPKI certificate (Let's Encrypt, Google Trust Services or ZeroSSL) is issued to the device's own TLS key. The phone keeps one outbound HTTP/2 mTLS control stream to `connect.<base>` and, per public connection, dials back to the entry node and splices it to a loopback TLS listener (random port, served by `McpServer` through `TunnelListenerHost`) — the relay never sees plaintext. One "base address" setting (default `arc-tunnel.io`) derives `enroll.<base>`, `connect.<base>` and `d.<base>` (self-hosting). A Certificate Transparency check (SSLMate Cert Spotter, on by default, 1 % of requests, ≤ 1 per 30 min) alerts when a certificate for the name carries another public key. Identity metadata lives in an app-private JSON file per base address; private keys never leave the keystore.
+- **Cloudflare Quick Tunnels**: Runs the `cloudflared` binary as a child process. Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL. No account or configuration needed. The cloudflared binary is bundled as a native library (`libcloudflared.so`) via a git submodule in `vendor/cloudflared/`.
 - **ngrok**: Uses the `ngrok-java` library (JNI-based, in-process). Requires an ngrok authtoken (free tier available). Supports optional custom domains. Available on arm64-v8a and x86_64 devices.
 
 Tunnel architecture:
 - `TunnelProvider` interface defines `start(localPort, config)` / `stop()` with `status: StateFlow<TunnelStatus>`
 - `TunnelManager` orchestrates provider lifecycle, reads `ServerConfig` to select the active provider
 - `McpServerService` starts tunnel AFTER the Ktor server is running and stops tunnel BEFORE the server on shutdown
+- `TunnelListenerHost` (implemented by `McpServer`) opens/closes the loopback TLS listener the free E2E tunnel needs; `TunnelManager.start(localPort, listenerHost)` binds it to `ArcTunnelProvider`. The listener's TLS handler is built from a key manager that hands the AndroidKeyStore key handle and the issued chain to the TLS stack (`TunnelTlsContext`), never a `KeyStore` (the key cannot be exported); it serves HTTP/2 and HTTP/1.1 over ALPN, and HTTP/1.1 to clients without ALPN. The handler is named `ssl` because Ktor reports an HTTP/1.1 request as `https` only then, and the OAuth metadata, the token audience and the share links take their scheme from it
+- A missing or expired certificate is renewed at tunnel start while the MCP server already serves locally; `ArcTunnelRenewals` mirrors it for the UI: the progress with "Cancel and stop server" and, on failure, the reason with Retry. The renewal runs in the tunnel session, so a server stop cancels it like everything else, an `/issue` request in flight included. A server start still in progress is cancelled and waited for before the service tears down (`ServerStartTracker`)
+- The HTTPS guard (no tunnel while the server serves HTTPS) applies to Cloudflare/ngrok only; the free E2E tunnel has its own listener
 - Tunnel failure does NOT prevent the MCP server from running locally
 - Tunnel URL is logged to both logcat and the UI server logs via `McpServerService.serverLogEvents` SharedFlow
 
@@ -667,7 +674,7 @@ Tunnel architecture:
 
 ### Permission Security
 
-Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), `CAMERA` (camera tools, runtime), `RECORD_AUDIO` (video recording with audio, runtime), `ACCESS_FINE_LOCATION` (device location, runtime), `ACCESS_COARSE_LOCATION` (location fallback, declared), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker). Display clear explanations before requesting.
+Only necessary permissions: `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` (free E2E tunnel enrollment foreground service), `RECEIVE_BOOT_COMPLETED`, `QUERY_ALL_PACKAGES` (app listing), `KILL_BACKGROUND_PROCESSES` (app closing), `CAMERA` (camera tools, runtime), `RECORD_AUDIO` (video recording with audio, runtime), `ACCESS_FINE_LOCATION` (device location, runtime), `ACCESS_COARSE_LOCATION` (location fallback, declared), Accessibility Service (user-granted via Settings), SAF tree URI permissions (user-granted per storage location via system file picker). Display clear explanations before requesting.
 Per-location read/write/delete permissions are enforced by `FileOperationProvider` — see the Storage Location Permissions section above.
 
 ### Code Security
@@ -701,7 +708,9 @@ MCP tools return data originating from the Android device (UI element text, cont
 - **HTTPS**: Disabled by default (HTTP is the primary transport). When enabled by the user, uses auto-generated self-signed certificate with hostname "android-mcp.local", 1-year validity. Clients must allow insecure/self-signed certificates.
 - **Auto-start on Boot**: Disabled
 - **Remote Access Tunnel**: Disabled by default
-- **Tunnel Provider**: Cloudflare (no account required)
+- **Tunnel Provider**: Free E2E tunnel (`android-remote-control-mcp-tunneld`, no account) for fresh installs. Existing installs that ever wrote a tunnel setting keep **Cloudflare** (one-time migration, `tunnel_provider_migrated`)
+- **Free E2E tunnel base address**: `arc-tunnel.io`
+- **Free E2E tunnel CT check**: Enabled
 - **ngrok Authtoken**: Empty (required when using ngrok)
 - **ngrok Domain**: Empty (auto-assigned when empty)
 - **File Size Limit**: 50 MB (range 1-500 MB, configurable via UI, applies to all file operations)
