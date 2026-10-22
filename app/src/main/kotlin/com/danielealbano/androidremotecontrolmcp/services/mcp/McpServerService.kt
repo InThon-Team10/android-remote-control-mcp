@@ -365,18 +365,17 @@ class McpServerService : Service() {
     }
 
     override fun onDestroy() {
+        // A start still in progress would bring the server, the tunnel and the Privacy Mode model up after this
+        // teardown: cancel it and wait for it (it stops at its next suspension point) before releasing anything.
+        if (!startTracker.cancelAndAwait()) {
+            Log.w(TAG, "Server start still running after ${START_JOIN_TIMEOUT_MS}ms; proceeding with shutdown")
+        }
         screenStateSnapshotCache.clear()
         // Release the Privacy Mode model and clear session-scoped pseudonym/NER caches (never persisted).
         privacyModeManager.shutdown()
         pseudonymStore.clear()
         nerCache.clear()
         Log.i(TAG, "McpServerService destroying")
-
-        // A start still in progress would bring the server and the tunnel up after this teardown: cancel it and
-        // wait for it (it stops at its next suspension point) before stopping anything.
-        if (!startTracker.cancelAndAwait()) {
-            Log.w(TAG, "Server start still running after ${START_JOIN_TIMEOUT_MS}ms; proceeding with shutdown")
-        }
         updateStatus(ServerStatus.Stopping)
 
         // Second, later attempt to durably commit an explicit stop, in case the first bounded write in
