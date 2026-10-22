@@ -18,7 +18,7 @@ play-services-location = "21.4.0"
 osmdroid = "6.1.20"
 
 # Networking
-ktor = "3.5.2"
+ktor = "3.6.0"
 
 # MCP SDK
 mcp-kotlin-sdk = "0.15.0"
@@ -36,7 +36,7 @@ coil = "3.5.0"
 slf4j-android = "1.7.36"
 
 # Certificate generation
-bouncy-castle = "1.85"
+bouncy-castle = "1.86"
 
 # Free E2E tunnel client (raw OkHttp: HTTP/2 duplex control stream)
 okhttp = "5.5.0"
