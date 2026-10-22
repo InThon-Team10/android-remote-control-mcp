@@ -1,7 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -9,6 +8,10 @@ import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
+import okhttp3.Call
+import okhttp3.EventListener
+import okhttp3.OkHttpClient
+import okhttp3.Response
 import okio.buffer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -38,12 +41,35 @@ class ArcTunnelHttpTest {
         server.close()
     }
 
-    private suspend fun getNonce(): ArcTunnelNonceResponse =
+    private suspend fun getNonce(client: OkHttpClient = net.serverClient()): ArcTunnelNonceResponse =
         ArcTunnelHttp.get(
             ArcTunnelNonceResponse.serializer(),
-            net.serverClient(),
+            client,
             net.url(ArcTunnelTestServer.ENROLL_HOST, "/api/v1/enroll/nonce"),
         )
+
+    /** Counts down [headersRead] once the client has the response headers and [canceled] once its call is cancelled. */
+    private fun observed(
+        headersRead: CountDownLatch = CountDownLatch(1),
+        canceled: CountDownLatch = CountDownLatch(1),
+    ): OkHttpClient =
+        net
+            .serverClient()
+            .newBuilder()
+            .eventListener(
+                object : EventListener() {
+                    override fun responseHeadersEnd(
+                        call: Call,
+                        response: Response,
+                    ) {
+                        headersRead.countDown()
+                    }
+
+                    override fun canceled(call: Call) {
+                        canceled.countDown()
+                    }
+                },
+            ).build()
 
     private fun status(
         code: Int,
@@ -116,23 +142,29 @@ class ArcTunnelHttpTest {
 
     @Test
     fun `cancelling the coroutine cancels the call`() {
+        val arrived = CountDownLatch(1)
         val release = CountDownLatch(1)
         server.dispatcher =
             object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
+                    arrived.countDown()
                     release.await(BLOCK_S, TimeUnit.SECONDS)
                     return ArcTunnelTestServer.json("""{"nonce":"late"}""")
                 }
             }
+        val canceled = CountDownLatch(1)
+        val client = observed(canceled = canceled)
         try {
             runBlocking {
-                val job = launch(Dispatchers.IO) { getNonce() }
-                delay(SETTLE_MS)
+                val job = launch(Dispatchers.IO) { getNonce(client) }
+                assertTrue(arrived.await(BLOCK_S, TimeUnit.SECONDS), "the request never reached the server")
 
                 job.cancel()
                 withTimeout(CANCEL_BUDGET_MS) { job.join() }
 
                 assertTrue(job.isCancelled)
+                assertTrue(canceled.await(CANCEL_BUDGET_MS, TimeUnit.MILLISECONDS), "the call was not cancelled")
+                assertEquals(0, client.dispatcher.runningCallsCount())
             }
         } finally {
             release.countDown()
@@ -161,9 +193,11 @@ class ArcTunnelHttpTest {
                 }
             },
         )
+        val headersRead = CountDownLatch(1)
+        val client = observed(headersRead = headersRead)
         runBlocking {
-            val job = launch(Dispatchers.IO) { getNonce() }
-            delay(SETTLE_MS)
+            val job = launch(Dispatchers.IO) { getNonce(client) }
+            assertTrue(headersRead.await(BLOCK_S, TimeUnit.SECONDS), "the response headers never arrived")
 
             job.cancel()
             withTimeout(CANCEL_BUDGET_MS) { job.join() }
@@ -188,7 +222,6 @@ class ArcTunnelHttpTest {
 
     private companion object {
         const val BLOCK_S = 30L
-        const val SETTLE_MS = 300L
         const val CANCEL_BUDGET_MS = 1_000L
         const val TRICKLE_STEPS = 300
         const val TRICKLE_MS = 100L

@@ -204,6 +204,26 @@ class ArcTunnelDialBackTest {
         }
 
     @Test
+    fun `a failed open leaves no session registered`() =
+        runBlocking {
+            // One shared registry across the failure kinds: refused upgrade, bad address, local target, peer close.
+            servePeer { respond(it, "HTTP/1.1 404 Not Found") }
+            assertTrue(failureOf { dialBack().open(target(), sessions) } is IOException)
+            assertEquals(0, sessions.size())
+
+            assertTrue(failureOf { dialBack().open(target("nohost"), sessions) } is IllegalArgumentException)
+            assertEquals(0, sessions.size())
+
+            val local = target("127.0.0.1:${peer.localPort}")
+            assertTrue(failureOf { dialBack(allowLocal = false).open(local, sessions) } is IllegalArgumentException)
+            assertEquals(0, sessions.size())
+
+            servePeer { it.close() }
+            assertTrue(failureOf { dialBack().open(target(), sessions) } is IOException)
+            assertEquals(0, sessions.size())
+        }
+
+    @Test
     fun `a successful open keeps the raw socket registered`() =
         runBlocking {
             val done = CountDownLatch(1)

@@ -8,6 +8,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -66,6 +67,11 @@ class ArcTunnelCtMonitorTest {
         enabled,
         ArcTunnelCtMonitor.Options(server.url("/").toString(), ZeroRandom, minIntervalMs),
     )
+
+    /** Waits for every check [ArcTunnelCtMonitor.onRequest] launched (none launched returns at once). */
+    private suspend fun awaitChecks() {
+        withTimeout(BUDGET_MS) { parent.children.toList().joinAll() }
+    }
 
     private fun issuances(vararg entries: Pair<String, String>): MockResponse {
         val items = entries.joinToString(",") { (id, key) -> """{"id":"$id","pubkey_sha256":"$key"}""" }
@@ -195,7 +201,7 @@ class ArcTunnelCtMonitorTest {
             server.enqueue(issuances())
 
             monitor(minIntervalMs = ArcTunnelCtTrigger.MIN_INTERVAL_MS).onRequest()
-            delay(SETTLE_MS)
+            awaitChecks()
 
             assertEquals(0, server.requestCount)
         }
@@ -222,7 +228,7 @@ class ArcTunnelCtMonitorTest {
                 awaitThat { held.arrivals.size == 1 }
 
                 parent.cancelChildren()
-                delay(SETTLE_MS)
+                awaitChecks()
                 m.onRequest()
 
                 awaitThat { held.arrivals.size == 2 }
@@ -267,10 +273,12 @@ class ArcTunnelCtMonitorTest {
             server.dispatcher = held
             val m = monitor()
             try {
-                repeat(CONCURRENT_REQUESTS) { scope.launch { m.onRequest() } }
+                val callers = List(CONCURRENT_REQUESTS) { scope.launch { m.onRequest() } }
                 awaitThat { held.arrivals.size == 1 }
-                delay(SETTLE_MS)
+                callers.joinAll()
 
+                // Every launched check is a child of the scope: only the held one exists.
+                assertEquals(1, parent.children.count())
                 assertEquals(1, held.arrivals.size)
             } finally {
                 held.release.countDown()
@@ -283,7 +291,7 @@ class ArcTunnelCtMonitorTest {
             server.enqueue(issuances())
 
             monitor(enabled = false).onRequest()
-            delay(SETTLE_MS)
+            awaitChecks()
 
             assertEquals(0, server.requestCount)
         }
@@ -292,7 +300,6 @@ class ArcTunnelCtMonitorTest {
         const val HOLD_S = 10L
         const val BUDGET_MS = 5_000L
         const val POLL_MS = 20L
-        const val SETTLE_MS = 300L
         const val CONCURRENT_REQUESTS = 20
     }
 }
