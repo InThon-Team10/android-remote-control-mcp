@@ -102,13 +102,6 @@ class ArcTunnelViewModel
             }
         }
 
-        /** Re-reads the saved URL; an enrolled URL ends a pending enrollment request. */
-        private fun refreshUrl() {
-            val url = enrollment.savedUrl(env)
-            _url.value = url?.let { ArcTunnelUrlState.Enrolled(it) } ?: ArcTunnelUrlState.NotEnrolled
-            if (url != null) _enrollmentRequested.value = false
-        }
-
         /** Validates live; nothing is persisted until [commitBaseAddress] (so no environment flips while typing). */
         fun updateBaseAddressInput(value: String) {
             _baseAddressInput.value = value
@@ -178,5 +171,12 @@ class ArcTunnelViewModel
                 enrollment.dismissCtAlert(env)
                 ctAlerts.dismiss()
             }
+        }
+
+        /** Re-reads the saved URL; an enrolled URL ends a pending enrollment request. */
+        private fun refreshUrl() {
+            val url = enrollment.savedUrl(env)
+            _url.value = url?.let { ArcTunnelUrlState.Enrolled(it) } ?: ArcTunnelUrlState.NotEnrolled
+            if (url != null) _enrollmentRequested.value = false
         }
     }

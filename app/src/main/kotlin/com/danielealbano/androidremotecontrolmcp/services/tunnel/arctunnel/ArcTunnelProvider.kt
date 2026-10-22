@@ -63,12 +63,6 @@ class ArcTunnelProvider
             @Volatile
             var lastFailure: String = ""
 
-            /** The error shown when the control stream did not bind within [timeoutMs]. */
-            fun notConnectedMessage(timeoutMs: Long): String {
-                val head = "Not connected after ${timeoutMs / MS_PER_S} s; still retrying"
-                return if (lastFailure.isEmpty()) head else "$head: $lastFailure"
-            }
-
             @Volatile
             var bindTimeout: Job? = null
 
@@ -83,6 +77,12 @@ class ArcTunnelProvider
 
             @Volatile
             var control: ArcTunnelControl? = null
+
+            /** The error shown when the control stream did not bind within [timeoutMs]. */
+            fun notConnectedMessage(timeoutMs: Long): String {
+                val head = "Not connected after ${timeoutMs / MS_PER_S} s; still retrying"
+                return if (lastFailure.isEmpty()) head else "$head: $lastFailure"
+            }
         }
 
         private val _status = MutableStateFlow<TunnelStatus>(TunnelStatus.Disconnected)

@@ -57,6 +57,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.CloudflareTunnelMode
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.launch
@@ -70,6 +71,7 @@ fun TunnelSettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
     arcViewModel: ArcTunnelViewModel = hiltViewModel(),
+    arcRenewalViewModel: ArcTunnelRenewalViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val serverConfig by viewModel.serverConfig.collectAsStateWithLifecycle()
@@ -270,6 +272,7 @@ fun TunnelSettingsScreen(
                         ctCheckEnabled = serverConfig.arcTunnelCtCheckEnabled,
                         onStopServer = { viewModel.stopServer(context) },
                         viewModel = arcViewModel,
+                        renewalViewModel = arcRenewalViewModel,
                     )
                 }
             }
