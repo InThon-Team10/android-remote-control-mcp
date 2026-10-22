@@ -25,7 +25,8 @@ interface TunnelProvider {
      * A second start while running is either ignored (logged) or rejected with
      * [IllegalStateException], depending on the provider; it never alters a live status.
      *
-     * @param localPort The local port to forward traffic to.
+     * @param localPort The local port to forward traffic to (the free E2E tunnel ignores it: it serves through its
+     *                  own loopback TLS listener).
      * @param config The current server configuration (providers extract their own
      *               relevant fields, e.g. ngrok reads [ServerConfig.ngrokAuthtoken]
      *               and [ServerConfig.ngrokDomain]).

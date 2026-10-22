@@ -20,7 +20,10 @@ data class ArcTunnelCtAlert(
 
 /** Owns the per-environment identity stores and serializes enrollment, rotation, forget and renewal. */
 interface ArcTunnelEnrollment {
-    /** Idle → Enrolling → Idle | Failed; observed by the UI. */
+    /**
+     * Idle → Enrolling → Idle | Failed; a renewal that saves the certificate turns Failed into Idle. Observed by
+     * the UI.
+     */
     val state: StateFlow<ArcTunnelEnrollmentState>
 
     fun store(env: ArcTunnelEnv): ArcTunnelIdentityStore
@@ -60,7 +63,10 @@ interface ArcTunnelEnrollment {
      */
     suspend fun readyIdentity(env: ArcTunnelEnv): ArcTunnelIdentity?
 
-    /** One renewal (nudge nonce or fresh nonce), saved only while [identity] is still the saved one. */
+    /**
+     * One renewal (nudge nonce or fresh nonce), saved only while [identity] is still the saved one; a saved
+     * certificate also clears a `Failed` [state].
+     */
     suspend fun renew(
         identity: ArcTunnelIdentity,
         nonce: String?,

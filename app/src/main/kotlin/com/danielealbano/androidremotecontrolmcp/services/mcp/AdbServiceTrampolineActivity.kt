@@ -7,13 +7,13 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollService
 
 /**
- * Invisible trampoline [Activity] that starts or stops [McpServerService] from ADB
- * when the app is in the background.
+ * Invisible trampoline [Activity] that starts or stops [McpServerService], or starts the free E2E tunnel
+ * enrollment ([ArcTunnelEnrollService]), from ADB when the app is in the background.
  *
  * On Android 12+ (API 31+), apps cannot call [android.content.Context.startForegroundService]
  * from the background. Using `am start` to launch an Activity gives the app a foreground
  * exemption, allowing it to start the foreground service. This Activity renders no UI
- * (uses `Theme.NoDisplay`), performs the service start/stop in [onCreate], and calls
+ * (uses `Theme.NoDisplay`), performs the service start/stop or the enrollment start in [onCreate], and calls
  * [finish] immediately.
  *
  * For configuration-only changes (no service start/stop), use [AdbConfigReceiver] instead
