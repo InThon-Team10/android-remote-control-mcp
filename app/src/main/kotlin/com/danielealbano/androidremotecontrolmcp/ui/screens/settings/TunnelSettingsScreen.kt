@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -70,6 +71,7 @@ fun TunnelSettingsScreen(
     viewModel: MainViewModel = hiltViewModel(),
     arcViewModel: ArcTunnelViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val serverConfig by viewModel.serverConfig.collectAsStateWithLifecycle()
     val serverStatus by viewModel.serverStatus.collectAsStateWithLifecycle()
     val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
@@ -266,6 +268,7 @@ fun TunnelSettingsScreen(
                         tunnelEnabled = serverConfig.tunnelEnabled,
                         enabled = isEnabled,
                         ctCheckEnabled = serverConfig.arcTunnelCtCheckEnabled,
+                        onStopServer = { viewModel.stopServer(context) },
                         viewModel = arcViewModel,
                     )
                 }

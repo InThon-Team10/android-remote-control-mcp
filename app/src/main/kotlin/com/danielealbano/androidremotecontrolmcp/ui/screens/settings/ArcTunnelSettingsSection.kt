@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
+import com.danielealbano.androidremotecontrolmcp.ui.components.ArcTunnelRenewalBlock
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelUrlState
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 
@@ -48,6 +50,7 @@ data class ArcTunnelSettingsState(
     val url: ArcTunnelUrlState,
     val enrollmentState: ArcTunnelEnrollmentState,
     val enrollmentRequested: Boolean,
+    val renewal: ArcTunnelRenewalState = ArcTunnelRenewalState.Idle,
 )
 
 data class ArcTunnelSettingsActions(
@@ -57,6 +60,8 @@ data class ArcTunnelSettingsActions(
     val onEnroll: () -> Unit,
     val onCancelEnrollment: () -> Unit,
     val onRotateName: () -> Unit,
+    val onCancelRenewal: () -> Unit = {},
+    val onRetryRenewal: () -> Unit = {},
 )
 
 /**
@@ -82,6 +87,7 @@ fun ArcTunnelSettingsSection(
     tunnelEnabled: Boolean,
     enabled: Boolean,
     ctCheckEnabled: Boolean,
+    onStopServer: () -> Unit,
     viewModel: ArcTunnelViewModel,
 ) {
     val baseAddress by viewModel.baseAddressInput.collectAsStateWithLifecycle()
@@ -89,6 +95,7 @@ fun ArcTunnelSettingsSection(
     val url by viewModel.url.collectAsStateWithLifecycle()
     val enrollmentState by viewModel.enrollmentState.collectAsStateWithLifecycle()
     val enrollmentRequested by viewModel.enrollmentRequested.collectAsStateWithLifecycle()
+    val renewal by viewModel.renewal.collectAsStateWithLifecycle()
     ArcTunnelSettingsContent(
         state =
             ArcTunnelSettingsState(
@@ -100,6 +107,7 @@ fun ArcTunnelSettingsSection(
                 url = url,
                 enrollmentState = enrollmentState,
                 enrollmentRequested = enrollmentRequested,
+                renewal = renewal,
             ),
         actions =
             ArcTunnelSettingsActions(
@@ -109,6 +117,11 @@ fun ArcTunnelSettingsSection(
                 onEnroll = viewModel::enroll,
                 onCancelEnrollment = viewModel::cancelEnrollment,
                 onRotateName = viewModel::rotateName,
+                onCancelRenewal = {
+                    viewModel.cancelRenewal()
+                    onStopServer()
+                },
+                onRetryRenewal = viewModel::retryRenewal,
             ),
     )
 }
@@ -162,6 +175,13 @@ fun ArcTunnelSettingsContent(
         Spacer(modifier = Modifier.height(8.dp))
         UrlRow(state, enrolling, onRotate = { showRotateDialog = true }, onEnroll = actions.onEnroll)
         EnrollmentProgress(state.enrollmentState, enabled = state.enabled, onRetry = actions.onEnroll)
+        if (state.renewal != ArcTunnelRenewalState.Idle) {
+            ArcTunnelRenewalBlock(
+                failure = (state.renewal as? ArcTunnelRenewalState.Failed)?.message,
+                onCancel = actions.onCancelRenewal,
+                onRetry = actions.onRetryRenewal,
+            )
+        }
     }
 
     if (arcTunnelEnrollDialogVisible(state)) {

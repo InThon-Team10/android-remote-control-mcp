@@ -5,6 +5,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType.ARC_TUNNEL
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType.CLOUDFLARE
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -324,5 +325,23 @@ class ConnectionInfoCardTest {
 
         assertEquals(TunnelRowContent.Connected(listOf(ep(url))), result)
         assertEquals("URL: https://127.0.0.1:8080/mcp\nTunnel: $url/mcp", connectionString)
+    }
+
+    @Test
+    fun `tunnelRowContent shows the start renewal over the tunnel status`() {
+        assertEquals(
+            TunnelRowContent.Renewing,
+            tunnelRowContent(true, running, TunnelStatus.Connecting, ArcTunnelRenewalState.Renewing),
+        )
+        assertEquals(
+            TunnelRowContent.RenewalFailed("acme_rate_limited"),
+            tunnelRowContent(true, running, TunnelStatus.Error("x"), ArcTunnelRenewalState.Failed("acme_rate_limited")),
+        )
+    }
+
+    @Test
+    fun `tunnelRowContent hides the start renewal while the server is stopped`() {
+        val renewing = ArcTunnelRenewalState.Renewing
+        assertNull(tunnelRowContent(true, ServerStatus.Stopped, TunnelStatus.Connecting, renewing))
     }
 }

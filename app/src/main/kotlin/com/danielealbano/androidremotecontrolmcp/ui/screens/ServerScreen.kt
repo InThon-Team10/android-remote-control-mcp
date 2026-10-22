@@ -99,6 +99,7 @@ fun ServerScreen(
     val channelConfig by channelViewModel.eventChannelConfig.collectAsStateWithLifecycle()
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
     val ctAlert by arcTunnelViewModel.ctAlert.collectAsStateWithLifecycle()
+    val renewal by arcTunnelViewModel.renewal.collectAsStateWithLifecycle()
 
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) ?: "N/A" }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
@@ -202,6 +203,12 @@ fun ServerScreen(
                 tunnelEnabled = serverConfig.tunnelEnabled,
                 serverStatus = serverStatus,
                 tunnelStatus = tunnelStatus,
+                renewal = renewal,
+                onCancelRenewal = {
+                    arcTunnelViewModel.cancelRenewal()
+                    viewModel.stopServer(context)
+                },
+                onRetryRenewal = arcTunnelViewModel::retryRenewal,
                 onCopyAll = { text ->
                     scope.launch {
                         clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Server details", text)))

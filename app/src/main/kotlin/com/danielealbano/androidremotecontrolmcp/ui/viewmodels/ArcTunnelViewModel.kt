@@ -12,6 +12,8 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelHosts
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,7 @@ class ArcTunnelViewModel
     constructor(
         private val settingsRepository: SettingsRepository,
         private val enrollment: ArcTunnelEnrollment,
+        private val renewals: ArcTunnelRenewals,
         private val ctAlerts: ArcTunnelCtAlerts,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
@@ -58,6 +61,9 @@ class ArcTunnelViewModel
         val enrollmentRequested: StateFlow<Boolean> = _enrollmentRequested.asStateFlow()
 
         val enrollmentState: StateFlow<ArcTunnelEnrollmentState> = enrollment.state
+
+        /** The tunnel-start certificate renewal (shown with Cancel / Retry while the server runs). */
+        val renewal: StateFlow<ArcTunnelRenewalState> = renewals.state
         val ctAlert: StateFlow<ArcTunnelCtAlert?> = ctAlerts.alert
 
         @Volatile
@@ -68,6 +74,12 @@ class ArcTunnelViewModel
         private var persistedBaseAddress: String? = null
 
         init {
+            /** Re-reads the saved URL; an enrolled URL ends a pending enrollment request. */
+            fun refreshUrl() {
+                val url = enrollment.savedUrl(env)
+                _url.value = url?.let { ArcTunnelUrlState.Enrolled(it) } ?: ArcTunnelUrlState.NotEnrolled
+                if (url != null) _enrollmentRequested.value = false
+            }
             viewModelScope.launch(ioDispatcher) {
                 var previousSelected = false
                 var alertRestored = false
@@ -164,17 +176,20 @@ class ArcTunnelViewModel
             }
         }
 
+        /** Aborts the tunnel-start renewal; the caller also stops the MCP server (the user's Cancel). */
+        fun cancelRenewal() {
+            renewals.cancel()
+        }
+
+        fun retryRenewal() {
+            renewals.retry()
+        }
+
         /** The persisted alert is cleared BEFORE the banner hides, so a config emission cannot restore it. */
         fun dismissCtAlert() {
             viewModelScope.launch(ioDispatcher) {
                 enrollment.dismissCtAlert(env)
                 ctAlerts.dismiss()
             }
-        }
-
-        private fun refreshUrl() {
-            val url = enrollment.savedUrl(env)
-            _url.value = url?.let { ArcTunnelUrlState.Enrolled(it) } ?: ArcTunnelUrlState.NotEnrolled
-            if (url != null) _enrollmentRequested.value = false
         }
     }
