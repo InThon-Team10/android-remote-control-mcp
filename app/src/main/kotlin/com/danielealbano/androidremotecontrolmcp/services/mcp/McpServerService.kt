@@ -396,9 +396,10 @@ class McpServerService : Service() {
         OAuthApprovalNotifier.cancel(this)
 
         // Stop tunnel first (with ANR-safe timeout).
-        // Worst-case blocking time: START_JOIN_TIMEOUT_MS (5s) + TUNNEL_STOP_TIMEOUT_MS (3s)
-        // + SHUTDOWN_GRACE_PERIOD_MS (1s) + SHUTDOWN_TIMEOUT_MS (5s) = ~14s total. This is well within the
-        // Android service onDestroy ANR threshold (~200s), so blocking the main thread here is acceptable.
+        // Worst-case blocking time: START_JOIN_TIMEOUT_MS (5s) + the stop flag write (2s) + TUNNEL_STOP_TIMEOUT_MS
+        // (3s) + McpServer.stop: SDK close (SHUTDOWN_TIMEOUT_MS, 5s) + SHUTDOWN_GRACE_PERIOD_MS (1s) +
+        // SHUTDOWN_TIMEOUT_MS (5s) + the tunnel listener stop (0.6s) = ~22s total. This is well within the Android
+        // service onDestroy ANR threshold (~200s), so blocking the main thread here is acceptable.
         stopTunnel()
 
         // Stop the Ktor server gracefully
