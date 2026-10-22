@@ -8,8 +8,6 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollment
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnv
-import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
-import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -43,8 +41,6 @@ class ArcTunnelViewModelTest {
     private val repository = mockk<SettingsRepository>(relaxed = true)
     private val enrollment = mockk<ArcTunnelEnrollment>(relaxed = true)
     private val ctAlerts = mockk<ArcTunnelCtAlerts>(relaxed = true)
-    private val renewal = MutableStateFlow<ArcTunnelRenewalState>(ArcTunnelRenewalState.Idle)
-    private val renewals = mockk<ArcTunnelRenewals>(relaxed = true)
     private var savedUrl: String? = null
     private lateinit var viewModel: ArcTunnelViewModel
 
@@ -56,7 +52,6 @@ class ArcTunnelViewModelTest {
         every { enrollment.savedUrl(any()) } answers { savedUrl }
         every { enrollment.savedCtAlert(any()) } returns null
         every { ctAlerts.alert } returns alert
-        every { renewals.state } returns renewal
     }
 
     @AfterEach
@@ -65,7 +60,7 @@ class ArcTunnelViewModelTest {
     }
 
     private fun createViewModel(): ArcTunnelViewModel =
-        ArcTunnelViewModel(repository, enrollment, renewals, ctAlerts, dispatcher).also { viewModel = it }
+        ArcTunnelViewModel(repository, enrollment, ctAlerts, dispatcher).also { viewModel = it }
 
     private fun arc(tunnelEnabled: Boolean): ServerConfig =
         ServerConfig(tunnelEnabled = tunnelEnabled, tunnelProvider = TunnelProviderType.ARC_TUNNEL)
@@ -362,26 +357,6 @@ class ArcTunnelViewModelTest {
 
             verify(exactly = 1) { ctAlerts.restore(persisted) }
         }
-
-    @Test
-    fun `renewal mirrors the tunnel-start renewal state`() {
-        createViewModel()
-
-        renewal.value = ArcTunnelRenewalState.Failed("acme_rate_limited")
-
-        assertEquals(ArcTunnelRenewalState.Failed("acme_rate_limited"), viewModel.renewal.value)
-    }
-
-    @Test
-    fun `cancelRenewal and retryRenewal delegate to the renewals`() {
-        createViewModel()
-
-        viewModel.cancelRenewal()
-        viewModel.retryRenewal()
-
-        verify(exactly = 1) { renewals.cancel() }
-        verify(exactly = 1) { renewals.retry() }
-    }
 
     private companion object {
         const val URL = "https://abcdefghij.d.arc-tunnel.io"

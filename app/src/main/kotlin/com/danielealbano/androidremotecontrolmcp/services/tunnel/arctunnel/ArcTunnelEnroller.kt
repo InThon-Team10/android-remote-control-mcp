@@ -4,7 +4,6 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.IOException
 
 /** Phase 1 enrollment, Phase 2 issuance and every renewal (PROTOCOL.md §2–§3) with one TLS key per name. */
 class ArcTunnelEnroller(
@@ -25,29 +24,16 @@ class ArcTunnelEnroller(
 
     /**
      * Phase 2 / renewal: [nonce] is the Phase-1 issue nonce or the RENEW_NUDGE nonce (null = fetch a fresh one).
-     * Serialized per identity; retries per PROTOCOL.md §3. Each attempt runs inside [gate] together with [persist]
-     * (saving the result), so a server stop lets an attempt in flight finish and save; a stopped gate ends the
-     * retries. A failed save is not retried (a retry would issue again).
+     * Serialized per identity; retries per PROTOCOL.md §3.
      */
     suspend fun issue(
         identity: ArcTunnelIdentity,
         nonce: String?,
-        gate: ArcTunnelIssuanceGate = ArcTunnelIssuanceGate(),
-        persist: suspend () -> Unit = {},
     ) {
         identity.issueMutex.withLock {
             ArcTunnelIssueRetry.run(
                 nonce = nonce,
-                issue = { n ->
-                    gate.attempt {
-                        withContext(Dispatchers.IO) { issueOnce(identity, n) }
-                        try {
-                            persist()
-                        } catch (e: IOException) {
-                            throw IllegalStateException("the issued certificate could not be saved", e)
-                        }
-                    }
-                },
+                issue = { n -> withContext(Dispatchers.IO) { issueOnce(identity, n) } },
                 freshNonce = { freshNonce(identity.net, identity.hosts) },
             ) { n, wait, t -> Log.w(TAG, "issuance failed; retry $n in ${wait}ms", t) }
         }

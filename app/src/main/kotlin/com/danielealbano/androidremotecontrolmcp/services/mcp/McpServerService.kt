@@ -31,12 +31,9 @@ import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyModeStatus
 import com.danielealbano.androidremotecontrolmcp.privacy.PseudonymStore
 import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerCache
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateSnapshotCache
-import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
-import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
-import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewals
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.tunnelAllowedWithHttps
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
@@ -51,6 +48,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,13 +81,7 @@ class McpServerService : Service() {
 
     @Inject lateinit var toolRegistration: McpToolRegistration
 
-    @Inject lateinit var arcTunnelRenewals: ArcTunnelRenewals
-
     @Inject lateinit var screenStateSnapshotCache: ScreenStateSnapshotCache
-
-    @Inject lateinit var cameraProvider: CameraProvider
-
-    @Inject lateinit var notificationProvider: NotificationProvider
 
     @Inject lateinit var ephemeralFileLinkService: EphemeralFileLinkService
 
@@ -116,8 +109,9 @@ class McpServerService : Service() {
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val serverActive = AtomicBoolean(false)
-    private val serverTornDown = AtomicBoolean(false)
-    private val stopSequencer by lazy { ServerStopSequencer(arcTunnelRenewals, coroutineScope, Dispatchers.Main) }
+    private val startTracker = ServerStartTracker(coroutineScope, START_JOIN_TIMEOUT_MS)
+
+    @Volatile
     private var mcpServer: McpServer? = null
     private var tunnelObserverJob: Job? = null
     private var approvalObserverJob: Job? = null
@@ -148,25 +142,17 @@ class McpServerService : Service() {
             ACTION_STOP -> {
                 lastIntentWasStop = true
                 persistServerRunning(settingsRepository, false)
-                stopSequencer.stop(
-                    teardown = ::teardownServer,
-                    showFinishing = ::showFinishingRenewal,
-                    stopService = { stopSelf() },
-                )
+                stopSelf()
                 return START_NOT_STICKY
             }
 
             ACTION_START, null -> {
                 lastIntentWasStop = false
-                stopSequencer.cancelPendingStop()
                 persistServerRunning(settingsRepository, true)
                 if (!serverActive.compareAndSet(false, true)) {
                     Log.w(TAG, "Server already starting or running, ignoring duplicate start request")
                 } else {
-                    serverTornDown.set(false)
-                    coroutineScope.launch {
-                        startServer()
-                    }
+                    startTracker.launch { startServer() }
                 }
             }
         }
@@ -300,6 +286,7 @@ class McpServerService : Service() {
                 try {
                     tunnelManager.start(config.port, requireNotNull(mcpServer))
                 } catch (e: Exception) {
+                    currentCoroutineContext().ensureActive()
                     Log.w(TAG, "Failed to start tunnel (server continues without tunnel)", e)
                 }
             }
@@ -350,6 +337,8 @@ class McpServerService : Service() {
 
             Log.i(TAG, "MCP server started successfully on ${config.bindingAddress.address}:${config.port}")
         } catch (e: Exception) {
+            // A start cancelled by a teardown is not a start failure.
+            currentCoroutineContext().ensureActive()
             Log.e(TAG, "Failed to start MCP server", e)
             updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
             serverActive.set(false)
@@ -375,6 +364,7 @@ class McpServerService : Service() {
         }
     }
 
+    @Suppress("TooGenericExceptionCaught", "LongMethod")
     override fun onDestroy() {
         screenStateSnapshotCache.clear()
         // Release the Privacy Mode model and clear session-scoped pseudonym/NER caches (never persisted).
@@ -383,33 +373,19 @@ class McpServerService : Service() {
         nerCache.clear()
         Log.i(TAG, "McpServerService destroying")
 
+        // A start still in progress would bring the server and the tunnel up after this teardown: cancel it and
+        // wait for it (it stops at its next suspension point) before stopping anything.
+        if (!startTracker.cancelAndAwait()) {
+            Log.w(TAG, "Server start still running after ${START_JOIN_TIMEOUT_MS}ms; proceeding with shutdown")
+        }
+        updateStatus(ServerStatus.Stopping)
+
         // Second, later attempt to durably commit an explicit stop, in case the first bounded write in
         // onStartCommand timed out. Gated on lastIntentWasStop so an OEM/system kill (last action was a
         // start) never clears the flag — there the flag MUST stay true for restart-if-running.
         if (lastIntentWasStop) {
             persistServerRunning(settingsRepository, false)
         }
-
-        teardownServer()
-
-        // Cancel coroutine scope
-        coroutineScope.cancel()
-
-        // Clear singleton
-        instance = null
-
-        Log.i(TAG, "McpServerService destroyed")
-
-        super.onDestroy()
-    }
-
-    /**
-     * Stops the tunnel and the Ktor server; idempotent. Runs from [onDestroy], or at once on a stop that keeps the
-     * service alive until a tunnel certificate issuance in flight is saved ([ServerStopSequencer]).
-     */
-    private fun teardownServer() {
-        if (!serverTornDown.compareAndSet(false, true)) return
-        updateStatus(ServerStatus.Stopping)
 
         // Cancel tunnel status observer before stopping the tunnel
         tunnelObserverJob?.cancel()
@@ -449,12 +425,17 @@ class McpServerService : Service() {
         }
         mcpServer = null
         serverActive.set(false)
-        updateStatus(ServerStatus.Stopped)
-    }
 
-    private fun showFinishingRenewal() {
-        val text = getString(R.string.notification_mcp_server_finishing_renewal)
-        startForeground(NOTIFICATION_ID, createNotification(text))
+        // Cancel coroutine scope
+        coroutineScope.cancel()
+
+        // Clear singleton
+        instance = null
+
+        updateStatus(ServerStatus.Stopped)
+        Log.i(TAG, "McpServerService destroyed")
+
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -464,7 +445,7 @@ class McpServerService : Service() {
         serverLogRepository.log(ServerLogEntry.Type.SERVER, serverStatusLogMessage(status))
     }
 
-    private fun createNotification(contentText: String? = null): Notification {
+    private fun createNotification(): Notification {
         val pendingIntent =
             PendingIntent.getActivity(
                 this,
@@ -476,7 +457,6 @@ class McpServerService : Service() {
         return NotificationCompat
             .Builder(this, McpApplication.MCP_SERVER_CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_mcp_server_title))
-            .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -491,6 +471,7 @@ class McpServerService : Service() {
         const val SHUTDOWN_GRACE_PERIOD_MS = 1000L
         const val SHUTDOWN_TIMEOUT_MS = 5000L
         const val TUNNEL_STOP_TIMEOUT_MS = 3_000L
+        const val START_JOIN_TIMEOUT_MS = 5_000L
 
         /**
          * Shared server status flow. Collected by MainViewModel to update the UI.

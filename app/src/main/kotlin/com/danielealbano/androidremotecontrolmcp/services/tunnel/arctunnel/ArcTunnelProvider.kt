@@ -160,7 +160,6 @@ class ArcTunnelProvider
             val outcome =
                 runCatching {
                     val identity = enrollment.readyIdentity(s.env) ?: error(NOT_ENROLLED_MESSAGE)
-                    renewals.resume()
                     if (certificateMissingOrExpired(identity)) renewForStart(identity)
                     val net = identity.net
                     val monitor =
@@ -196,15 +195,19 @@ class ArcTunnelProvider
 
         /**
          * The tunnel-start renewal (the MCP server already serves locally): a failure shows its reason and waits for
-         * the user's Retry; a stop cancels the wait, never an issuance attempt in flight.
+         * the user's Retry; a stop cancels it like the rest of the session, a request in flight included.
          */
         private suspend fun renewForStart(identity: ArcTunnelIdentity) {
-            while (true) {
-                val failure = runCatching { renewals.renewForStart(identity) }.exceptionOrNull() ?: return
-                if (failure is CancellationException) throw failure
-                _status.value = TunnelStatus.Error(failure.message ?: failure.javaClass.simpleName)
-                renewals.awaitRetry()
-                _status.value = TunnelStatus.Connecting
+            try {
+                while (true) {
+                    val failure = runCatching { renewals.renewForStart(identity) }.exceptionOrNull() ?: return
+                    if (failure is CancellationException) throw failure
+                    _status.value = TunnelStatus.Error(failure.message ?: failure.javaClass.simpleName)
+                    renewals.awaitRetry()
+                    _status.value = TunnelStatus.Connecting
+                }
+            } finally {
+                renewals.clear()
             }
         }
 
@@ -276,7 +279,8 @@ class ArcTunnelProvider
 
         /**
          * (Re)starts the bind window: unbound for [bindTimeoutMs] turns the status into an error naming the last
-         * failure; the control loop keeps retrying and a bind restores Connected.
+         * failure; the control loop keeps retrying and a bind restores Connected. Only `Connecting` turns into the
+         * error (compare-and-set), so a bind racing the timer always ends Connected.
          */
         private fun armBindTimeout(s: Session) {
             s.bindTimeout?.cancel()
@@ -284,10 +288,8 @@ class ArcTunnelProvider
             s.bindTimeout =
                 s.scope.launch {
                     delay(bindTimeoutMs)
-                    if (!s.connected.get()) {
-                        s.bindTimedOut.set(true)
-                        _status.value = TunnelStatus.Error(s.notConnectedMessage(bindTimeoutMs))
-                    }
+                    val error = TunnelStatus.Error(s.notConnectedMessage(bindTimeoutMs))
+                    if (_status.compareAndSet(TunnelStatus.Connecting, error)) s.bindTimedOut.set(true)
                 }
         }
 
@@ -317,8 +319,10 @@ class ArcTunnelProvider
 
             override fun onAttemptFailed(reason: String) {
                 s.lastFailure = reason
-                if (s.bindTimedOut.get() && !s.connected.get()) {
-                    _status.value = TunnelStatus.Error(s.notConnectedMessage(bindTimeoutMs))
+                val shown = _status.value
+                // Compare-and-set: a bind racing this update keeps Connected.
+                if (s.bindTimedOut.get() && !s.connected.get() && shown is TunnelStatus.Error) {
+                    _status.compareAndSet(shown, TunnelStatus.Error(s.notConnectedMessage(bindTimeoutMs)))
                 }
             }
 
@@ -326,7 +330,7 @@ class ArcTunnelProvider
             override suspend fun onRenewNudge(nonce: String) {
                 val identity = s.identity ?: return
                 try {
-                    renewals.renew(identity, nonce)
+                    enrollment.renew(identity, nonce)
                     s.certSwap.schedule()
                 } catch (e: CancellationException) {
                     throw e

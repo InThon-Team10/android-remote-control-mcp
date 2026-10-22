@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
@@ -179,33 +178,6 @@ class ArcTunnelEnrollerTest {
             assertTrue(error is IllegalStateException, "error $error")
             assertTrue(error?.message.orEmpty().contains("new name"))
             assertEquals(generatedBefore, keys.generated.size)
-        }
-
-    @Test
-    fun `a failed save is not retried`() =
-        runBlocking {
-            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
-
-            val error =
-                runCatching {
-                    enroller.issue(identity, "0c01", ArcTunnelIssuanceGate()) { throw IOException("disk full") }
-                }.exceptionOrNull()
-
-            assertTrue(error is IllegalStateException, "error $error")
-            assertTrue(error?.cause is IOException, "cause ${error?.cause}")
-            assertEquals(1, service.count(ISSUE_PATH))
-        }
-
-    @Test
-    fun `a stopped gate issues nothing`() =
-        runBlocking {
-            val identity = ArcTunnelTestIdentity.create(keys, net, withPublicChain = false)
-            val gate = ArcTunnelIssuanceGate().apply { stop() }
-
-            val error = runCatching { enroller.issue(identity, "0c01", gate) }.exceptionOrNull()
-
-            assertEquals(ArcTunnelIssuanceGate.STOPPED, error?.message)
-            assertEquals(0, service.count(ISSUE_PATH))
         }
 
     @Test

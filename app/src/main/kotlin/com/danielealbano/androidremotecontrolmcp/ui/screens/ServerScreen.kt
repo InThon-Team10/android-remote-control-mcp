@@ -58,6 +58,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCar
 import com.danielealbano.androidremotecontrolmcp.ui.components.PrivacyModeCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.LogsViewModel
@@ -79,6 +80,7 @@ fun ServerScreen(
     channelViewModel: ChannelViewModel = hiltViewModel(),
     privacyViewModel: PrivacyViewModel = hiltViewModel(),
     arcTunnelViewModel: ArcTunnelViewModel = hiltViewModel(),
+    arcTunnelRenewalViewModel: ArcTunnelRenewalViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -99,7 +101,7 @@ fun ServerScreen(
     val channelConfig by channelViewModel.eventChannelConfig.collectAsStateWithLifecycle()
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
     val ctAlert by arcTunnelViewModel.ctAlert.collectAsStateWithLifecycle()
-    val renewal by arcTunnelViewModel.renewal.collectAsStateWithLifecycle()
+    val renewal by arcTunnelRenewalViewModel.renewal.collectAsStateWithLifecycle()
 
     val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) ?: "N/A" }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
@@ -204,11 +206,8 @@ fun ServerScreen(
                 serverStatus = serverStatus,
                 tunnelStatus = tunnelStatus,
                 renewal = renewal,
-                onCancelRenewal = {
-                    arcTunnelViewModel.cancelRenewal()
-                    viewModel.stopServer(context)
-                },
-                onRetryRenewal = arcTunnelViewModel::retryRenewal,
+                onCancelRenewal = { viewModel.stopServer(context) },
+                onRetryRenewal = arcTunnelRenewalViewModel::retry,
                 onCopyAll = { text ->
                     scope.launch {
                         clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Server details", text)))

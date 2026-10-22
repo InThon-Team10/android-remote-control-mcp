@@ -60,14 +60,10 @@ interface ArcTunnelEnrollment {
      */
     suspend fun readyIdentity(env: ArcTunnelEnv): ArcTunnelIdentity?
 
-    /**
-     * One issuance (the nudge nonce, or a fresh one when null) under the enrollment lock, each attempt run through
-     * [gate]; the result is saved only while [identity] is still the saved one.
-     */
-    suspend fun issueAndSave(
+    /** One renewal (nudge nonce or fresh nonce), saved only while [identity] is still the saved one. */
+    suspend fun renew(
         identity: ArcTunnelIdentity,
         nonce: String?,
-        gate: ArcTunnelIssuanceGate,
     )
 
     /** Clears the persisted undismissed CT alert of the environment (the UI dismissed it). */

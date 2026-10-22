@@ -357,26 +357,14 @@ class ArcTunnelEnrollmentImplTest {
         }
 
     @Test
-    fun `issueAndSave issues and saves the public certificate`() =
+    fun `renew issues and saves the public certificate`() =
         runBlocking {
             val identity = saveIdentity(withPublicChain = false)
 
-            impl.issueAndSave(identity, null, ArcTunnelIssuanceGate())
+            impl.renew(identity, null)
 
             assertEquals(1, service.count(ISSUE_PATH))
             assertTrue(requireNotNull(impl.store(env).load()).publicChain.isNotEmpty())
-        }
-
-    @Test
-    fun `issueAndSave through a stopped gate issues nothing`() =
-        runBlocking {
-            val identity = saveIdentity(withPublicChain = false)
-            val gate = ArcTunnelIssuanceGate().apply { stop() }
-
-            val error = runCatching { impl.issueAndSave(identity, null, gate) }.exceptionOrNull()
-
-            assertEquals(ArcTunnelIssuanceGate.STOPPED, error?.message)
-            assertEquals(0, service.count(ISSUE_PATH))
         }
 
     @Test
@@ -400,12 +388,12 @@ class ArcTunnelEnrollmentImplTest {
         }
 
     @Test
-    fun `issueAndSave after forget throws and saves nothing`() =
+    fun `renew after forget throws and saves nothing`() =
         runBlocking {
             val identity = saveIdentity(withPublicChain = true)
             impl.store(env).forget()
 
-            val error = runCatching { impl.issueAndSave(identity, null, ArcTunnelIssuanceGate()) }.exceptionOrNull()
+            val error = runCatching { impl.renew(identity, null) }.exceptionOrNull()
 
             assertTrue(error is IllegalStateException, "error $error")
             assertNull(impl.store(env).load())

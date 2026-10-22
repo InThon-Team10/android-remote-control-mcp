@@ -107,17 +107,15 @@ class ArcTunnelEnrollmentImpl
                 restoreArcTunnelIdentity(env, record, keys, net(env))
             }
 
-        override suspend fun issueAndSave(
+        override suspend fun renew(
             identity: ArcTunnelIdentity,
             nonce: String?,
-            gate: ArcTunnelIssuanceGate,
         ) {
             mutex.withLock {
                 val store = store(ArcTunnelEnv(identity.hosts.baseAddress))
                 check(store.holds(identity)) { "identity ${identity.name} was forgotten; renewal skipped" }
-                enroller.issue(identity, nonce, gate) {
-                    if (store.holds(identity)) withContext(Dispatchers.IO) { store.save(identity) }
-                }
+                enroller.issue(identity, nonce)
+                if (store.holds(identity)) withContext(Dispatchers.IO) { store.save(identity) }
             }
         }
 

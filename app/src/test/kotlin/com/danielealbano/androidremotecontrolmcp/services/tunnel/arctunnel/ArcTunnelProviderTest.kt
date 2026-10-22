@@ -16,6 +16,7 @@ import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -253,6 +254,65 @@ class ArcTunnelProviderTest {
         }
 
     @Test
+    fun `a drop with no rebind reports Error after the timeout`() =
+        runBlocking {
+            provider.bindTimeoutMs = SHORT_BIND_TIMEOUT_MS
+            // Bound once, then dropped; the next control request is never answered.
+            server.enqueue(ArcTunnelTestServer.answer(200) { socket -> socket.cancel() })
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitConnected()
+
+            assertTrue(awaitError().message.startsWith("Not connected after"))
+        }
+
+    @Test
+    fun `a bind racing the timeout ends Connected`() =
+        runBlocking {
+            provider.bindTimeoutMs = 0
+            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            awaitConnected()
+            delay(RECONNECT_WINDOW_MS)
+
+            assertTrue(provider.status.value is TunnelStatus.Connected, "${provider.status.value}")
+        }
+
+    @Test
+    fun `a stop during the start renewal cancels it and shows no error`() =
+        runBlocking {
+            val bare = ArcTunnelTestIdentity.create(FakeArcTunnelKeyStore(), identity.net, withPublicChain = false)
+            coEvery { enrollment.readyIdentity(any()) } returns bare
+            val renewing = CompletableDeferred<Unit>()
+            val cancelled = CompletableDeferred<Unit>()
+            coEvery { renewals.renewForStart(any()) } coAnswers {
+                renewing.complete(Unit)
+                try {
+                    awaitCancellation()
+                } finally {
+                    cancelled.complete(Unit)
+                }
+            }
+            val statuses = CopyOnWriteArrayList<TunnelStatus>()
+            val collector = launch(Dispatchers.Unconfined) { provider.status.collect { statuses += it } }
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+            withTimeout(BUDGET_MS) { renewing.await() }
+            provider.stop()
+            collector.cancel()
+
+            assertTrue(cancelled.isCompleted)
+            assertTrue(statuses.none { it is TunnelStatus.Error }, "statuses $statuses")
+            coVerify(exactly = 0) { renewals.awaitRetry() }
+            verify(exactly = 1) { renewals.clear() }
+            verify(exactly = 0) { host.startTlsListener(any(), any(), any()) }
+        }
+
+    @Test
     fun `a missing certificate is renewed before the listener starts`() =
         runBlocking {
             val bare = ArcTunnelTestIdentity.create(FakeArcTunnelKeyStore(), identity.net, withPublicChain = false)
@@ -264,7 +324,6 @@ class ArcTunnelProviderTest {
             awaitConnected()
 
             coVerifyOrder {
-                renewals.resume()
                 renewals.renewForStart(bare)
                 host.startTlsListener(any(), null, any())
             }
@@ -277,7 +336,6 @@ class ArcTunnelProviderTest {
 
             startBound()
 
-            coVerify(exactly = 1) { renewals.resume() }
             coVerify(exactly = 0) { renewals.renewForStart(any()) }
         }
 
@@ -331,7 +389,7 @@ class ArcTunnelProviderTest {
     fun `stop completes within 2 seconds while a renewal is blocked`() =
         runBlocking {
             val renewing = CompletableDeferred<Unit>()
-            coEvery { renewals.renew(any(), any()) } coAnswers {
+            coEvery { enrollment.renew(any(), any()) } coAnswers {
                 renewing.complete(Unit)
                 withContext(NonCancellable) { delay(BLOCKED_MS) }
             }
@@ -385,7 +443,7 @@ class ArcTunnelProviderTest {
             server.enqueue(streamWith(nudge()))
             startBound()
 
-            coVerify(timeout = BUDGET_MS) { renewals.renew(identity, "0a01") }
+            coVerify(timeout = BUDGET_MS) { enrollment.renew(identity, "0a01") }
             awaitThat { logged(RENEWED) == 1 }
 
             verify(exactly = 1) { host.stopTlsListener() }
@@ -396,11 +454,11 @@ class ArcTunnelProviderTest {
     fun `renewal failure keeps the current listener`() =
         runBlocking {
             provider.swapPollMs = SWAP_POLL_MS
-            coEvery { renewals.renew(any(), any()) } throws ArcTunnelApiException("refused", false, 0, 403)
+            coEvery { enrollment.renew(any(), any()) } throws ArcTunnelApiException("refused", false, 0, 403)
             server.enqueue(streamWith(nudge()))
             startBound()
 
-            coVerify(timeout = BUDGET_MS) { renewals.renew(any(), any()) }
+            coVerify(timeout = BUDGET_MS) { enrollment.renew(any(), any()) }
             awaitThat { logged("renewal failed") == 1 }
             delay(RECONNECT_WINDOW_MS)
 

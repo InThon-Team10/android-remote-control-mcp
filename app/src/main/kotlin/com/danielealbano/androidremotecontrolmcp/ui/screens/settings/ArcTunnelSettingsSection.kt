@@ -31,11 +31,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelEnrollmentState
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.ui.components.ArcTunnelRenewalBlock
+import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelUrlState
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 
@@ -89,13 +91,14 @@ fun ArcTunnelSettingsSection(
     ctCheckEnabled: Boolean,
     onStopServer: () -> Unit,
     viewModel: ArcTunnelViewModel,
+    renewalViewModel: ArcTunnelRenewalViewModel = hiltViewModel(),
 ) {
     val baseAddress by viewModel.baseAddressInput.collectAsStateWithLifecycle()
     val baseAddressValid by viewModel.baseAddressValid.collectAsStateWithLifecycle()
     val url by viewModel.url.collectAsStateWithLifecycle()
     val enrollmentState by viewModel.enrollmentState.collectAsStateWithLifecycle()
     val enrollmentRequested by viewModel.enrollmentRequested.collectAsStateWithLifecycle()
-    val renewal by viewModel.renewal.collectAsStateWithLifecycle()
+    val renewal by renewalViewModel.renewal.collectAsStateWithLifecycle()
     ArcTunnelSettingsContent(
         state =
             ArcTunnelSettingsState(
@@ -117,11 +120,8 @@ fun ArcTunnelSettingsSection(
                 onEnroll = viewModel::enroll,
                 onCancelEnrollment = viewModel::cancelEnrollment,
                 onRotateName = viewModel::rotateName,
-                onCancelRenewal = {
-                    viewModel.cancelRenewal()
-                    onStopServer()
-                },
-                onRetryRenewal = viewModel::retryRenewal,
+                onCancelRenewal = onStopServer,
+                onRetryRenewal = renewalViewModel::retry,
             ),
     )
 }

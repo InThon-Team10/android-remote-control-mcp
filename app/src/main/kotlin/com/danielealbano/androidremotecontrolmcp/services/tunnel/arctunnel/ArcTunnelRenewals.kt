@@ -14,44 +14,22 @@ sealed class ArcTunnelRenewalState {
 }
 
 /**
- * Certificate renewals of a running tunnel. Every renewal runs in its own long-lived scope, so cancelling the
- * caller (the tunnel stopping) never abandons a `/issue` attempt in flight; a server stop ends them through
- * [stop].
+ * The tunnel-start certificate renewal, run by the tunnel session (a server stop cancels it like everything else,
+ * a request in flight included) and mirrored into [state] for the UI.
  */
 interface ArcTunnelRenewals {
-    /** The tunnel-start renewal: Idle → Renewing → Idle | Failed. Routine renewals are not shown. */
+    /** Idle → Renewing → Idle | Failed. */
     val state: StateFlow<ArcTunnelRenewalState>
 
-    /** Allows issuance again at a tunnel start (after a [stop]). */
-    fun resume()
-
-    /**
-     * Tunnel start with a missing or expired public certificate: issues it (shown as [state]) and returns once it
-     * is saved. Throws the failure, or [IllegalStateException] when the user cancelled it ([cancel]).
-     */
+    /** Issues the missing or expired public certificate and saves it; throws the failure (shown as [state]). */
     suspend fun renewForStart(identity: ArcTunnelIdentity)
 
-    /** A routine renewal requested by the server (`RENEW_NUDGE`); silent. */
-    suspend fun renew(
-        identity: ArcTunnelIdentity,
-        nonce: String,
-    )
-
-    /** User Cancel: aborts the tunnel-start renewal at once, even mid-request. */
-    fun cancel()
-
-    /** User Retry after a failed tunnel-start renewal: releases [awaitRetry]. */
+    /** User Retry after a failed renewal: releases [awaitRetry]. */
     fun retry()
 
-    /** Suspends until the user asks to retry the failed tunnel-start renewal. */
+    /** Suspends until the user asks to retry the failed renewal. */
     suspend fun awaitRetry()
 
-    /**
-     * Server stop: no new issuance attempt starts. True when an attempt is still in flight (keep the process in the
-     * foreground until [awaitIdle]); otherwise every pending renewal is cancelled at once.
-     */
-    fun stop(): Boolean
-
-    /** Suspends until every renewal has ended. */
-    suspend fun awaitIdle()
+    /** The tunnel stopped: nothing is shown any more. */
+    fun clear()
 }

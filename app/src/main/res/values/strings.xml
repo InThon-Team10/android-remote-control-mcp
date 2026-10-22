@@ -10,7 +10,6 @@
     <string name="notification_channel_mcp_server_name">MCP Server</string>
     <!-- Notification Content -->
     <string name="notification_mcp_server_title">MCP Server Running</string>
-    <string name="notification_mcp_server_finishing_renewal">Finishing the tunnel certificate renewal…</string>
 
     <!-- App Bar -->
     <string name="app_bar_title">MCP Remote Control</string>
