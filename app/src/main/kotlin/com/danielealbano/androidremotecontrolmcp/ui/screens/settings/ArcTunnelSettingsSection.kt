@@ -61,8 +61,8 @@ data class ArcTunnelSettingsActions(
     val onEnroll: () -> Unit,
     val onCancelEnrollment: () -> Unit,
     val onRotateName: () -> Unit,
-    val onCancelRenewal: () -> Unit = {},
-    val onRetryRenewal: () -> Unit = {},
+    val onCancelRenewal: () -> Unit,
+    val onRetryRenewal: () -> Unit,
 )
 
 /**
