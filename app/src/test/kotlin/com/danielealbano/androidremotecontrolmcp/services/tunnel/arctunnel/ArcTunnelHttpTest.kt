@@ -86,14 +86,27 @@ class ArcTunnelHttpTest {
     }
 
     @Test
-    fun `enrollClient and issueClient timeouts`() {
+    fun `enrollClient and issueClient set a per-read timeout and no total-call timeout`() {
         val enroll = ArcTunnelHttp.enrollClient(net.serverClient())
         val issue = ArcTunnelHttp.issueClient(net.serverClient())
 
         assertEquals(300_000, enroll.readTimeoutMillis)
-        assertEquals(300_000, enroll.callTimeoutMillis)
+        assertEquals(0, enroll.callTimeoutMillis)
         assertEquals(400_000, issue.readTimeoutMillis)
-        assertEquals(400_000, issue.callTimeoutMillis)
+        assertEquals(0, issue.callTimeoutMillis)
+    }
+
+    @Test
+    fun `an unexpected exception reaches the caller`() {
+        val failing = net.serverClient().newBuilder().addInterceptor { throw IllegalStateException("boom") }.build()
+        val url = net.url(ArcTunnelTestServer.ENROLL_HOST, "/api/v1/enroll/nonce")
+
+        val error =
+            assertThrows<IllegalStateException> {
+                runBlocking { ArcTunnelHttp.get(ArcTunnelNonceResponse.serializer(), failing, url) }
+            }
+
+        assertEquals("boom", error.message)
     }
 
     @Test

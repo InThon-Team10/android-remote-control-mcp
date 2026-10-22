@@ -1,21 +1,24 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import android.util.Log
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import okhttp3.Call
-import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resumeWithException
 
-/** JSON GET/POST without blocking: calls are enqueued and cancelled together with the calling coroutine. */
+/** JSON GET/POST on the IO dispatcher; a call is cancelled together with the calling coroutine. */
 object ArcTunnelHttp {
     private const val TAG = "MCP:ArcTunnelHttp"
     private const val ENROLL_TIMEOUT_S = 300L
@@ -52,18 +55,21 @@ object ArcTunnelHttp {
         return decode(serializer, execute(client, request))
     }
 
+    /**
+     * Per-read timeout only, as the reference client: a total-call timeout would also count DNS, connect, the
+     * handshake and the upload, and could abandon an enrollment the server is still completing.
+     */
     fun enrollClient(client: OkHttpClient): OkHttpClient =
         client
             .newBuilder()
             .readTimeout(ENROLL_TIMEOUT_S, TimeUnit.SECONDS)
-            .callTimeout(ENROLL_TIMEOUT_S, TimeUnit.SECONDS)
             .build()
 
+    /** Per-read timeout only (see [enrollClient]): the server may answer `/issue` up to 390 s later. */
     fun issueClient(client: OkHttpClient): OkHttpClient =
         client
             .newBuilder()
             .readTimeout(ISSUE_TIMEOUT_S, TimeUnit.SECONDS)
-            .callTimeout(ISSUE_TIMEOUT_S, TimeUnit.SECONDS)
             .build()
 
     /** Executes and returns the body of a 200; any other status is thrown as [ArcTunnelApiException]. */
@@ -77,29 +83,31 @@ object ArcTunnelHttp {
     }
 
     /**
-     * Suspends until [call] answered AND its body was read (both on OkHttp's thread, so `cancel()` aborts a
-     * stalled body read too); cancelling the coroutine cancels the call. Returns the status and the body.
+     * Runs [call] synchronously on the IO dispatcher, as the reference client does, and returns the status and
+     * the body. Every exception reaches the caller: OkHttp's asynchronous path rethrows a non-I/O exception on
+     * its own thread, which would crash the app. Cancelling the coroutine cancels the call, which aborts a
+     * blocked connect, upload or body read.
      */
     suspend fun await(call: Call): Pair<Int, String> =
-        suspendCancellableCoroutine { continuation ->
-            continuation.invokeOnCancellation { call.cancel() }
-            call.enqueue(
-                object : Callback {
-                    override fun onFailure(
-                        call: Call,
-                        e: IOException,
-                    ) {
-                        continuation.resumeWithException(e)
+        coroutineScope {
+            // UNDISPATCHED: the canceller is parked before the call starts, so a cancellation is never missed.
+            val canceller =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        call.cancel()
                     }
-
-                    override fun onResponse(
-                        call: Call,
-                        response: Response,
-                    ) {
-                        continuation.resumeWith(runCatching { response.use { it.code to it.body.string() } })
-                    }
-                },
-            )
+                }
+            try {
+                withContext(Dispatchers.IO) { call.execute().use { it.code to it.body.string() } }
+            } catch (e: IOException) {
+                // A call cancelled by our own cancellation fails with an IOException: report the cancellation.
+                ensureActive()
+                throw e
+            } finally {
+                canceller.cancel()
+            }
         }
 
     fun fail(
