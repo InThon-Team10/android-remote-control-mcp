@@ -11,11 +11,13 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.installOAuthRoutes
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelListenerHost
+import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsContext
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMaterial
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.engine.EmbeddedServer
+import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
 import io.ktor.server.netty.Netty
@@ -25,6 +27,7 @@ import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.netty.handler.ssl.SslContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
@@ -172,11 +175,7 @@ class McpServer(
     ): Int {
         check(running.get()) { "MCP server is not running" }
         check(tunnelListener == null) { "Tunnel listener is already running" }
-        val keyStore =
-            KeyStore.getInstance(KeyStore.getDefaultType()).apply {
-                load(null, null)
-                setKeyEntry(TUNNEL_KEY_ALIAS, material.privateKey, TUNNEL_KEY_PASSWORD, material.chain.toTypedArray())
-            }
+        val sslContext = TunnelTlsContext.create(material)
         val attempts = if (port == null) TUNNEL_RANDOM_PORT_ATTEMPTS else TUNNEL_FIXED_PORT_ATTEMPTS
         var lastError: IOException? = null
         repeat(attempts) { attempt ->
@@ -187,7 +186,7 @@ class McpServer(
                 // with a 2 s quiet period (twice), so a held port would cost seconds per attempt. A port taken
                 // between the probe and the engine bind still fails through the engine below.
                 ServerSocket().use { it.bind(InetSocketAddress(LOOPBACK, candidate)) }
-                engine = createTunnelListener(keyStore, candidate, onRequest)
+                engine = createTunnelListener(sslContext, candidate, onRequest)
                 engine.start(wait = false)
                 tunnelListener = engine
                 Log.i(TAG, "Tunnel listener started on 127.0.0.1:$candidate")
@@ -210,22 +209,29 @@ class McpServer(
 
     private fun randomPort(): Int = SecureRandom().nextInt(TUNNEL_PORT_MAX - TUNNEL_PORT_MIN + 1) + TUNNEL_PORT_MIN
 
+    /**
+     * A plain loopback connector with [sslContext]'s TLS handler first in the pipeline (see [TunnelTlsContext]).
+     * Behind it Ktor's cleartext HTTP/2 handler serves both protocols: an ALPN `h2` client sends the HTTP/2
+     * preface (prior knowledge), an `http/1.1` or ALPN-less client sends HTTP/1.1.
+     */
     private fun createTunnelListener(
-        keyStore: KeyStore,
+        sslContext: SslContext,
         port: Int,
         onRequest: () -> Unit,
     ): EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> =
         embeddedServer(
             factory = Netty,
             configure = {
-                sslConnector(
-                    keyStore = keyStore,
-                    keyAlias = TUNNEL_KEY_ALIAS,
-                    keyStorePassword = { TUNNEL_KEY_PASSWORD },
-                    privateKeyPassword = { TUNNEL_KEY_PASSWORD },
-                ) {
+                connector {
                     host = LOOPBACK
                     this.port = port
+                }
+                enableHttp2 = true
+                enableH2c = true
+                channelPipelineConfig = {
+                    if (get(TunnelTlsContext.HANDLER_NAME) == null) {
+                        addFirst(TunnelTlsContext.HANDLER_NAME, sslContext.newHandler(channel().alloc()))
+                    }
                 }
             },
             module = {
@@ -304,8 +310,6 @@ class McpServer(
         private const val DEFAULT_GRACE_PERIOD_MS = 1000L
         private const val DEFAULT_TIMEOUT_MS = 5000L
         private const val LOOPBACK = "127.0.0.1"
-        private const val TUNNEL_KEY_ALIAS = "tunnel"
-        private val TUNNEL_KEY_PASSWORD = CharArray(0)
         private const val TUNNEL_PORT_MIN = 49152
         private const val TUNNEL_PORT_MAX = 65535
         private const val TUNNEL_RANDOM_PORT_ATTEMPTS = 20

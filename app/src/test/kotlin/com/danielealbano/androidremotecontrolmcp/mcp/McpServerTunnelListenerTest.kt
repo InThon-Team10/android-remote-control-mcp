@@ -7,6 +7,11 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMateri
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.server.Server
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -18,16 +23,20 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import java.io.IOException
+import java.math.BigInteger
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
 import java.security.cert.X509Certificate
+import java.security.interfaces.ECPrivateKey
+import java.security.spec.ECParameterSpec
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
@@ -170,6 +179,76 @@ class McpServerTunnelListenerTest {
         assertFalse(accepts(port))
     }
 
+    @Test
+    fun `HTTP-2 is negotiated over ALPN`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        okHttpHealth(port, listOf(Protocol.HTTP_2, Protocol.HTTP_1_1)).use {
+            assertEquals(200, it.code)
+            assertEquals(Protocol.HTTP_2, it.protocol)
+        }
+    }
+
+    @Test
+    fun `HTTP-1-1 is served when ALPN offers only http-1-1`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        okHttpHealth(port, listOf(Protocol.HTTP_1_1)).use {
+            assertEquals(200, it.code)
+            assertEquals(Protocol.HTTP_1_1, it.protocol)
+        }
+    }
+
+    @Test
+    fun `a client without ALPN is served HTTP-1-1`() {
+        server.start()
+        val port = server.startTlsListener(material, null) {}
+
+        val response =
+            (trustAllContext().socketFactory.createSocket(LOOPBACK, port) as SSLSocket).use { socket ->
+                socket.soTimeout = TIMEOUT_MS
+                val request = "GET /health HTTP/1.1\r\nHost: $LOOPBACK\r\nConnection: close\r\n\r\n"
+                socket.outputStream.write(request.toByteArray())
+                socket.outputStream.flush()
+                socket.inputStream.readNBytes(READ_LIMIT).decodeToString()
+            }
+
+        assertTrue(response.startsWith("HTTP/1.1 200"), response)
+    }
+
+    @Test
+    fun `a key that cannot be exported serves TLS`() {
+        server.start()
+        val key = OpaqueEcPrivateKey(held.keyPair.private as ECPrivateKey)
+        val opaque = TunnelTlsMaterial(key, listOf(held.certificate))
+
+        val port = server.startTlsListener(opaque, null) {}
+
+        assertEquals(200, healthStatus(port))
+    }
+
+    private fun okHttpHealth(
+        port: Int,
+        protocols: List<Protocol>,
+    ): Response {
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(held.certificate).build()
+        val client =
+            OkHttpClient
+                .Builder()
+                .sslSocketFactory(trust.sslSocketFactory(), trust.trustManager)
+                .hostnameVerifier { _, _ -> true }
+                .protocols(protocols)
+                .build()
+        val request =
+            Request
+                .Builder()
+                .url("https://$LOOPBACK:$port/health")
+                .build()
+        return client.newCall(request).execute()
+    }
+
     private fun healthStatus(port: Int): Int {
         val connection = URI("https://127.0.0.1:$port/health").toURL().openConnection() as HttpsURLConnection
         connection.sslSocketFactory = trustAllContext().socketFactory
@@ -211,6 +290,21 @@ class McpServerTunnelListenerTest {
 
     private fun freePort(): Int = ServerSocket(0, BACKLOG, InetAddress.getByName(LOOPBACK)).use { it.localPort }
 
+    /** An EC key that cannot be exported, like an AndroidKeyStore key: no encoding, no format. */
+    private class OpaqueEcPrivateKey(
+        private val delegate: ECPrivateKey,
+    ) : ECPrivateKey {
+        override fun getS(): BigInteger = delegate.s
+
+        override fun getParams(): ECParameterSpec = delegate.params
+
+        override fun getAlgorithm(): String = "EC"
+
+        override fun getFormat(): String? = null
+
+        override fun getEncoded(): ByteArray? = null
+    }
+
     private companion object {
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 50
@@ -218,6 +312,7 @@ class McpServerTunnelListenerTest {
         const val STOP_TIMEOUT_MS = 1_000L
         const val FIXED_PORT_BUDGET_MS = 2_000L
         const val NANOS_PER_MS = 1_000_000L
+        const val READ_LIMIT = 4096
         val RANDOM_PORT_RANGE = 49152..65535
     }
 }
