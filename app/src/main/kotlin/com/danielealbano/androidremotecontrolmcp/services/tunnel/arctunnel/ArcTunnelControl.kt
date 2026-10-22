@@ -44,6 +44,12 @@ class ArcTunnelControl(
     private val current = AtomicReference<Call?>(null)
     private val renewalInFlight = AtomicBoolean(false)
     private val node = AtomicReference("unknown")
+
+    /** Test seam: the watchdog's clock (nanoseconds). */
+    internal var watchdogClock: () -> Long = System::nanoTime
+
+    /** Test seam: a RENEW_NUDGE renewal is running (a nudge now is ignored). */
+    internal val renewing: Boolean get() = renewalInFlight.get()
     private val client =
         client
             .newBuilder()
@@ -68,27 +74,16 @@ class ArcTunnelControl(
      * Any failure ends the current stream only (reported to [ArcTunnelControlEvents.onAttemptFailed]); the loop
      * reconnects with backoff, as the reference client does.
      */
-    @Suppress("TooGenericExceptionCaught")
     suspend fun run() =
         supervisorScope {
             val backoff = ArcTunnelBackoff()
             while (running.get() && isActive) {
                 val wasBound = AtomicBoolean(false)
-                val failure =
-                    try {
-                        withContext(Dispatchers.IO) { serveControlOnce(this@supervisorScope, wasBound) }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: IOException) {
-                        Log.w(TAG, "control connection ended", e)
-                        e.message ?: e.javaClass.simpleName
-                    } catch (e: IllegalArgumentException) {
-                        Log.w(TAG, "control stream torn down on a malformed frame", e)
-                        MALFORMED_FRAME
-                    } catch (e: Exception) {
-                        Log.e(TAG, "unexpected control failure; reconnecting", e)
-                        e.message ?: e.javaClass.simpleName
-                    }
+                val outcome =
+                    runCatching { withContext(Dispatchers.IO) { serveControlOnce(this@supervisorScope, wasBound) } }
+                // Cancellation (the provider stopping) and JVM errors are not stream failures.
+                outcome.exceptionOrNull()?.let { if (it is CancellationException || it !is Exception) throw it }
+                val failure = outcome.getOrElse(::failureReason)
                 if (!running.get() || !isActive) break
                 failure?.let(events::onAttemptFailed)
                 if (wasBound.get()) backoff.reset()
@@ -129,7 +124,7 @@ class ArcTunnelControl(
         val sessions = ArcTunnelSessions { Log.d(TAG, "dial-back session close failed", it) }
         val lastFrameAt = AtomicLong(System.nanoTime())
         val silent = AtomicBoolean(false)
-        val watchdog = scope.launch { ArcTunnelWatchdog.watch(call, lastFrameAt, silent) }
+        val watchdog = scope.launch { ArcTunnelWatchdog.watch(call, lastFrameAt, silent, watchdogClock) }
         var response: Response? = null
         return try {
             val r = call.execute()
@@ -162,6 +157,25 @@ class ArcTunnelControl(
             if (silent.get()) client.connectionPool.evictAll()
         }
     }
+
+    /** The reason [ArcTunnelControlEvents.onAttemptFailed] reports for a stream that ended with [e]. */
+    private fun failureReason(e: Throwable): String =
+        when (e) {
+            is IOException -> {
+                Log.w(TAG, "control connection ended", e)
+                e.message ?: e.javaClass.simpleName
+            }
+
+            is IllegalArgumentException -> {
+                Log.w(TAG, "control stream torn down on a malformed frame", e)
+                MALFORMED_FRAME
+            }
+
+            else -> {
+                Log.e(TAG, "unexpected control failure; reconnecting", e)
+                e.message ?: e.javaClass.simpleName
+            }
+        }
 
     private fun readFrames(
         scope: CoroutineScope,

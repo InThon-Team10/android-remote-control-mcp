@@ -115,8 +115,12 @@ class ArcTunnelControlTest {
             localConnectWindowMs = LOCAL_WINDOW_MS,
         )
 
-    private fun start(handler: ArcTunnelOpenHandler = opens()): ArcTunnelControl {
+    private fun start(
+        handler: ArcTunnelOpenHandler = opens(),
+        watchdogClock: () -> Long = System::nanoTime,
+    ): ArcTunnelControl {
         val c = ArcTunnelControl(net.controlClient(identity), net, ArcTunnelTestServer.CONTROL_HOST, handler, events)
+        c.watchdogClock = watchdogClock
         control = c
         job = scope.launch { c.run() }
         return c
@@ -249,6 +253,32 @@ class ArcTunnelControlTest {
 
             awaitThat { events.boundCount.get() == 2 }
             assertEquals(1, events.unbound.get())
+            assertEquals(listOf(MALFORMED_REASON), events.attemptFailures.toList())
+        }
+
+    @Test
+    fun `a bound stream ending on an I-O error reports it and reconnects`() =
+        runBlocking {
+            server.enqueue(ArcTunnelTestServer.answer(200) { socket -> socket.cancel() })
+            server.enqueue(ArcTunnelTestServer.hold())
+            start()
+
+            awaitThat { events.boundCount.get() == 2 }
+
+            val reason = events.attemptFailures.single()
+            assertTrue(reason.isNotBlank() && reason != MALFORMED_REASON && reason != SILENT_REASON, reason)
+        }
+
+    @Test
+    fun `a silent stream is dropped and reported as silence`() =
+        runBlocking {
+            server.enqueue(ArcTunnelTestServer.hold())
+            // Every poll of the watchdog sees more than 90 s since the last frame.
+            start(watchdogClock = { System.nanoTime() + SILENCE_NANOS })
+
+            awaitThat { events.unbound.get() >= 1 }
+
+            assertEquals(SILENT_REASON, events.attemptFailures.first())
         }
 
     @Test
@@ -269,7 +299,7 @@ class ArcTunnelControlTest {
             assertEquals(listOf("0a"), events.nudges.toList())
 
             gate.complete(Unit)
-            delay(SETTLE_MS)
+            awaitThat { !requireNotNull(control).renewing }
             stream.outgoing += nudge("0c")
 
             awaitThat { events.nudges.size == 2 }
@@ -447,7 +477,9 @@ class ArcTunnelControlTest {
         const val MS_PER_S = 1_000L
         const val EOF_BUDGET_MS = 1_000
         const val NOTHING_ACCEPTED_MS = 300
-        const val SETTLE_MS = 200L
+        const val MALFORMED_REASON = "the tunnel service sent a malformed control frame"
+        const val SILENT_REASON = "no data from the tunnel service for 90 s"
+        val SILENCE_NANOS: Long = TimeUnit.SECONDS.toNanos(91)
         const val STOP_BUDGET_MS = 2_000L
         const val SILENCE_MS = 12_000L
         const val NANOS_PER_MS = 1_000_000L
