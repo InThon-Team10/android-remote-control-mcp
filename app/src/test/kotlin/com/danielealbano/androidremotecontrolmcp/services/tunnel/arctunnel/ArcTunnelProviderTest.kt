@@ -131,6 +131,13 @@ class ArcTunnelProviderTest {
         withTimeout(BUDGET_MS) { while (!condition()) delay(POLL_MS) }
     }
 
+    /** The first error recorded after the first Connected, if any. */
+    private fun errorAfterConnected(statuses: List<TunnelStatus>): TunnelStatus.Error? {
+        val connectedAt = statuses.indexOfFirst { it is TunnelStatus.Connected }
+        if (connectedAt < 0) return null
+        return statuses.drop(connectedAt).filterIsInstance<TunnelStatus.Error>().firstOrNull()
+    }
+
     /** A saved identity whose public certificate expired yesterday. */
     private fun expiredIdentity(): ArcTunnelIdentity {
         val keyStore = FakeArcTunnelKeyStore()
@@ -287,12 +294,12 @@ class ArcTunnelProviderTest {
             provider.bind(host)
 
             provider.start(LOCAL_PORT, config)
-            val error = awaitError()
+            // A slow first bind may show the timeout error before Connected: wait for the one after the drop.
+            awaitThat { errorAfterConnected(statuses) != null }
             collector.cancel()
 
+            val error = requireNotNull(errorAfterConnected(statuses))
             assertTrue(error.message.startsWith("Not connected after"), error.message)
-            val connectedAt = statuses.indexOfFirst { it is TunnelStatus.Connected }
-            assertTrue(connectedAt in 0 until statuses.indexOfFirst { it is TunnelStatus.Error }, "statuses $statuses")
         }
 
     @Test
