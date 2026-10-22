@@ -18,31 +18,7 @@ import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSystemActionT
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTextInputTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerTouchActionTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerUtilityTools
-import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
-import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityToolCallIndicator
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.ActionExecutor
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenStateSnapshotCache
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInputController
-import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
-import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
-import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
-import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
-import com.danielealbano.androidremotecontrolmcp.services.location.LocationProvider
-import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotAnnotator
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotEncoder
-import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotRedactor
-import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
-import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInbox
-import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
-import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import javax.inject.Inject
 
@@ -52,57 +28,14 @@ import javax.inject.Inject
  */
 class McpToolRegistration
     @Inject
-    constructor() {
-        @Inject lateinit var serverLogRepository: ServerLogRepository
-
-        @Inject lateinit var screenStateSnapshotCache: ScreenStateSnapshotCache
-
-        @Inject lateinit var cameraProvider: CameraProvider
-
-        @Inject lateinit var notificationProvider: NotificationProvider
-
-        @Inject lateinit var ephemeralFileLinkService: EphemeralFileLinkService
-
-        @Inject lateinit var actionExecutor: ActionExecutor
-
-        @Inject lateinit var accessibilityServiceProvider: AccessibilityServiceProvider
-
-        @Inject lateinit var screenCaptureProvider: ScreenCaptureProvider
-
-        @Inject lateinit var treeParser: AccessibilityTreeParser
-
-        @Inject lateinit var elementFinder: ElementFinder
-
-        @Inject lateinit var compactTreeFormatter: CompactTreeFormatter
-
-        @Inject lateinit var screenshotAnnotator: ScreenshotAnnotator
-
-        @Inject lateinit var screenshotEncoder: ScreenshotEncoder
-
-        @Inject lateinit var storageLocationProvider: StorageLocationProvider
-
-        @Inject lateinit var fileOperationProvider: FileOperationProvider
-
-        @Inject lateinit var appManager: AppManager
-
-        @Inject lateinit var typeInputController: TypeInputController
-
-        @Inject lateinit var nodeCache: AccessibilityNodeCache
-
-        @Inject lateinit var webViewNodeMerger: WebViewNodeMerger
-
-        @Inject lateinit var intentDispatcher: IntentDispatcher
-
-        @Inject lateinit var locationProvider: LocationProvider
-
-        @Inject lateinit var sharedContentInbox: SharedContentInbox
-
-        @Inject lateinit var privacyToolGate: PrivacyToolGate
-
-        @Inject lateinit var placeholderSubstitutor: PlaceholderSubstitutor
-
-        @Inject lateinit var screenshotRedactor: ScreenshotRedactor
-
+    constructor(
+        private val serverLogRepository: ServerLogRepository,
+        private val accessibility: AccessibilityToolDeps,
+        private val screen: ScreenToolDeps,
+        private val privacy: PrivacyToolDeps,
+        private val device: DeviceToolDeps,
+        private val inbox: InboxToolDeps,
+    ) {
         /** Registers every MCP tool on [server]; [currentBaseUrl] is the URL the sharing tools hand out. */
         fun registerAll(
             server: Server,
@@ -121,19 +54,20 @@ class McpToolRegistration
                     toolCallIndicator,
                 )
             registerAccessibilityToolBundle(registrar, toolNamePrefix, perms)
-            registerFileTools(registrar, storageLocationProvider, fileOperationProvider, toolNamePrefix, perms)
-            registerAppManagementTools(registrar, appManager, privacyToolGate, toolNamePrefix, perms)
-            registerCameraTools(registrar, cameraProvider, fileOperationProvider, toolNamePrefix, perms)
-            registerIntentTools(registrar, intentDispatcher, toolNamePrefix, perms)
+            val d = device
+            registerFileTools(registrar, d.storageLocationProvider, d.fileOperationProvider, toolNamePrefix, perms)
+            registerAppManagementTools(registrar, d.appManager, privacy.privacyToolGate, toolNamePrefix, perms)
+            registerCameraTools(registrar, d.cameraProvider, d.fileOperationProvider, toolNamePrefix, perms)
+            registerIntentTools(registrar, d.intentDispatcher, toolNamePrefix, perms)
             registerNotificationTools(
                 registrar,
-                notificationProvider,
-                privacyToolGate,
-                placeholderSubstitutor,
+                inbox.notificationProvider,
+                privacy.privacyToolGate,
+                privacy.placeholderSubstitutor,
                 toolNamePrefix,
                 perms,
             )
-            registerLocationTools(registrar, locationProvider, privacyToolGate, toolNamePrefix, perms)
+            registerLocationTools(registrar, d.locationProvider, privacy.privacyToolGate, toolNamePrefix, perms)
             registerSharingBundle(registrar, toolNamePrefix, perms, fileSizeLimitMb, currentBaseUrl)
         }
 
@@ -142,57 +76,72 @@ class McpToolRegistration
             toolNamePrefix: String,
             perms: ToolPermissionsConfig,
         ) {
-            registerScreenIntrospectionTools(
+            val a = accessibility
+            registerScreenTools(registrar, toolNamePrefix, perms)
+            registerSystemActionTools(
                 registrar,
-                treeParser,
-                accessibilityServiceProvider,
-                screenCaptureProvider,
-                compactTreeFormatter,
-                screenshotAnnotator,
-                screenshotEncoder,
-                nodeCache,
-                screenStateSnapshotCache,
-                webViewNodeMerger,
-                privacyToolGate,
-                screenshotRedactor,
+                a.actionExecutor,
+                a.accessibilityServiceProvider,
                 toolNamePrefix,
                 perms,
             )
-            registerSystemActionTools(registrar, actionExecutor, accessibilityServiceProvider, toolNamePrefix, perms)
-            registerTouchActionTools(registrar, actionExecutor, toolNamePrefix, perms)
-            registerGestureTools(registrar, actionExecutor, toolNamePrefix, perms)
+            registerTouchActionTools(registrar, a.actionExecutor, toolNamePrefix, perms)
+            registerGestureTools(registrar, a.actionExecutor, toolNamePrefix, perms)
             registerNodeActionTools(
                 registrar,
-                treeParser,
-                elementFinder,
-                actionExecutor,
-                accessibilityServiceProvider,
-                nodeCache,
-                privacyToolGate,
-                placeholderSubstitutor,
+                a.treeParser,
+                a.elementFinder,
+                a.actionExecutor,
+                a.accessibilityServiceProvider,
+                a.nodeCache,
+                privacy.privacyToolGate,
+                privacy.placeholderSubstitutor,
                 toolNamePrefix,
                 perms,
             )
             registerTextInputTools(
                 registrar,
-                treeParser,
-                actionExecutor,
-                accessibilityServiceProvider,
-                typeInputController,
-                nodeCache,
-                privacyToolGate,
-                placeholderSubstitutor,
+                a.treeParser,
+                a.actionExecutor,
+                a.accessibilityServiceProvider,
+                a.typeInputController,
+                a.nodeCache,
+                privacy.privacyToolGate,
+                privacy.placeholderSubstitutor,
                 toolNamePrefix,
                 perms,
             )
             registerUtilityTools(
                 registrar,
-                treeParser,
-                elementFinder,
-                accessibilityServiceProvider,
-                nodeCache,
-                privacyToolGate,
-                placeholderSubstitutor,
+                a.treeParser,
+                a.elementFinder,
+                a.accessibilityServiceProvider,
+                a.nodeCache,
+                privacy.privacyToolGate,
+                privacy.placeholderSubstitutor,
+                toolNamePrefix,
+                perms,
+            )
+        }
+
+        private fun registerScreenTools(
+            registrar: LoggedToolRegistrar,
+            toolNamePrefix: String,
+            perms: ToolPermissionsConfig,
+        ) {
+            registerScreenIntrospectionTools(
+                registrar,
+                accessibility.treeParser,
+                accessibility.accessibilityServiceProvider,
+                screen.screenCaptureProvider,
+                screen.compactTreeFormatter,
+                screen.screenshotAnnotator,
+                screen.screenshotEncoder,
+                accessibility.nodeCache,
+                screen.screenStateSnapshotCache,
+                screen.webViewNodeMerger,
+                privacy.privacyToolGate,
+                privacy.screenshotRedactor,
                 toolNamePrefix,
                 perms,
             )
@@ -207,12 +156,12 @@ class McpToolRegistration
         ) {
             registerSharingTools(
                 registrar,
-                sharedContentInbox,
-                ephemeralFileLinkService,
-                fileOperationProvider,
+                inbox.sharedContentInbox,
+                inbox.ephemeralFileLinkService,
+                device.fileOperationProvider,
                 fileSizeLimitMb,
                 currentBaseUrl,
-                privacyToolGate,
+                privacy.privacyToolGate,
                 toolNamePrefix,
                 perms,
             )
