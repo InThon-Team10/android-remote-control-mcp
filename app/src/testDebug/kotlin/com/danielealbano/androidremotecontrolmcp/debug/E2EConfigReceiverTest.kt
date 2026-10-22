@@ -323,7 +323,7 @@ class E2EConfigReceiverTest {
         every { intent.getStringExtra("arc_tunnel_base_address") } returns "x"
 
         receiver.onReceive(mockContext, intent)
-        Thread.sleep(COROUTINE_WAIT_MS)
+        verify(timeout = VERIFY_TIMEOUT_MS) { Log.i(any(), CONFIGURE_DONE) }
 
         coVerify(exactly = 0) { mockSettingsRepository.updateTunnelProvider(any()) }
         coVerify(exactly = 0) { mockSettingsRepository.updateArcTunnelBaseAddress(any()) }
@@ -373,8 +373,8 @@ class E2EConfigReceiverTest {
 
         receiver.onReceive(mockContext, intent)
 
-        coVerify(timeout = VERIFY_TIMEOUT_MS) { mockSettingsRepository.updateBearerToken("t") }
-        Thread.sleep(COROUTINE_WAIT_MS)
+        verify(timeout = VERIFY_TIMEOUT_MS) { Log.i(any(), CONFIGURE_DONE) }
+        coVerify(exactly = 1) { mockSettingsRepository.updateBearerToken("t") }
         coVerify(exactly = 0) { mockSettingsRepository.updateArcTunnelE2EOverride(any(), any()) }
     }
 
@@ -404,8 +404,8 @@ class E2EConfigReceiverTest {
         withServerStatus(ServerStatus.Running(port = 8080, bindingAddress = "127.0.0.1"))
 
         receiver.onReceive(mockContext, actionIntent(E2EConfigReceiver.ACTION_E2E_ARC_TUNNEL_ENROLL))
-        Thread.sleep(COROUTINE_WAIT_MS)
 
+        verify(exactly = 1) { Log.w(any(), "E2E enroll ignored: stop the MCP server first") }
         verify(exactly = 0) { mockArcTunnelEnrollment.requestEnroll(any()) }
     }
 
@@ -440,6 +440,7 @@ class E2EConfigReceiverTest {
     companion object {
         private const val COROUTINE_WAIT_MS = 200L
         private const val VERIFY_TIMEOUT_MS = 5_000L
+        private const val CONFIGURE_DONE = "E2E configuration applied successfully"
         private const val EDGE = "10.88.0.1:18443"
         private const val PEM = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
         private const val PEM_B64 = "UEVN"

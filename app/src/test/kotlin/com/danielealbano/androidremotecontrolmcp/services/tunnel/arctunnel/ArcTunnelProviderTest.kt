@@ -268,7 +268,7 @@ class ArcTunnelProviderTest {
         }
 
     @Test
-    fun `a bind racing the timeout ends Connected`() =
+    fun `a bind after the bind timeout fired restores Connected`() =
         runBlocking {
             provider.bindTimeoutMs = 0
             server.enqueue(ArcTunnelTestServer.hold())
