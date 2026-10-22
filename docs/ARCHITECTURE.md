@@ -96,14 +96,14 @@ graph TB
      d. Creates `McpServer` with config, keystore, and SDK `Server` (MCP Kotlin SDK)
      e. Starts Ktor server (HTTP by default, HTTPS if enabled)
      f. Updates `ServerStatus.Running` via companion-level StateFlow
-     g. If tunnel enabled: starts `TunnelManager` with the `McpServer` as `TunnelListenerHost` (free E2E tunnel: resumes the saved identity, issues a missing certificate, opens the loopback TLS listener and the control stream; Cloudflare/ngrok: as before)
+     g. If tunnel enabled: starts `TunnelManager` with the `McpServer` as `TunnelListenerHost` (free E2E tunnel: resumes the saved identity, renews a missing or expired certificate (shown in the UI through `ArcTunnelRenewals`), opens the loopback TLS listener and the control stream; Cloudflare/ngrok: as before)
      h. Tunnel status and URL logged to UI via `serverLogEvents` SharedFlow
 
 ### Shutdown Sequence
 
 1. **User taps "Stop Server"** -> `MainViewModel.stopServer()` called
    - Sends `ACTION_STOP` intent to `McpServerService`
-   - `McpServerService.onDestroy()`:
+   - `McpServerService.onDestroy()` (a server start still in progress is cancelled and waited for first, at most 5 s, through `ServerStartTracker`):
      a. Updates `ServerStatus.Stopping` via companion-level StateFlow
      b. Stops tunnel (with 3s ANR-safe timeout) — tunnel stops BEFORE server
      c. Stops Ktor server gracefully (1s grace + 5s timeout)
