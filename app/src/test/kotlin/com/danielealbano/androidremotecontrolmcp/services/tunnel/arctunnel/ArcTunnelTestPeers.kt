@@ -16,6 +16,11 @@ class ArcTunnelTestEvents : ArcTunnelControlEvents {
     val unbound = AtomicInteger()
     val nudges = CopyOnWriteArrayList<String>()
     val failures = CopyOnWriteArrayList<String>()
+    val attemptFailures = CopyOnWriteArrayList<String>()
+
+    /** When true, the FIRST [onBound] throws an unexpected exception (the catch-all reconnect test). */
+    @Volatile
+    var throwOnFirstBound: Boolean = false
 
     /** When set, [onRenewNudge] suspends until it completes (single-flight tests). */
     @Volatile
@@ -26,8 +31,9 @@ class ArcTunnelTestEvents : ArcTunnelControlEvents {
     var throwOnDialBackFailed: Boolean = false
 
     override fun onBound(node: String) {
-        boundCount.incrementAndGet()
+        val count = boundCount.incrementAndGet()
         bound.countDown()
+        check(!(throwOnFirstBound && count == 1)) { "injected unexpected failure" }
     }
 
     override fun onUnbound() {
@@ -42,6 +48,10 @@ class ArcTunnelTestEvents : ArcTunnelControlEvents {
     override fun onDialBackFailed(message: String) {
         failures += message
         check(!throwOnDialBackFailed) { "injected failure" }
+    }
+
+    override fun onAttemptFailed(reason: String) {
+        attemptFailures += reason
     }
 }
 

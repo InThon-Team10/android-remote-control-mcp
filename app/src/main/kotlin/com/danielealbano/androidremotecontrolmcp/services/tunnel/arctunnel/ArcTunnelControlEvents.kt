@@ -10,4 +10,7 @@ interface ArcTunnelControlEvents {
     suspend fun onRenewNudge(nonce: String)
 
     fun onDialBackFailed(message: String)
+
+    /** A control stream attempt failed or ended on an error (bound or not); [reason] is user-facing. */
+    fun onAttemptFailed(reason: String)
 }

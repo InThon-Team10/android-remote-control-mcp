@@ -56,6 +56,15 @@ class ArcTunnelProvider
             val certSwap = ArcTunnelCertSwap()
             val connected = AtomicBoolean(false)
 
+            /** The bind timeout fired; later failures keep the error status up to date. */
+            val bindTimedOut = AtomicBoolean(false)
+
+            @Volatile
+            var lastFailure: String = ""
+
+            @Volatile
+            var bindTimeout: Job? = null
+
             @Volatile
             var identity: ArcTunnelIdentity? = null
 
@@ -84,6 +93,9 @@ class ArcTunnelProvider
 
         /** Test seam: the certificate-swap poll interval. */
         internal var swapPollMs: Long = SWAP_POLL_MS
+
+        /** Test seam: how long the control stream may stay unbound before the status turns into an error. */
+        internal var bindTimeoutMs: Long = BIND_TIMEOUT_MS
 
         /** Must be called before [start] with the host that serves the MCP application. */
         fun bind(host: TunnelListenerHost) {
@@ -159,6 +171,7 @@ class ArcTunnelProvider
                         ArcTunnelControl(net.controlClient(identity), net, s.env.hosts.controlHost, opens, events)
                     s.opens = opens
                     s.control = control
+                    armBindTimeout(s)
                     s.scope.launch { control.run() }
                     s.scope.launch { swapLoop(s) }
                 }
@@ -237,6 +250,28 @@ class ArcTunnelProvider
             }
         }
 
+        /**
+         * (Re)starts the bind window: unbound for [bindTimeoutMs] turns the status into an error naming the last
+         * failure; the control loop keeps retrying and a bind restores Connected.
+         */
+        private fun armBindTimeout(s: Session) {
+            s.bindTimeout?.cancel()
+            s.bindTimedOut.set(false)
+            s.bindTimeout =
+                s.scope.launch {
+                    delay(bindTimeoutMs)
+                    if (!s.connected.get()) {
+                        s.bindTimedOut.set(true)
+                        _status.value = TunnelStatus.Error(notConnectedMessage(s))
+                    }
+                }
+        }
+
+        private fun notConnectedMessage(s: Session): String {
+            val head = "Not connected after ${bindTimeoutMs / MS_PER_S} s; still retrying"
+            return if (s.lastFailure.isEmpty()) head else "$head: ${s.lastFailure}"
+        }
+
         private fun connectedStatus(s: Session): TunnelStatus.Connected =
             TunnelStatus.Connected(
                 endpoints = listOf(TunnelEndpoint(url = s.identity?.publicUrl().orEmpty(), valid = true)),
@@ -247,13 +282,25 @@ class ArcTunnelProvider
             private val s: Session,
         ) : ArcTunnelControlEvents {
             override fun onBound(node: String) {
+                s.bindTimeout?.cancel()
+                s.bindTimedOut.set(false)
                 s.connected.set(true)
                 Log.i(TAG, "Free E2E tunnel control bound via $node")
                 _status.value = connectedStatus(s)
             }
 
             override fun onUnbound() {
-                if (s.connected.compareAndSet(true, false)) _status.value = TunnelStatus.Connecting
+                if (s.connected.compareAndSet(true, false)) {
+                    _status.value = TunnelStatus.Connecting
+                    armBindTimeout(s)
+                }
+            }
+
+            override fun onAttemptFailed(reason: String) {
+                s.lastFailure = reason
+                if (s.bindTimedOut.get() && !s.connected.get()) {
+                    _status.value = TunnelStatus.Error(notConnectedMessage(s))
+                }
             }
 
             @Suppress("TooGenericExceptionCaught")
@@ -278,6 +325,8 @@ class ArcTunnelProvider
         companion object {
             private const val TAG = "MCP:ArcTunnelProvider"
             private const val SWAP_POLL_MS = 5_000L
+            private const val BIND_TIMEOUT_MS = 60_000L
+            private const val MS_PER_S = 1_000L
             private const val STOP_JOIN_MS = 1_000L
             private const val NOT_ENROLLED_MESSAGE = "Not enrolled: enable Remote Access in Settings → Tunnel first"
         }

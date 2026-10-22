@@ -226,6 +226,31 @@ class ArcTunnelProviderTest {
         }
 
     @Test
+    fun `no bind within the timeout reports Error with the last reason and keeps retrying`() =
+        runBlocking {
+            provider.bindTimeoutMs = SHORT_BIND_TIMEOUT_MS
+            repeat(2) {
+                server.enqueue(
+                    MockResponse
+                        .Builder()
+                        .code(503)
+                        .doNotReadRequestBody()
+                        .build(),
+                )
+            }
+            server.enqueue(ArcTunnelTestServer.hold())
+            provider.bind(host)
+
+            provider.start(LOCAL_PORT, config)
+
+            assertTrue(awaitError().message.startsWith("Not connected after"))
+            withTimeout(BUDGET_MS) {
+                provider.status.first { it is TunnelStatus.Error && it.message.contains("HTTP 503") }
+            }
+            assertEquals(TunnelProviderType.ARC_TUNNEL, awaitConnected().providerType)
+        }
+
+    @Test
     fun `stop tears down control scope and listener`() =
         runBlocking {
             server.enqueue(ArcTunnelTestServer.hold())
@@ -418,6 +443,7 @@ class ArcTunnelProviderTest {
         const val BLOCKED_MS = 10_000L
         const val RECONNECT_WINDOW_MS = 1_500L
         const val SWAP_POLL_MS = 200L
+        const val SHORT_BIND_TIMEOUT_MS = 300L
         const val POLL_MS = 20L
         const val EOF_BUDGET_MS = 1_000
         const val NANOS_PER_MS = 1_000_000L

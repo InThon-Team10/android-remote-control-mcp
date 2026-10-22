@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -62,20 +63,34 @@ class ArcTunnelControl(
         current.get()?.cancel()
     }
 
-    /** Serves control streams until [stop]; OPEN handlers, renewals and the watchdog run as children of this scope. */
+    /**
+     * Serves control streams until [stop]; OPEN handlers, renewals and the watchdog run as children of this scope.
+     * Any failure ends the current stream only (reported to [ArcTunnelControlEvents.onAttemptFailed]); the loop
+     * reconnects with backoff, as the reference client does.
+     */
+    @Suppress("TooGenericExceptionCaught")
     suspend fun run() =
         supervisorScope {
             val backoff = ArcTunnelBackoff()
             while (running.get() && isActive) {
                 val wasBound = AtomicBoolean(false)
-                try {
-                    withContext(Dispatchers.IO) { serveControlOnce(this@supervisorScope, wasBound) }
-                } catch (e: IOException) {
-                    Log.w(TAG, "control connection ended", e)
-                } catch (e: IllegalArgumentException) {
-                    Log.w(TAG, "control stream torn down on a malformed frame", e)
-                }
+                val failure =
+                    try {
+                        withContext(Dispatchers.IO) { serveControlOnce(this@supervisorScope, wasBound) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: IOException) {
+                        Log.w(TAG, "control connection ended", e)
+                        e.message ?: e.javaClass.simpleName
+                    } catch (e: IllegalArgumentException) {
+                        Log.w(TAG, "control stream torn down on a malformed frame", e)
+                        MALFORMED_FRAME
+                    } catch (e: Exception) {
+                        Log.e(TAG, "unexpected control failure; reconnecting", e)
+                        e.message ?: e.javaClass.simpleName
+                    }
                 if (!running.get() || !isActive) break
+                failure?.let(events::onAttemptFailed)
                 if (wasBound.get()) backoff.reset()
                 events.onUnbound()
                 delay(backoff.next())
@@ -84,12 +99,12 @@ class ArcTunnelControl(
 
     /**
      * One control stream; [wasBound] is set as soon as the stream is bound, so an abrupt end still resets
-     * the backoff.
+     * the backoff. Returns the refusal reason of a non-200 answer, null when a bound stream ended.
      */
     private fun serveControlOnce(
         scope: CoroutineScope,
         wasBound: AtomicBoolean,
-    ) {
+    ): String? {
         var sink: BufferedSink? = null
         val request =
             Request
@@ -116,7 +131,7 @@ class ArcTunnelControl(
         val silent = AtomicBoolean(false)
         val watchdog = scope.launch { ArcTunnelWatchdog.watch(call, lastFrameAt, silent) }
         var response: Response? = null
-        try {
+        return try {
             val r = call.execute()
             response = r
             val s = sink
@@ -124,9 +139,15 @@ class ArcTunnelControl(
                 wasBound.set(true)
                 events.onBound(node.get())
                 readFrames(scope, r.body.source(), s, sessions, lastFrameAt)
+                null
             } else {
                 Log.w(TAG, "control connect rejected: ${r.code}")
+                "the tunnel service refused the connection (HTTP ${r.code})"
             }
+        } catch (e: IOException) {
+            // The watchdog cancels a silent stream: name the cause instead of OkHttp's bare "Canceled".
+            if (silent.get()) throw IOException(SILENT_REASON, e)
+            throw e
         } finally {
             canceller.cancel()
             watchdog.cancel()
@@ -223,5 +244,7 @@ class ArcTunnelControl(
     companion object {
         private const val TAG = "MCP:ArcTunnelControl"
         private const val CONTROL_PATH = "/api/v1/control"
+        private const val MALFORMED_FRAME = "the tunnel service sent a malformed control frame"
+        private const val SILENT_REASON = "no data from the tunnel service for 90 s"
     }
 }

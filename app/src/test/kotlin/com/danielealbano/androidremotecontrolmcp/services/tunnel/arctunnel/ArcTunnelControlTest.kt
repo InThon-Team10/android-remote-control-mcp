@@ -277,6 +277,38 @@ class ArcTunnelControlTest {
         }
 
     @Test
+    fun `an unexpected failure ends the stream and the loop reconnects`() =
+        runBlocking {
+            events.throwOnFirstBound = true
+            server.enqueue(ArcTunnelTestServer.hold())
+            server.enqueue(ArcTunnelTestServer.hold())
+            start()
+
+            awaitThat { events.boundCount.get() == 2 }
+
+            assertEquals(listOf("injected unexpected failure"), events.attemptFailures.toList())
+        }
+
+    @Test
+    fun `a refused connect is reported with its HTTP status`() =
+        runBlocking {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(503)
+                    .doNotReadRequestBody()
+                    .build(),
+            )
+            server.enqueue(ArcTunnelTestServer.hold())
+            start()
+
+            awaitThat { events.boundCount.get() == 1 }
+
+            val expected = listOf("the tunnel service refused the connection (HTTP 503)")
+            assertEquals(expected, events.attemptFailures.toList())
+        }
+
+    @Test
     fun `non-200 answer closes the request body`() =
         runBlocking {
             val cleanEof = CountDownLatch(1)
