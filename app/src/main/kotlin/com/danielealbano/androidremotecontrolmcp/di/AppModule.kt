@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
@@ -55,6 +57,8 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileL
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkServiceImpl
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInbox
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInboxImpl
+import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClient
+import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClientImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.MediaStoreFileOperations
@@ -171,6 +175,10 @@ abstract class RepositoryModule {
     @Singleton
     abstract fun bindArcTunnelSettings(impl: ArcTunnelSettingsImpl): ArcTunnelSettings
 
+    @Binds
+    @Singleton
+    abstract fun bindDownloadSettings(impl: DownloadSettingsImpl): DownloadSettings
+
     /** Binds the persisted OAuth client registry. */
     @Binds
     @Singleton
@@ -233,6 +241,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindMediaStoreFileOperations(impl: MediaStoreFileOperationsImpl): MediaStoreFileOperations
+
+    @Binds
+    @Singleton
+    abstract fun bindDownloadHttpClient(impl: DownloadHttpClientImpl): DownloadHttpClient
 
     @Binds
     @Singleton

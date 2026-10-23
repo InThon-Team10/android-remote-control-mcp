@@ -175,6 +175,7 @@ class GeofenceConfigRepositoryTest {
                     changeLogger,
                     EventChannelSettingsImpl(dataStore, changeLogger),
                     ArcTunnelSettingsImpl(dataStore, changeLogger),
+                    DownloadSettingsImpl(dataStore, changeLogger),
                 )
             settingsRepository.updateNotificationChannelEnabled(true)
 

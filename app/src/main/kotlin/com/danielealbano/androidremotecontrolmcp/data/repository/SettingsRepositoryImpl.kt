@@ -62,8 +62,6 @@ private val CLOUDFLARE_TUNNEL_TOKEN_KEY = stringPreferencesKey("cloudflare_tunne
 private val CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY = stringPreferencesKey("cloudflare_tunnel_extra_args")
 private val TUNNEL_PROVIDER_MIGRATED_KEY = booleanPreferencesKey("tunnel_provider_migrated")
 private val FILE_SIZE_LIMIT_KEY = intPreferencesKey("file_size_limit_mb")
-private val ALLOW_HTTP_DOWNLOADS_KEY = booleanPreferencesKey("allow_http_downloads")
-private val ALLOW_UNVERIFIED_HTTPS_KEY = booleanPreferencesKey("allow_unverified_https_certs")
 private val DOWNLOAD_TIMEOUT_KEY = intPreferencesKey("download_timeout_seconds")
 private val DEVICE_SLUG_KEY = stringPreferencesKey("device_slug")
 private val TOOL_PERMISSIONS_KEY = stringPreferencesKey("tool_permissions")
@@ -140,6 +138,7 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         fileSizeLimitMb = prefs[FILE_SIZE_LIMIT_KEY] ?: ServerConfig.DEFAULT_FILE_SIZE_LIMIT_MB,
         allowHttpDownloads = prefs[ALLOW_HTTP_DOWNLOADS_KEY] ?: false,
         allowUnverifiedHttpsCerts = prefs[ALLOW_UNVERIFIED_HTTPS_KEY] ?: false,
+        blockLocalNetworkDownloads = prefs[BLOCK_LOCAL_NETWORK_DOWNLOADS_KEY] ?: false,
         downloadTimeoutSeconds =
             prefs[DOWNLOAD_TIMEOUT_KEY]
                 ?: ServerConfig.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
@@ -260,9 +259,11 @@ class SettingsRepositoryImpl
         private val settingsChangeLogger: SettingsChangeLogger,
         eventChannelSettings: EventChannelSettings,
         arcTunnelSettings: ArcTunnelSettings,
+        downloadSettings: DownloadSettings,
     ) : SettingsRepository,
         EventChannelSettings by eventChannelSettings,
-        ArcTunnelSettings by arcTunnelSettings {
+        ArcTunnelSettings by arcTunnelSettings,
+        DownloadSettings by downloadSettings {
         override val serverConfig: Flow<ServerConfig> =
             dataStore.data.map { prefs ->
                 mapPreferencesToServerConfig(prefs)
@@ -316,9 +317,7 @@ class SettingsRepositoryImpl
             onWord: String = "enabled",
             offWord: String = "disabled",
         ) {
-            settingsChangeLogger.submit(key, oldValue.toString(), newValue.toString()) { _, n ->
-                "$subject ${if (n.toBoolean()) onWord else offWord}"
-            }
+            settingsChangeLogger.submitToggle(key, oldValue, newValue, subject, onWord, offWord)
         }
 
         override suspend fun updateOauthEnabled(enabled: Boolean) {
@@ -535,29 +534,6 @@ class SettingsRepositoryImpl
                     ),
                 )
             }
-
-        override suspend fun updateAllowHttpDownloads(enabled: Boolean) {
-            dataStore.edit { prefs ->
-                val old = prefs[ALLOW_HTTP_DOWNLOADS_KEY] ?: false
-                prefs[ALLOW_HTTP_DOWNLOADS_KEY] = enabled
-                logToggle("allow_http_downloads", old, enabled, "HTTP downloads", "allowed", "disallowed")
-            }
-        }
-
-        override suspend fun updateAllowUnverifiedHttpsCerts(enabled: Boolean) {
-            dataStore.edit { prefs ->
-                val old = prefs[ALLOW_UNVERIFIED_HTTPS_KEY] ?: false
-                prefs[ALLOW_UNVERIFIED_HTTPS_KEY] = enabled
-                logToggle(
-                    "allow_unverified_https_certs",
-                    old,
-                    enabled,
-                    "Unverified HTTPS certificates",
-                    "allowed",
-                    "disallowed",
-                )
-            }
-        }
 
         override suspend fun updateDownloadTimeout(seconds: Int) =
             logScalarChange(

@@ -207,6 +207,11 @@ class E2EConfigReceiver : BroadcastReceiver() {
             settingsRepository.updateAllowHttpDownloads(allowHttp)
             Log.i(TAG, "Allow HTTP downloads updated to $allowHttp")
         }
+        if (intent.hasExtra(EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS)) {
+            val block = intent.getBooleanExtra(EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS, false)
+            settingsRepository.updateBlockLocalNetworkDownloads(block)
+            Log.i(TAG, "Block local network downloads updated to $block")
+        }
     }
 
     private suspend fun applyTunnelSettings(intent: Intent) {
@@ -351,5 +356,6 @@ class E2EConfigReceiver : BroadcastReceiver() {
         private const val EXTRA_STORAGE_ALLOW_DELETE = "storage_allow_delete"
         private const val EXTRA_DOWNLOAD_TIMEOUT_SECONDS = "download_timeout_seconds"
         private const val EXTRA_ALLOW_HTTP_DOWNLOADS = "allow_http_downloads"
+        private const val EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS = "block_local_network_downloads"
     }
 }

@@ -25,7 +25,8 @@ import kotlinx.coroutines.flow.Flow
 @Suppress("TooManyFunctions")
 interface SettingsRepository :
     EventChannelSettings,
-    ArcTunnelSettings {
+    ArcTunnelSettings,
+    DownloadSettings {
     /**
      * Observes the current server configuration. Emits a new [ServerConfig]
      * whenever any setting changes.
@@ -191,12 +192,6 @@ interface SettingsRepository :
      * @return [Result.success] with the validated limit, or [Result.failure] with an [IllegalArgumentException].
      */
     fun validateFileSizeLimit(limitMb: Int): Result<Int>
-
-    /** Updates whether HTTP (non-HTTPS) downloads are allowed. */
-    suspend fun updateAllowHttpDownloads(enabled: Boolean)
-
-    /** Updates whether unverified HTTPS certificates are accepted for downloads. */
-    suspend fun updateAllowUnverifiedHttpsCerts(enabled: Boolean)
 
     /** Updates the download timeout in seconds. */
     suspend fun updateDownloadTimeout(seconds: Int)
