@@ -322,6 +322,42 @@ class ScreenIntrospectionIntegrationTest {
             verify { mockBitmap.recycle() }
         }
 
+    @Test
+    fun `get_screen_state with annotate false and an encoding failure returns error`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            deps.setupReadyService()
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
+            val mockBitmap = mockk<Bitmap>(relaxed = true)
+            coEvery {
+                deps.screenCaptureProvider.captureScreenshotBitmap(any(), any())
+            } returns Result.success(mockBitmap)
+
+            // Simulate an encoding failure of the plain screenshot
+            every {
+                deps.screenshotEncoder.bitmapToScreenshotData(any(), any())
+            } throws RuntimeException("JPEG writer error")
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_get_screen_state",
+                        arguments = mapOf("include_screenshot" to true, "annotate" to false),
+                    )
+                assertEquals(true, result.isError)
+                // The error names the encoding (nothing was annotated) and does not leak the internal details
+                val errorText = (result.content[0] as TextContent).text
+                assertTrue(errorText.contains("Screenshot encoding failed"), errorText)
+                assertFalse(errorText.contains("annotation"), errorText)
+                assertFalse(errorText.contains("JPEG writer error"), errorText)
+            }
+
+            verify(exactly = 0) { deps.screenshotAnnotator.annotate(any(), any(), any(), any()) }
+            // The captured bitmap is still recycled via the finally block
+            verify { mockBitmap.recycle() }
+        }
+
     @Nested
     @DisplayName("Multi-Window Scenarios")
     inner class MultiWindowScenarios {
