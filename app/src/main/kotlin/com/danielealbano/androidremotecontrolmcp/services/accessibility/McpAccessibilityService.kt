@@ -12,6 +12,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
@@ -21,6 +22,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.TextView
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotPacer
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -50,6 +52,9 @@ class McpAccessibilityService : AccessibilityService() {
     private var cacheInvalidationDebouncer: CacheInvalidationDebouncer? = null
 
     private var toolCallIndicatorView: View? = null
+
+    /** One pacer per service connection: the platform's interval is tracked per accessibility service connection. */
+    private val screenshotPacer = ScreenshotPacer(SystemClock::uptimeMillis)
 
     @Volatile
     private var currentPackageName: String? = null
@@ -332,12 +337,16 @@ class McpAccessibilityService : AccessibilityService() {
 
     /**
      * Takes a screenshot using AccessibilityService.takeScreenshot() API.
-     * Does NOT require user consent.
+     * Does NOT require user consent. Captures are spaced out by [screenshotPacer], since the platform
+     * rejects requests that arrive too close together.
      *
-     * @param timeoutMs Maximum time to wait for screenshot capture.
+     * @param timeoutMs Maximum time to wait for screenshot capture (the pacing wait is not included).
      * @return Bitmap of the screenshot, or null if capture failed or timed out.
      */
     suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? =
+        screenshotPacer.paced { captureScreenshotBitmap(timeoutMs) }
+
+    private suspend fun captureScreenshotBitmap(timeoutMs: Long): Bitmap? =
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 val executor = Executor { it.run() }
