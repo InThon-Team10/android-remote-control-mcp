@@ -180,7 +180,7 @@ Protocol-level errors (parse errors, invalid requests) are handled automatically
 
 ### `android_get_screen_state`
 
-Returns the consolidated current screen state: screen dimensions and a compact filtered flat TSV list of UI nodes from **all on-screen windows** (including system dialogs, permission popups, and IME keyboards). Optionally includes an annotated low-resolution screenshot with bounding boxes and node ID labels.
+Returns the consolidated current screen state: screen dimensions and a compact filtered flat TSV list of UI nodes from **all on-screen windows** (including system dialogs, permission popups, and IME keyboards). Optionally includes a low-resolution screenshot, annotated with bounding boxes and node ID labels unless `annotate=false`.
 
 Uses Android's multi-window accessibility API (`getWindows()`) to enumerate all interactive windows. Falls back to single-window mode via `rootInActiveWindow` when the multi-window API is unavailable (degraded mode).
 
@@ -220,7 +220,7 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
 }
 ```
 
-`include_screenshot` and `annotate` are listed only while the `include_screenshot` parameter is enabled in the tool permissions. `include_offscreen` and `include_hierarchy` are fixed by the fresh capture (no `cursor`); the cursor pages of that capture keep them, and values passed with a `cursor` are ignored.
+`include_screenshot` and `annotate` are listed only while the `include_screenshot` parameter is enabled in the tool permissions. `include_offscreen` and `include_hierarchy` are fixed by the fresh capture (no `cursor`); the cursor pages of that capture keep them, and values passed with a `cursor` are type-checked but otherwise ignored.
 
 **Request Example** (text only):
 ```json
@@ -365,6 +365,7 @@ Screenshots are spaced at least 334 ms apart: Android rejects a screenshot reque
 - **Action failed**: No windows available and no active window root node
 - **Permission denied**: Screen capture not available (when `include_screenshot` is true)
 - **Action failed**: Screenshot capture failed
+- **Action failed**: Screenshot annotation failed (annotating or encoding the screenshot failed, with `annotate` true), or Screenshot encoding failed (with `annotate=false`)
 
 ---
 
@@ -2317,7 +2318,7 @@ Downloads a file from a URL and saves it to a storage location.
 - Subject to file size limit, download timeout, and HTTP/HTTPS security settings configured in the app.
 - HTTP downloads (non-HTTPS) must be explicitly allowed in app settings.
 - Unverified HTTPS certificates must be explicitly allowed in app settings.
-- When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, private LAN, link-local, CGNAT/Tailscale and their IPv6 equivalents). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
+- When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including their IPv4-mapped/compatible IPv6 forms). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
 - Parent directories are created automatically if they don't exist.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):

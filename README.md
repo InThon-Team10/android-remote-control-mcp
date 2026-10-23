@@ -340,7 +340,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | Tool Permissions | All enabled | Per-tool and per-parameter enable/disable (Settings > MCP Tools) |
 | File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
 | Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
-| Block Local Network Downloads | Disabled | `android_download_from_url` refuses to connect to this phone, the local network or VPN addresses (loopback, private LAN, link-local, CGNAT/Tailscale and their IPv6 equivalents) |
+| Block Local Network Downloads | Disabled | `android_download_from_url` refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including their IPv4-mapped/compatible IPv6 forms) |
 | Download Timeout | 60 seconds | Timeout for file downloads (range 10-300 seconds) |
 
 ### Using with adb Port Forwarding
