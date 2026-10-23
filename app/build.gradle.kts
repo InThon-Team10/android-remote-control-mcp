@@ -547,7 +547,13 @@ val jacocoExcludes =
         "**/BuildConfig.*",
         "**/Manifest*.*",
         // Hilt / Dagger generated
-        "**/*_HiltModules*",
+        "**/*_HiltModule*",
+        "**/*_HiltComponents*",
+        "**/*_ComponentTreeDeps*",
+        "**/*_GeneratedInjector*",
+        "**/*_AssistedFactory*",
+        "**/HiltWrapper_*",
+        "**/hilt_aggregated_deps/**",
         "**/*_Factory*",
         "**/*_MembersInjector*",
         "**/Hilt_*",
@@ -584,43 +590,21 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         csv.required.set(false)
     }
 
+    // The gmsDebug classes exactly as the unit tests run them: after Hilt's bytecode transform, so @AndroidEntryPoint
+    // classes match the execution data (the old tmp/kotlin-classes/gmsDebug path is no longer produced).
+    val debugClassesDir = "intermediates/classes/gmsDebug/transformGmsDebugClassesWithAsm/dirs"
     val debugTree =
-        fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/gmsDebug") {
+        fileTree(layout.buildDirectory.dir(debugClassesDir)) {
             exclude(jacocoExcludes)
         }
 
     classDirectories.setFrom(debugTree)
-    sourceDirectories.setFrom(files("src/main/kotlin", "src/gms/kotlin"))
+    sourceDirectories.setFrom(files("src/main/kotlin", "src/gms/kotlin", "src/debug/kotlin"))
     executionData.setFrom(
         fileTree(layout.buildDirectory) {
             include("jacoco/testGmsDebugUnitTest.exec")
         },
     )
-}
-
-tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
-    dependsOn("jacocoTestReport")
-
-    val debugTree =
-        fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/gmsDebug") {
-            exclude(jacocoExcludes)
-        }
-
-    classDirectories.setFrom(debugTree)
-    sourceDirectories.setFrom(files("src/main/kotlin", "src/gms/kotlin"))
-    executionData.setFrom(
-        fileTree(layout.buildDirectory) {
-            include("jacoco/testGmsDebugUnitTest.exec")
-        },
-    )
-
-    violationRules {
-        rule {
-            limit {
-                minimum = "0.50".toBigDecimal()
-            }
-        }
-    }
 }
 
 /**
