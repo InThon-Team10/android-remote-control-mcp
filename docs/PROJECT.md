@@ -565,8 +565,8 @@ HomeScreen contains a TopAppBar, then a scrollable layout with: ServerStatusCard
 
 ### Coverage
 
-- **Target**: Minimum 80% code coverage for unit tests (Jacoco, enforced via `jacocoTestCoverageVerification`)
-- **Report**: `make coverage` or `./gradlew jacocoTestReport`
+- **Report**: `make coverage` or `./gradlew jacocoTestReport` (Jacoco HTML + XML; CI uploads the `:app` report as the `coverage-report` artifact)
+- **No coverage gate**: no minimum percentage is enforced; every change MUST still ship with its tests
 
 ### Continuous Testing
 

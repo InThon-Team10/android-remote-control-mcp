@@ -133,7 +133,7 @@ make test
 make coverage
 ```
 
-Generates a Jacoco HTML report at `app/build/reports/jacoco/jacocoTestReport/html/index.html`. Minimum coverage target: 80%.
+Generates a Jacoco HTML report at `app/build/reports/jacoco/jacocoTestReport/html/index.html`. No minimum coverage is enforced; every change still needs its tests.
 
 ---
 
