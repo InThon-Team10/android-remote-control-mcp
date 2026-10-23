@@ -467,6 +467,18 @@ object AndroidContainerSetup {
     }
 
     /**
+     * Launch the long scrollable list test activity (60 rows in a ScrollView) from its top.
+     */
+    fun launchLongListTestApp() {
+        val result = execAdb(
+            "shell", "am", "start", "-W", "-S",
+            "-n", "$COMPOSE_TEST_PACKAGE/.LongListActivity",
+        )
+        println("[E2E Setup] launchLongListTestApp result: $result")
+        Thread.sleep(2_000)
+    }
+
+    /**
      * Launch the WebView test activity using am start.
      */
     fun launchWebViewTestApp() {
