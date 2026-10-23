@@ -140,7 +140,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `services/tunnel/` — `TunnelProvider.kt`, `TunnelManager.kt`, `TunnelListenerHost.kt`, `TunnelTlsContext.kt`, `TunnelHttpsGuard.kt`, `CloudflareTunnelProvider.kt`, `CloudflaredBinaryResolver.kt`, `AndroidCloudflareBinaryResolver.kt`, `NgrokTunnelProvider.kt`
   - `services/tunnel/arctunnel/` — free E2E tunnel client (`android-remote-control-mcp-tunneld` protocol v2): `ArcTunnelHosts.kt`, `ArcTunnelEnv.kt`, `ArcTunnelPem.kt`, `ArcTunnelSockets.kt`, `ArcTunnelWire.kt`, `ArcTunnelFrames.kt`, `ArcTunnelCsr.kt`, `ArcTunnelSessions.kt`, `ArcTunnelKeyStore.kt`, `AndroidArcTunnelKeyStore.kt`, `ArcTunnelIdentity.kt`, `ArcTunnelNet.kt`, `ArcTunnelHttp.kt`, `ArcTunnelDialBack.kt`, `ArcTunnelEnrollRetry.kt`, `ArcTunnelIssueRetry.kt`, `ArcTunnelEnroller.kt`, `ArcTunnelIdentityStore.kt`, `ArcTunnelBackoff.kt`, `ArcTunnelLocalConnect.kt`, `ArcTunnelSplice.kt`, `ArcTunnelWatchdog.kt`, `ArcTunnelControlEvents.kt`, `ArcTunnelOpenHandler.kt`, `ArcTunnelControl.kt`, `ArcTunnelEnrollment.kt`, `ArcTunnelEnrollmentFlow.kt`, `ArcTunnelStartTracker.kt`, `ArcTunnelEnrollmentImpl.kt`, `ArcTunnelEnrollService.kt`, `ArcTunnelRenewals.kt`, `ArcTunnelRenewalsImpl.kt`, `ArcTunnelCtNotifier.kt`, `ArcTunnelCtAlerts.kt`, `ArcTunnelCtMonitor.kt`, `ArcTunnelCertSwap.kt`, `ArcTunnelProvider.kt`
   - `mcp/` — `McpServer.kt`, `McpStatelessTransport.kt`, `McpToolException.kt`, `CertificateManager.kt`
-  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
+  - `mcp/tools/` — `McpToolUtils.kt`, `TreeFingerprint.kt`, `ScreenIntrospectionTools.kt`, `TouchActionTools.kt`, `NodeActionTools.kt`, `NodeTargetResolver.kt`, `TextInputTools.kt`, `SystemActionTools.kt`, `GestureTools.kt`, `UtilityTools.kt`, `FileTools.kt`, `AppManagementTools.kt`, `CameraTools.kt`, `LocationTools.kt`
   - `mcp/auth/` — `BearerTokenAuth.kt`
   - `ui/` — `MainActivity.kt`
   - `ui/theme/` — `Theme.kt`, `Color.kt`, `Type.kt`
@@ -202,7 +202,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 57 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_nodes`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -228,26 +228,29 @@ The MCP server exposes 57 tools across 14 categories. For full JSON-RPC schemas,
 
 **Errors**: Returns `CallToolResult(isError = true)` if accessibility not enabled or action execution failed.
 
-### 3. Node Action Tools (5 tools)
+### 3. Node Action Tools (6 tools)
+
+"Target" = exactly one of `node_id` (string) or a selector: `by` (string: text/content_desc/resource_id/class_name) + `value` (string), optional `exact_match` (boolean, default false). A selector is resolved in the tool's own fresh screen read among on-screen nodes (`android_scroll_to_node`: on- and off-screen); more than one match returns an untrusted `isError` result listing up to 5 candidates, never a guess.
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `android_find_nodes` | Find UI nodes by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false) |
-| `android_click_node` | Click an accessibility node | `node_id` (string) | — |
-| `android_long_click_node` | Long-click an accessibility node | `node_id` (string) | — |
-| `android_tap_node` | Gesture-based tap at a random point within node bounds (unlike `android_click_node`, which uses ACTION_CLICK) | `node_id` (string) | `inset_percentage` (number: 0.0-45.0, default 5.0) |
-| `android_scroll_to_node` | Scroll to make node visible | `node_id` (string) | — |
+| `android_find_nodes` | Find UI nodes by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false), `visible_only` (boolean, default false) |
+| `android_click_node` | Click an accessibility node | Target | — |
+| `android_long_click_node` | Long-click an accessibility node | Target | — |
+| `android_tap_node` | Gesture-based tap at a random point within node bounds (unlike `android_click_node`, which uses ACTION_CLICK) | Target | `inset_percentage` (number: 0.0-45.0, default 5.0) |
+| `android_scroll_to_node` | Scroll the nearest scrollable ancestor in the given direction until the node is visible (up to 5 scrolls, stops early when it does not scroll further), re-finding it after each scroll; returns its current ID | Target, `direction` (string: up/down/left/right) | — |
+| `android_scroll_node` | Scroll a scrollable node once in a direction | Target, `direction` (string: up/down/left/right) | — |
 
-**Errors**: Returns `CallToolResult(isError = true)` if node not found (ID invalid or stale) or node not clickable. `android_find_nodes` returns empty array (not error) when no matches found.
+**Errors**: Returns `CallToolResult(isError = true)` if node not found (ID invalid or stale, or no selector match), the selector is ambiguous, or the node does not support the action. `android_find_nodes` returns empty array (not error) when no matches found.
 
 ### 4. Text Input Tools (5 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
-| `android_type_append_text` | Type text at end of field via InputConnection | `node_id` (string), `text` (string) | `typing_speed` (int, ms, default 250), `typing_speed_variance` (int, ms, default 50) |
-| `android_type_insert_text` | Type text at specific position via InputConnection | `node_id` (string), `text` (string), `offset` (int) | `typing_speed` (int, ms, default 250), `typing_speed_variance` (int, ms, default 50) |
-| `android_type_replace_text` | Find and replace text in field via InputConnection | `node_id` (string), `search` (string), `new_text` (string) | `typing_speed` (int, ms, default 250), `typing_speed_variance` (int, ms, default 50) |
-| `android_type_clear_text` | Clear all text from field via select-all + delete | `node_id` (string) | — |
+| `android_type_append_text` | Type text at end of field via InputConnection | Target (see Node Action Tools), `text` (string) | `typing_speed` (int, ms, default 250), `typing_speed_variance` (int, ms, default 50) |
+| `android_type_insert_text` | Type text at specific position via InputConnection | Target, `text` (string), `offset` (int) | `typing_speed` (int, ms, default 250), `typing_speed_variance` (int, ms, default 50) |
+| `android_type_replace_text` | Find and replace text in field via InputConnection | Target, `search` (string), `new_text` (string) | `typing_speed` (int, ms, default 250), `typing_speed_variance` (int, ms, default 50) |
+| `android_type_clear_text` | Clear all text from field via select-all + delete | Target | — |
 | `android_press_key` | Press a specific key | `key` (string: ENTER/BACK/DEL/HOME/TAB/SPACE) | — |
 
 ### 5. System Action Tools (6 tools)
@@ -819,7 +822,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 57 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 58 tools
 
 ---
 

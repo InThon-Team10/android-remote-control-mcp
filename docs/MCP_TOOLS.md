@@ -34,7 +34,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 
 ## Overview
 
-The MCP server exposes 57 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
+The MCP server exposes 58 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -42,7 +42,7 @@ The MCP server exposes 57 tools via the JSON-RPC 2.0 protocol, organized into 14
 | System Actions | `android_press_back`, `android_press_home`, `android_press_recents`, `android_open_notifications`, `android_open_quick_settings`, `android_dismiss_keyboard` | 6 |
 | Touch Actions | `android_tap`, `android_long_press`, `android_double_tap`, `android_swipe`, `android_scroll` | 8 |
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
-| Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_tap_node`, `android_scroll_to_node` | 9, 35 |
+| Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_tap_node`, `android_scroll_to_node`, `android_scroll_node` | 9, 35 |
 | Text Input | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | 9, 22 |
 | Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_node`, `android_wait_for_idle`, `android_get_node_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
@@ -1069,6 +1069,17 @@ Each path is an array of point objects:
 
 ## 5. Node Action Tools
 
+### Targeting a node
+
+The node tools (`click_node`, `long_click_node`, `tap_node`, `scroll_to_node`, `scroll_node`) and the text input tools (`type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`) take their target in one of two forms, exactly one of them:
+
+- `node_id`: a node ID from `get_screen_state` or `find_nodes`.
+- A selector: `by` (`text`, `content_desc`, `resource_id`, `class_name`) + `value`, with optional `exact_match` (default `false`: case-insensitive contains), the same semantics as `find_nodes`. The selector is matched in the tool's own fresh read of the screen, among **on-screen** nodes (`scroll_to_node` also matches off-screen nodes). With Privacy Mode on, pseudonym placeholders in `value` are matched against the real text.
+
+A selector never guesses: no match is a **Node not found** error; more than one match is an error (`isError = true`) whose first line is the untrusted-content warning, followed by `Ambiguous selector: N on-screen nodes match by=<by>...` (`N nodes match` for `scroll_to_node`, whose selector also matches off-screen nodes) and a `{"nodes":[...]}` JSON list of the first 5 candidates (same shape as `find_nodes`, with Privacy Mode applied and texts longer than 100 characters shortened like in `get_screen_state`). Retry with `node_id` set to one of them or with a more specific selector.
+
+Node IDs hash the node's bounds, so a node's ID changes when it moves (e.g. after a scroll); a selector stays valid.
+
 ### `android_find_nodes`
 
 Find UI nodes matching the specified criteria in the accessibility tree.
@@ -1091,6 +1102,11 @@ Find UI nodes matching the specified criteria in the accessibility tree.
       "type": "boolean",
       "default": false,
       "description": "If true, match exactly. If false, match contains (case-insensitive)"
+    },
+    "visible_only": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, return only the matches that are on screen"
     }
   },
   "required": ["by", "value"]
@@ -1130,23 +1146,26 @@ curl -X POST http://localhost:8080/mcp \
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Invalid `by` value, empty `value`, or missing required parameters
+- **Invalid params**: Invalid `by` value, empty `value`, missing required parameters, or a non-boolean `visible_only`
 - **Permission denied**: Accessibility service not enabled
 
 ---
 
 ### `android_click_node`
 
-Click the specified accessibility node by node ID.
+Click the specified accessibility node, by node ID or by a selector (see [Targeting a node](#targeting-a-node)).
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "node_id": { "type": "string", "description": "Node ID from find_nodes" }
+    "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
+    "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single on-screen node that matches; more than one match is an error listing the candidates." },
+    "value": { "type": "string", "description": "Selector value (with by)" },
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" }
   },
-  "required": ["node_id"]
+  "required": []
 }
 ```
 
@@ -1164,25 +1183,29 @@ curl -X POST http://localhost:8080/mcp \
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id`
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
 - **Action failed**: Node is not clickable or click action failed
 
 ---
 
 ### `android_long_click_node`
 
-Long-click the specified accessibility node by node ID.
+Long-click the specified accessibility node, by node ID or by a selector (see [Targeting a node](#targeting-a-node)).
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "node_id": { "type": "string", "description": "Node ID from find_nodes" }
+    "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
+    "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single on-screen node that matches; more than one match is an error listing the candidates." },
+    "value": { "type": "string", "description": "Selector value (with by)" },
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" }
   },
-  "required": ["node_id"]
+  "required": []
 }
 ```
 
@@ -1200,26 +1223,30 @@ curl -X POST http://localhost:8080/mcp \
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id`
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found
+- **Node not found**: Node not found, or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches
 - **Action failed**: Node is not long-clickable or action failed
 
 ---
 
 ### `android_tap_node`
 
-Performs a gesture-based tap at a random point within the bounds of the node identified by node_id. Unlike `click_node` (which uses the accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. The tap point is randomized within the node bounds, inset by a configurable percentage (default 5%) from each edge to avoid hitting borders.
+Performs a gesture-based tap at a random point within the bounds of the node identified by node_id or by a selector (see [Targeting a node](#targeting-a-node)). Unlike `click_node` (which uses the accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. The tap point is randomized within the node bounds, inset by a configurable percentage (default 5%) from each edge to avoid hitting borders.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "node_id": { "type": "string", "description": "Node ID from find_nodes" },
+    "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
+    "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single on-screen node that matches; more than one match is an error listing the candidates." },
+    "value": { "type": "string", "description": "Selector value (with by)" },
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" },
     "inset_percentage": { "type": "number", "default": 5.0, "description": "Percentage to inset from each edge of the node bounds (0.0-45.0). Default 5.0" }
   },
-  "required": ["node_id"]
+  "required": []
 }
 ```
 
@@ -1237,29 +1264,38 @@ curl -X POST http://localhost:8080/mcp \
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id`, `inset_percentage` out of range (0.0-45.0)
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, an empty `node_id`, `inset_percentage` out of range (0.0-45.0)
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches
 - **Action failed**: Tap gesture failed
 
 ---
 
 ### `android_scroll_to_node`
 
-Scroll to make the specified node visible by scrolling its nearest scrollable ancestor.
+Scroll the nearest scrollable container of the specified node in the given `direction` until the node is visible: up to 5 scrolls, stopping early when the container does not scroll any further that way (e.g. it reached the end of its content). The direction is never guessed. The target is given by node ID or by a selector (see [Targeting a node](#targeting-a-node)); here the selector also matches **off-screen** nodes, which is the usual case.
+
+Node IDs hash the node's bounds, so the IDs of the target and of its container change as soon as they move. After each scroll the container is located again by its place in its window, and the target is found again: when given by ID, inside that container by its resource ID, class, text and content description; when given by a selector, by matching the selector again across all windows. More than one candidate is an error, never a guess. The result names the node's **current** ID.
+
+A target given by ID is never confused with a look-alike: its attributes must tell it apart in its container from the first read (otherwise the tool fails before any scroll), and once it drops out of its container (e.g. a list that unloads the rows scrolled past, when scrolling the wrong way) the tool stops instead of taking another node that looks like it.
 
 **Input Schema**:
 ```json
 {
   "type": "object",
   "properties": {
-    "node_id": { "type": "string", "description": "Node ID from find_nodes" }
+    "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
+    "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single node (on or off screen) that matches; more than one match is an error listing the candidates." },
+    "value": { "type": "string", "description": "Selector value (with by)" },
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" },
+    "direction": { "type": "string", "enum": ["up", "down", "left", "right"], "description": "Direction to scroll the node's container: down/right scroll forward, up/left backward" }
   },
-  "required": ["node_id"]
+  "required": ["direction"]
 }
 ```
 
-**Output**: `"Scrolled to node '<node_id>' (N scroll(s))"` or `"Node '<node_id>' is already visible"`
+**Output**: `"Scrolled to node '<current node_id>' (N scroll(s))"` or `"Node '<node_id>' is already visible"`
 
 **Example**:
 ```bash
@@ -1268,21 +1304,63 @@ curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-    "params": { "name": "android_scroll_to_node", "arguments": { "node_id": "node_abc123" } }
+    "params": { "name": "android_scroll_to_node", "arguments": { "by": "text", "value": "Privacy", "exact_match": true, "direction": "down" } }
   }'
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id`
+- **Invalid params**: Missing or unknown `direction`; neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found
-- **Action failed**: No scrollable container found, scroll failed, or node not visible after max attempts (5)
+- **Node not found**: Node not found, or no node in the current screen matches the selector (a list that has not loaded the item yet: scroll it with `scroll_node` and retry), or the container left the live tree between the read and the scroll
+- **Ambiguous selector**: More than one node matches the selector, before or after a scroll
+- **Action failed**: No scrollable container found; the container did not scroll further (`"Node '<node_id>' not visible after N scroll(s) <direction>: its container did not scroll further (...)"`); the container is no longer at its place in its window (gone, moved or no longer scrollable) or cannot be scrolled; node not visible after 5 scrolls; or, for a node given by ID: several nodes in its container look like it, at the first read or after a scroll (they cannot be told apart, not even by a selector: scroll with `scroll_node`, read the screen again and act on the node ID you pick), or it dropped out of its container (`"Node '<node_id>' is no longer in its container after N scroll(s) <direction> (...): scrolling <direction> cannot bring it back; scroll the other way, or read the screen again"`)
+
+---
+
+### `android_scroll_node`
+
+Scroll a scrollable node (a list, a carousel, a scroll view) once in the given direction, using the node's own accessibility scroll action: `up`/`left` scroll backward, `down`/`right` forward. The target is given by node ID or by a selector (see [Targeting a node](#targeting-a-node)) and must itself be scrollable; nothing else is searched or retried. Unlike `android_scroll` (a swipe from the screen centre), this scrolls exactly the container you name.
+
+**Input Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
+    "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single on-screen node that matches; more than one match is an error listing the candidates." },
+    "value": { "type": "string", "description": "Selector value (with by)" },
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" },
+    "direction": { "type": "string", "enum": ["up", "down", "left", "right"], "description": "Scroll direction" }
+  },
+  "required": ["direction"]
+}
+```
+
+**Output**: `"Scrolled node '<node_id>' <direction>"`. The tool returns once the scroll has started; the content may still be animating (use `android_wait_for_idle` before reading the screen again if needed).
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    "params": { "name": "android_scroll_node", "arguments": { "by": "resource_id", "value": "com.example:id/list", "direction": "down" } }
+  }'
+```
+
+**Error Cases** (returned as `CallToolResult(isError = true)`):
+- **Invalid params**: Missing or unknown `direction`; neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
+- **Permission denied**: Accessibility service not enabled
+- **Node not found**: Node not found, or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches
+- **Action failed**: The node is not scrollable or the scroll action failed
 
 ---
 
 ## 6. Text Input Tools
 
-Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools require `node_id` (mandatory), click the node to focus it, and return the field content after the operation for verification.
+Natural text input tools that use the Android AccessibilityService's `FLAG_INPUT_METHOD_EDITOR` + `AccessibilityInputConnection.commitText()` API (API 33+) for character-by-character typing that is indistinguishable from real IME input. All type tools take their target as `node_id` or as a selector (`by` + `value`, optional `exact_match`; see [Targeting a node](#targeting-a-node)), click the node to focus it, and return the field content after the operation for verification.
 
 All typing operations are serialized via a Mutex — concurrent MCP requests are queued, not interleaved.
 
@@ -1293,7 +1371,10 @@ Type text character by character at the end of a text field. Uses natural InputC
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `node_id` | string | Yes | - | Target node ID to type into |
+| `node_id` | string | One of node_id / selector | - | Target node ID to type into |
+| `by` | string | One of node_id / selector | - | Selector criteria (with `value`): `text`, `content_desc`, `resource_id`, `class_name`; the single on-screen match is the target |
+| `value` | string | With `by` | - | Selector value |
+| `exact_match` | boolean | No | false | Selector: if true, match exactly. If false, match contains (case-insensitive) |
 | `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
 | `typing_speed` | integer | No | 250 | Base delay between characters in ms (min: 10, max: 5000) |
 | `typing_speed_variance` | integer | No | 50 | Random variance in ms, clamped to [0, typing_speed] |
@@ -1333,9 +1414,10 @@ Type text character by character at the end of a text field. Uses natural InputC
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id` or `text`, text exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, an empty `node_id`, missing or empty `text`, text exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
 - **Action failed**: Click failed, input connection not ready (node may not be editable), cursor positioning failed, typing failed (input connection lost)
 
 ---
@@ -1347,7 +1429,10 @@ Type text character by character at a specific position in a text field. Uses na
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `node_id` | string | Yes | - | Target node ID to type into |
+| `node_id` | string | One of node_id / selector | - | Target node ID to type into |
+| `by` | string | One of node_id / selector | - | Selector criteria (with `value`): `text`, `content_desc`, `resource_id`, `class_name`; the single on-screen match is the target |
+| `value` | string | With `by` | - | Selector value |
+| `exact_match` | boolean | No | false | Selector: if true, match exactly. If false, match contains (case-insensitive) |
 | `text` | string | Yes | - | Text to type (must be non-empty, max 2000 characters) |
 | `offset` | integer | Yes | - | 0-based character offset for cursor position. Must be within [0, current text length] |
 | `typing_speed` | integer | No | 250 | Base delay between characters in ms (min: 10, max: 5000) |
@@ -1389,9 +1474,10 @@ Type text character by character at a specific position in a text field. Uses na
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id` or `text`, text exceeds 2000 characters, missing `offset`, `offset` negative, `offset` exceeds current text length, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, an empty `node_id`, missing or empty `text`, text exceeds 2000 characters, missing `offset`, `offset` negative, `offset` exceeds current text length, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches
 - **Action failed**: Click failed, input connection not ready, cursor positioning failed, typing failed (input connection lost)
 
 ---
@@ -1403,7 +1489,10 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `node_id` | string | Yes | - | Target node ID |
+| `node_id` | string | One of node_id / selector | - | Target node ID |
+| `by` | string | One of node_id / selector | - | Selector criteria (with `value`): `text`, `content_desc`, `resource_id`, `class_name`; the single on-screen match is the target |
+| `value` | string | With `by` | - | Selector value |
+| `exact_match` | boolean | No | false | Selector: if true, match exactly. If false, match contains (case-insensitive) |
 | `search` | string | Yes | - | Text to find in the field (first occurrence, max 10000 characters) |
 | `new_text` | string | Yes | - | Replacement text to type (max 2000 characters). Can be empty to just delete the found text |
 | `typing_speed` | integer | No | 250 | Base delay between characters in ms (min: 10, max: 5000) |
@@ -1445,9 +1534,10 @@ Find and replace text in a field by typing the replacement naturally. Finds the 
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id` or `search`, `search` exceeds 10000 characters, `new_text` exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, an empty `node_id`, missing or empty `search`, `search` exceeds 10000 characters, `new_text` exceeds 2000 characters, `typing_speed` out of range (10-5000), `typing_speed_variance` negative
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found in accessibility tree, or search text not found in the field
+- **Node not found**: Node not found in accessibility tree, no on-screen node matches the selector, or search text not found in the field
+- **Ambiguous selector**: More than one on-screen node matches
 - **Action failed**: Click failed, input connection not ready, text selection failed, deletion failed, typing failed (input connection lost)
 
 ---
@@ -1459,7 +1549,10 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 **Input Schema**:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `node_id` | string | Yes | - | Target node ID to clear |
+| `node_id` | string | One of node_id / selector | - | Target node ID to clear |
+| `by` | string | One of node_id / selector | - | Selector criteria (with `value`): `text`, `content_desc`, `resource_id`, `class_name`; the single on-screen match is the target |
+| `value` | string | With `by` | - | Selector value |
+| `exact_match` | boolean | No | false | Selector: if true, match exactly. If false, match contains (case-insensitive) |
 
 **Output**: `"Text cleared from node '<node_id>'.\nField content: <content>"`
 
@@ -1495,9 +1588,10 @@ Clear all text from a field naturally using select-all + delete. Uses InputConne
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `node_id`
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
 - **Permission denied**: Accessibility service not enabled
-- **Node not found**: Node not found in accessibility tree
+- **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
+- **Ambiguous selector**: More than one on-screen node matches
 - **Action failed**: Click failed, input connection not ready, select-all failed, deletion failed (input connection lost)
 
 ---
