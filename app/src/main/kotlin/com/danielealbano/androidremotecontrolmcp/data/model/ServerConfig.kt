@@ -30,7 +30,8 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property allowHttpDownloads Whether HTTP (non-HTTPS) downloads are allowed.
  * @property allowUnverifiedHttpsCerts Whether unverified HTTPS certs are accepted for downloads.
  * @property blockLocalNetworkDownloads Whether `download_from_url` refuses to connect to local network addresses
- *   (loopback, private LAN, link-local, CGNAT and their IPv6 equivalents). Off by default.
+ *   (loopback, unspecified, private LAN, link-local, CGNAT and IPv6 unique-local, including their
+ *   IPv4-mapped / IPv4-compatible IPv6 forms). Off by default.
  * @property downloadTimeoutSeconds Download timeout in seconds.
  * @property deviceSlug Optional device identifier slug for tool name prefix
  *   (letters, digits, underscores; max 20 chars).

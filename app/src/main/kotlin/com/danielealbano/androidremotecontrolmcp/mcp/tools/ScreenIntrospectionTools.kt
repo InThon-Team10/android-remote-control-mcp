@@ -73,6 +73,9 @@ class GetScreenStateHandler
 
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             val includeScreenshot = parseIncludeScreenshot(arguments)
+            // Validated with a cursor too, although the cursor's page keeps the options of its fresh capture
+            val annotate = parseAnnotate(arguments)
+            val formatOptions = parseFormatOptions(arguments)
             val cursorElement = arguments?.get("cursor")
             // Absent, JSON null, or a blank string ⇒ fresh cursorless capture (settled behavior 1).
             // A present, non-blank value (INCLUDING a non-primitive object/array) ⇒ paged path,
@@ -82,7 +85,7 @@ class GetScreenStateHandler
                     cursorElement is JsonNull ||
                     ((cursorElement as? JsonPrimitive)?.contentOrNull?.isBlank() == true)
             return if (isFresh) {
-                handleFreshRequest(includeScreenshot, parseAnnotate(arguments), parseFormatOptions(arguments))
+                handleFreshRequest(includeScreenshot, annotate, formatOptions)
             } else {
                 McpToolUtils.untrustedTextResult(buildPagedText(cursorElement, includeScreenshot))
             }

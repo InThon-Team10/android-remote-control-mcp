@@ -7,18 +7,30 @@ import java.net.Socket
 import java.net.SocketAddress
 import javax.net.SocketFactory
 
-/** A download connection refused because its address is on the local network ("Block Local Network Downloads"). */
-internal class LocalNetworkDownloadBlockedException(
-    endpoint: SocketAddress,
-) : IOException(
-        "connection to ${describe(endpoint)} refused: it is a local network address and " +
-            "'Block Local Network Downloads' is enabled in the storage settings",
-    ) {
-    private companion object {
-        fun describe(endpoint: SocketAddress): String =
-            (endpoint as? InetSocketAddress)
-                ?.let { "${it.address?.hostAddress ?: it.hostString}:${it.port}" }
-                ?: endpoint.toString()
+/** A download connection refused by "Block Local Network Downloads". */
+internal class LocalNetworkDownloadBlockedException private constructor(
+    message: String,
+) : IOException(message) {
+    /** The connection to [endpoint] was refused because its address is on the local network. */
+    constructor(endpoint: SocketAddress) : this(
+        "connection to ${describe(endpoint)} refused: it is a local network address and $SWITCH_ENABLED",
+    )
+
+    companion object {
+        private const val SWITCH_ENABLED = "'Block Local Network Downloads' is enabled in the storage settings"
+
+        /** The connection to [endpoint] was refused because it has no resolved address that could be checked. */
+        fun unchecked(endpoint: SocketAddress): LocalNetworkDownloadBlockedException =
+            LocalNetworkDownloadBlockedException(
+                "connection to ${describe(endpoint)} refused: its address could not be checked while $SWITCH_ENABLED",
+            )
+
+        /**
+         * The endpoint as requested: its host name when it has one, never the address it resolved to on the device,
+         * so a blocked download does not reveal how an internal name resolves.
+         */
+        private fun describe(endpoint: SocketAddress): String =
+            (endpoint as? InetSocketAddress)?.let { "${it.hostString}:${it.port}" } ?: endpoint.toString()
     }
 }
 
@@ -80,8 +92,10 @@ internal class LocalNetworkBlockingSocketFactory(
             timeout: Int,
         ) {
             // An unresolved endpoint has no address to check: refuse it rather than let the platform resolve it.
-            val address = (endpoint as? InetSocketAddress)?.address
-            if (address == null || isBlocked(address)) throw LocalNetworkDownloadBlockedException(endpoint)
+            val address =
+                (endpoint as? InetSocketAddress)?.address
+                    ?: throw LocalNetworkDownloadBlockedException.unchecked(endpoint)
+            if (isBlocked(address)) throw LocalNetworkDownloadBlockedException(endpoint)
             super.connect(endpoint, timeout)
         }
     }

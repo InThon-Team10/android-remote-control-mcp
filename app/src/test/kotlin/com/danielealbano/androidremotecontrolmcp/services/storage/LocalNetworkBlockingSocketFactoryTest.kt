@@ -32,9 +32,11 @@ class LocalNetworkBlockingSocketFactoryTest {
     fun `connect to a blocked address is refused before any connection`() {
         val socket = LocalNetworkBlockingSocketFactory().createSocket()
 
+        // An address without a host name, as an IP literal URL gives
+        val literal = InetAddress.getByAddress(loopback.address)
         val exception =
             assertThrows<LocalNetworkDownloadBlockedException> {
-                socket.connect(InetSocketAddress(loopback, listener.localPort), CONNECT_TIMEOUT_MS)
+                socket.connect(InetSocketAddress(literal, listener.localPort), CONNECT_TIMEOUT_MS)
             }
 
         assertFalse(socket.isConnected)
@@ -63,12 +65,33 @@ class LocalNetworkBlockingSocketFactoryTest {
     }
 
     @Test
-    fun `an unresolved endpoint is refused`() {
+    fun `a refused host name is reported by its name, not by the address it resolved to`() {
+        val socket = LocalNetworkBlockingSocketFactory().createSocket()
+        val resolved = InetAddress.getByAddress("intranet.example", byteArrayOf(192.toByte(), 168.toByte(), 1, 50))
+
+        val e =
+            assertThrows<LocalNetworkDownloadBlockedException> {
+                socket.connect(InetSocketAddress(resolved, HTTP_PORT), CONNECT_TIMEOUT_MS)
+            }
+
+        assertTrue(e.message!!.contains("connection to intranet.example:$HTTP_PORT refused"), e.message)
+        assertFalse(e.message!!.contains("192.168.1.50"), e.message)
+        socket.close()
+    }
+
+    @Test
+    fun `an unresolved endpoint is refused as unchecked, not as a local address`() {
         val socket = LocalNetworkBlockingSocketFactory { false }.createSocket()
 
-        assertThrows<LocalNetworkDownloadBlockedException> {
-            socket.connect(InetSocketAddress.createUnresolved("example.com", HTTPS_PORT), CONNECT_TIMEOUT_MS)
-        }
+        val e =
+            assertThrows<LocalNetworkDownloadBlockedException> {
+                socket.connect(InetSocketAddress.createUnresolved("example.com", HTTPS_PORT), CONNECT_TIMEOUT_MS)
+            }
+        assertEquals(
+            "connection to example.com:$HTTPS_PORT refused: its address could not be checked while " +
+                "'Block Local Network Downloads' is enabled in the storage settings",
+            e.message,
+        )
         socket.close()
     }
 
@@ -114,5 +137,6 @@ class LocalNetworkBlockingSocketFactoryTest {
     private companion object {
         const val CONNECT_TIMEOUT_MS = 5_000
         const val HTTPS_PORT = 443
+        const val HTTP_PORT = 80
     }
 }

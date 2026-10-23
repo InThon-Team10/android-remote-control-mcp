@@ -522,6 +522,24 @@ class ScreenIntrospectionToolsTest {
             }
 
         @Test
+        @DisplayName("rejects non-boolean annotate, include_offscreen and include_hierarchy with a cursor too")
+        fun rejectsNonBooleanOutputParametersWithACursor() =
+            runTest {
+                setupReadyService()
+
+                for (name in listOf("annotate", "include_offscreen", "include_hierarchy")) {
+                    assertThrows<McpToolException.InvalidParams> {
+                        handler.execute(
+                            buildJsonObject {
+                                put("cursor", "snap.2")
+                                put(name, "no")
+                            },
+                        )
+                    }
+                }
+            }
+
+        @Test
         @DisplayName("passes include_offscreen and include_hierarchy to the formatter")
         fun passesOutputOptionsToTheFormatter() =
             runTest {

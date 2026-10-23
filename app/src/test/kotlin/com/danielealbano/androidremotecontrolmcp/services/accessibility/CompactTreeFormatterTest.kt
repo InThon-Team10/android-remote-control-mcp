@@ -1251,6 +1251,48 @@ class CompactTreeFormatterTest {
         }
 
         @Test
+        @DisplayName("include_hierarchy=false leaves out the hierarchy of every window")
+        fun includeHierarchyFalseLeavesOutEveryWindowsHierarchy() {
+            val result =
+                MultiWindowResult(
+                    windows =
+                        listOf(
+                            PaginationTestTrees.keptNodeWindow(3, windowId = 1, packageName = "com.app1"),
+                            PaginationTestTrees.keptNodeWindow(3, windowId = 2, packageName = "com.app2"),
+                        ),
+                )
+
+            val withHierarchy = formatter.formatMultiWindow(result, defaultScreenInfo)
+            val output = formatter.formatMultiWindow(result, defaultScreenInfo, noHierarchy)
+
+            assertEquals(2, withHierarchy.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER })
+            assertEquals(0, output.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER })
+            assertEquals(rowIds(withHierarchy), rowIds(output))
+        }
+
+        @Test
+        @DisplayName("include_hierarchy=false leaves out the hierarchy of every window on every page")
+        fun includeHierarchyFalseLeavesOutEveryWindowsHierarchyOnPages() {
+            // w1 = 150 kept, w2 = 100 kept: page 1 holds both windows, page 2 the rest of window 2
+            val w1 = PaginationTestTrees.keptNodeWindow(148, windowId = 1, packageName = "com.app1")
+            val w2 = PaginationTestTrees.keptNodeWindow(98, windowId = 2, packageName = "com.app2")
+            val result = MultiWindowResult(windows = listOf(w1, w2))
+            val total = formatter.countKeptNodes(result, noHierarchy)
+            val withHierarchy = ScreenStateSnapshot("snap", result, defaultScreenInfo, total, 2)
+            val snapshot = ScreenStateSnapshot("snap", result, defaultScreenInfo, total, 2, noHierarchy)
+
+            val page1 = formatter.formatMultiWindowPage(snapshot, 1)
+            val page2 = formatter.formatMultiWindowPage(snapshot, 2)
+
+            assertTrue(page1.contains("window:1 ") && page1.contains("window:2 "), page1)
+            val defaultPage1 = formatter.formatMultiWindowPage(withHierarchy, 1)
+            assertEquals(2, defaultPage1.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER })
+            for (page in listOf(page1, page2)) {
+                assertEquals(0, page.lines().count { it == CompactTreeFormatter.HIERARCHY_HEADER }, page)
+            }
+        }
+
+        @Test
         @DisplayName("countKeptNodes counts the listed nodes of the options")
         fun countKeptNodesCountsListedNodes() {
             val result = mixedResult()
