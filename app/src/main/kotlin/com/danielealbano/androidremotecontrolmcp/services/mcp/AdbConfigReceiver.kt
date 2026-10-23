@@ -60,6 +60,7 @@ import javax.inject.Inject
  *   --ei file_size_limit_mb 50 \
  *   --ez allow_http_downloads false \
  *   --ez allow_unverified_https_certs false \
+ *   --ez block_local_network_downloads false \
  *   --ei download_timeout_seconds 60 \
  *   --es device_slug "my_pixel"
  *

@@ -267,6 +267,8 @@
     <string name="storage_allow_http_downloads_description">Allow downloading files from unencrypted HTTP URLs (less secure)</string>
     <string name="storage_allow_unverified_https_label">Allow Unverified HTTPS</string>
     <string name="storage_allow_unverified_https_description">Accept unverified HTTPS certificates for downloads (less secure)</string>
+    <string name="storage_block_local_network_downloads_label">Block Local Network Downloads</string>
+    <string name="storage_block_local_network_downloads_description">Refuse downloads from this phone, the local network and VPN addresses (e.g. 127.0.0.1, 192.168.x.x, 10.x.x.x, Tailscale)</string>
 
     <!-- Event Channel — start/stop dialogs -->
     <string name="channel_not_configured_dialog_title">Endpoint URL not set</string>

@@ -323,6 +323,29 @@ fun StorageSettingsScreen(
                         onCheckedChange = viewModel::updateAllowUnverifiedHttpsCerts,
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.storage_block_local_network_downloads_label),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(R.string.storage_block_local_network_downloads_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = serverConfig.blockLocalNetworkDownloads,
+                        onCheckedChange = viewModel::updateBlockLocalNetworkDownloads,
+                    )
+                }
             }
         }
         SnackbarHost(

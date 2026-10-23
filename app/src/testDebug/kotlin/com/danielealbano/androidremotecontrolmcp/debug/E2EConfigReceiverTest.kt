@@ -317,6 +317,27 @@ class E2EConfigReceiverTest {
     }
 
     @Test
+    fun `handleConfigure updates block local network downloads`() {
+        val intent = configureIntent()
+        every { intent.hasExtra("block_local_network_downloads") } returns true
+        every { intent.getBooleanExtra("block_local_network_downloads", false) } returns true
+
+        receiver.onReceive(mockContext, intent)
+
+        coVerify(timeout = VERIFY_TIMEOUT_MS) { mockSettingsRepository.updateBlockLocalNetworkDownloads(true) }
+    }
+
+    @Test
+    fun `handleConfigure leaves block local network downloads untouched when absent`() {
+        val intent = configureIntent()
+
+        receiver.onReceive(mockContext, intent)
+        verify(timeout = VERIFY_TIMEOUT_MS) { Log.i(any(), CONFIGURE_DONE) }
+
+        coVerify(exactly = 0) { mockSettingsRepository.updateBlockLocalNetworkDownloads(any()) }
+    }
+
+    @Test
     fun `handleConfigure ignores an unknown provider and an invalid base address`() {
         val intent = configureIntent()
         every { intent.getStringExtra("tunnel_provider") } returns "nope"

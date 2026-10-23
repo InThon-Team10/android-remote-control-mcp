@@ -708,6 +708,18 @@ class AdbConfigHandlerTest {
             }
 
         @Test
+        @DisplayName("block_local_network_downloads is applied")
+        fun blockLocalNetworkDownloads() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS, true)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateBlockLocalNetworkDownloads(true) }
+            }
+
+        @Test
         @DisplayName("valid download_timeout_seconds is applied")
         fun validDownloadTimeout() =
             runTest {
@@ -818,6 +830,7 @@ class AdbConfigHandlerTest {
                 coVerify(exactly = 0) { settingsRepository.updateFileSizeLimit(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateAllowHttpDownloads(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateAllowUnverifiedHttpsCerts(any()) }
+                coVerify(exactly = 0) { settingsRepository.updateBlockLocalNetworkDownloads(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateDownloadTimeout(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateDeviceSlug(any()) }
                 coVerify(exactly = 0) { settingsRepository.updateToolPermissionsConfig(any()) }
@@ -963,6 +976,18 @@ class AdbConfigHandlerTest {
                     }
                 handler.handle(context, intent)
                 coVerify { settingsRepository.updateAllowUnverifiedHttpsCerts(false) }
+            }
+
+        @Test
+        @DisplayName("block_local_network_downloads false is applied")
+        fun blockLocalNetworkDownloadsFalse() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        boolean(AdbConfigHandler.EXTRA_BLOCK_LOCAL_NETWORK_DOWNLOADS, false)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateBlockLocalNetworkDownloads(false) }
             }
     }
 
