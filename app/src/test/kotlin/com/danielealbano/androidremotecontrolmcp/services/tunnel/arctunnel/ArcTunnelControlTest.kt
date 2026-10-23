@@ -118,11 +118,12 @@ class ArcTunnelControlTest {
     private fun start(
         handler: ArcTunnelOpenHandler = opens(),
         watchdogClock: () -> Long = System::nanoTime,
+        runScope: CoroutineScope = scope,
     ): ArcTunnelControl {
         val c = ArcTunnelControl(net.controlClient(identity), net, ArcTunnelTestServer.CONTROL_HOST, handler, events)
         c.watchdogClock = watchdogClock
         control = c
-        job = scope.launch { c.run() }
+        job = runScope.launch { c.run() }
         return c
     }
 
@@ -338,25 +339,36 @@ class ArcTunnelControlTest {
             assertEquals(expected, events.attemptFailures.toList())
         }
 
-    @Test
-    fun `non-200 answer closes the request body`() =
-        runBlocking {
-            val cleanEof = CountDownLatch(1)
-            server.enqueue(
-                ArcTunnelTestServer.answer(503) { socket ->
-                    try {
-                        socket.source.buffer().readByteArray()
-                        cleanEof.countDown()
-                    } catch (e: IOException) {
-                        System.err.println("rejected stream ended with an error: $e")
-                    }
-                },
-            )
-            start()
+    /** A 503 whose server side reads the request body to the end: it must see a clean EOF, never a reset. */
+    private fun assertRejectedStreamEndsCleanly(runScope: CoroutineScope) {
+        val cleanEof = CountDownLatch(1)
+        server.enqueue(
+            ArcTunnelTestServer.answer(503) { socket ->
+                try {
+                    socket.source.buffer().readByteArray()
+                    cleanEof.countDown()
+                } catch (e: IOException) {
+                    System.err.println("rejected stream ended with an error: $e")
+                }
+            },
+        )
+        start(runScope = runScope)
 
-            assertTrue(cleanEof.await(BUDGET_S, TimeUnit.SECONDS))
-            assertEquals(0, events.boundCount.get())
-        }
+        assertTrue(cleanEof.await(BUDGET_S, TimeUnit.SECONDS))
+        assertEquals(0, events.boundCount.get())
+    }
+
+    @Test
+    fun `non-200 answer closes the request body`() = assertRejectedStreamEndsCleanly(scope)
+
+    @Test
+    fun `non-200 answer closes the request body before the call is cancelled`() {
+        // Unconfined: cancelling the scope-cancellation sibling runs its call.cancel() at once, on the thread
+        // that is closing the stream, so a cancel ordered before the graceful close resets the stream every time.
+        assertRejectedStreamEndsCleanly(
+            CoroutineScope(Dispatchers.Unconfined + CoroutineExceptionHandler { _, t -> recorded += t }),
+        )
+    }
 
     @Test
     fun `stop cancels the in-flight stream at once`() =

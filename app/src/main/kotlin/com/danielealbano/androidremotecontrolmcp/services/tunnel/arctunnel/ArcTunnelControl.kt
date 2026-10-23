@@ -144,18 +144,33 @@ class ArcTunnelControl(
             if (silent.get()) throw IOException(SILENT_REASON, e)
             throw e
         } finally {
-            canceller.cancel()
-            watchdog.cancel()
-            sessions.closeAll()
+            // Close gracefully before cancelling the siblings: the canceller's finally cancels the call, which would
+            // reset a stream whose request body is not closed yet. Meanwhile both stay active, so a scope cancellation
+            // (the canceller) or the watchdog can still cancel the call while the close waits on the stream.
             try {
-                sink?.close()
-            } catch (e: IOException) {
-                Log.d(TAG, "control request body close failed", e)
+                closeGracefully(sessions, sink, response)
+            } finally {
+                canceller.cancel()
+                watchdog.cancel()
             }
-            response?.close()
             current.compareAndSet(call, null)
             if (silent.get()) client.connectionPool.evictAll()
         }
+    }
+
+    /** Ends a control stream cleanly: the dial-back sessions, then the request body (END_STREAM), then the response. */
+    private fun closeGracefully(
+        sessions: ArcTunnelSessions,
+        sink: BufferedSink?,
+        response: Response?,
+    ) {
+        sessions.closeAll()
+        try {
+            sink?.close()
+        } catch (e: IOException) {
+            Log.d(TAG, "control request body close failed", e)
+        }
+        response?.close()
     }
 
     /** The reason [ArcTunnelControlEvents.onAttemptFailed] reports for a stream that ended with [e]. */
