@@ -24,6 +24,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationData
+import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenCaptureProvider
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.every
@@ -412,6 +413,49 @@ class PrivacyModeIntegrationTest {
                 }
                 // The masked copy (not the raw captured bitmap) must be the one annotated/encoded.
                 verify { deps.screenshotAnnotator.annotate(masked, any(), 1080, 2400) }
+            } finally {
+                unmockkConstructor(Canvas::class)
+            }
+        }
+
+    @Test
+    fun `screenshot with annotate false encodes the masked copy`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setPrivacy(deps, deterministicEnabled, PrivacyModeStatus.ReadyDeterministicOnly)
+            deps.setupTree(treeWith("john@example.com"))
+            every { deps.screenCaptureProvider.isScreenCaptureAvailable() } returns true
+
+            val resized = mockk<Bitmap>(relaxed = true)
+            val masked = mockk<Bitmap>(relaxed = true)
+            coEvery { deps.screenCaptureProvider.captureScreenshotBitmap(any(), any()) } returns Result.success(resized)
+            every { resized.copy(Bitmap.Config.ARGB_8888, true) } returns masked
+            every { masked.width } returns 1080
+            every { masked.height } returns 2400
+
+            mockkConstructor(Canvas::class)
+            every { anyConstructed<Canvas>().drawRect(any<RectF>(), any()) } just Runs
+
+            every { deps.screenshotEncoder.bitmapToScreenshotData(any(), any()) } returns
+                ScreenshotData(data = "dGVzdA==", width = 700, height = 500)
+
+            try {
+                McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                    val result =
+                        client.callTool(
+                            name = "android_get_screen_state",
+                            arguments = mapOf("include_screenshot" to true, "annotate" to false),
+                        )
+                    assertNotEquals(true, result.isError)
+                }
+                // The masked copy (not the raw captured bitmap) must be the one encoded, without annotation.
+                verify(exactly = 1) {
+                    deps.screenshotEncoder.bitmapToScreenshotData(masked, ScreenCaptureProvider.DEFAULT_QUALITY)
+                }
+                verify(exactly = 0) { deps.screenshotEncoder.bitmapToScreenshotData(resized, any()) }
+                verify(exactly = 0) { deps.screenshotAnnotator.annotate(any(), any(), any(), any()) }
+                verify(exactly = 1) { masked.recycle() }
+                verify(exactly = 1) { resized.recycle() }
             } finally {
                 unmockkConstructor(Canvas::class)
             }

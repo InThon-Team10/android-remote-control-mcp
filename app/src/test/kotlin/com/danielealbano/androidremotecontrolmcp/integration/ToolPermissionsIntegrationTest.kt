@@ -114,6 +114,13 @@ class ToolPermissionsIntegrationTest {
                     properties?.containsKey("include_screenshot") == true,
                     "include_screenshot should be absent from schema when disabled",
                 )
+                assertFalse(
+                    properties?.containsKey("annotate") == true,
+                    "annotate should be absent from schema while include_screenshot is disabled",
+                )
+                for (name in listOf("cursor", "include_offscreen", "include_hierarchy")) {
+                    assertTrue(properties?.containsKey(name) == true, "$name should stay in the schema")
+                }
             }
         }
 

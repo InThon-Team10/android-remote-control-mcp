@@ -195,11 +195,32 @@ Replaces the previous `get_accessibility_tree`, `capture_screenshot`, `get_curre
       "type": "boolean",
       "description": "Include a low-resolution screenshot. Only request when the UI node list is not sufficient.",
       "default": false
+    },
+    "annotate": {
+      "type": "boolean",
+      "description": "With include_screenshot=true: draw the node bounding boxes and ids on the screenshot. Set false for the plain screenshot.",
+      "default": true
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Pagination cursor from a previous response (format \"<id>.<page>\"). Omit to capture a fresh screen state starting at page 1. A cursor is tied to one screen snapshot; if the screen changed you will be told to request a fresh one."
+    },
+    "include_offscreen": {
+      "type": "boolean",
+      "description": "List nodes that are not on screen (flag 'off'). Set false for on-screen nodes only. Applies to a fresh capture; its cursor pages keep the same value.",
+      "default": true
+    },
+    "include_hierarchy": {
+      "type": "boolean",
+      "description": "Include the 'hierarchy:' section (node nesting by indentation) of each window. Set false for a smaller response. Applies to a fresh capture; its cursor pages keep the same value.",
+      "default": true
     }
   },
   "required": []
 }
 ```
+
+`include_screenshot` and `annotate` are listed only while the `include_screenshot` parameter is enabled in the tool permissions. `include_offscreen` and `include_hierarchy` are fixed by the fresh capture (no `cursor`); the cursor pages of that capture keep them, and values passed with a `cursor` are ignored.
 
 **Request Example** (text only):
 ```json
@@ -275,14 +296,16 @@ The text output is a multi-window compact flat TSV (tab-separated values) format
    - `note:structural-only nodes are omitted from the tree`
    - `note:certain elements are custom and will not be properly reported...`
    - `note:flags: on=onscreen off=offscreen clk=clickable lclk=longClickable foc=focusable scr=scrollable edt=editable ena=enabled`
-   - `note:offscreen items require scroll_to_node before interaction`
+   - `note:offscreen items require scroll_to_node before interaction`; with `include_offscreen=false` it is replaced by `note:offscreen nodes are not listed (include_offscreen=false); call without it, or scroll, to see them`
 3. **Screen line** (global): `screen:<width>x<height> density:<dpi> orientation:<orientation>`
 4. **Per-window sections** (repeated for each window):
    - **Window header**: `--- window:<id> type:<TYPE> pkg:<package> title:<title> [activity:<activity>] layer:<N> focused:<bool> ---`
    - **TSV header**: `node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags`
    - **Data rows**: One row per filtered node with tab-separated values
-   - **Hierarchy header**: `hierarchy:`
+   - **Hierarchy header**: `hierarchy:` (the header and its rows are left out with `include_hierarchy=false`)
    - **Hierarchy rows**: One line per kept node (node ID only), indented by 2 spaces per nesting depth. Structural-only nodes are omitted; their kept children are promoted to the parent's depth.
+
+With `include_offscreen=false`, nodes that are not on screen (flag `off`) get no data row and no hierarchy row; their on-screen descendants are still listed, nested under the nearest listed ancestor (the same way children of structural-only nodes are). Page counts and `nodes:` ranges count the listed nodes only.
 
 The `activity:` field in the window header is only present for the focused APPLICATION window whose package matches the tracked foreground package. Window types include: APPLICATION, INPUT_METHOD, SYSTEM, ACCESSIBILITY_OVERLAY, SPLIT_SCREEN_DIVIDER, MAGNIFICATION_OVERLAY.
 
@@ -326,13 +349,15 @@ Both `text` and `desc` columns are truncated to **100 characters**. If truncated
 
 #### Screenshot
 
-When `include_screenshot` is `true`, a low-resolution annotated JPEG screenshot (max 700px in either dimension, quality 80) is included as a second content item (`ImageContent`). The screenshot is annotated with:
+When `include_screenshot` is `true`, a low-resolution JPEG screenshot (max 700px in either dimension, quality 80) is included as a second content item (`ImageContent`). With Privacy Mode on, the regions of flagged nodes are masked first. Unless `annotate` is `false` (plain screenshot, still masked), the screenshot is annotated with:
 - **Red dashed bounding boxes** (2px) around each on-screen node that appears in the TSV
 - **Semi-transparent red pill labels** with white bold text showing the node ID hash (e.g., `a3f2` for `node_a3f2`) at the top-left of each bounding box
 
 Off-screen nodes (marked with `off` flag in the TSV) do not have bounding boxes on the screenshot. Use the `scroll_to_node` tool to bring them into view first.
 
 Only request the screenshot when the node list alone is not sufficient to understand the screen layout.
+
+Screenshots are spaced at least 334 ms apart: Android rejects a screenshot request that arrives 333 ms or less after the previous one, so simultaneous requests are captured one after the other instead of failing.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Permission denied**: Accessibility service not enabled or not ready
