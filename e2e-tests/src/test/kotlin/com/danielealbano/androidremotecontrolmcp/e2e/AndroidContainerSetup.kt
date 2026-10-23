@@ -8,6 +8,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.AbstractWaitStrategy
 import org.testcontainers.utility.DockerImageName
 import java.io.File
+import java.io.IOException
 import java.time.Duration
 import java.util.Base64
 import java.util.concurrent.TimeUnit
@@ -667,17 +668,24 @@ object AndroidContainerSetup {
     }
 
     /**
-     * Ensures binder_linux and fuse kernel modules are loaded.
+     * Ensures binder and fuse are available to redroid.
      *
-     * On CI, modules are pre-loaded by the workflow. On local dev, attempts
-     * `sudo modprobe` and provides a clear error on failure.
+     * On CI, modules are pre-loaded and binderfs mounted by the workflow. When [kernelPrerequisitesSatisfied] reports
+     * them usable (binderfs mounted, fuse loaded or built in) nothing is done; otherwise attempts `sudo modprobe`
+     * plus the binderfs mount and provides a clear error on failure.
      *
      * NOTE: Uses `sudo` — accepted exception to CLAUDE.md no-sudo rule.
      * Kernel module loading is a host-OS operation required by redroid.
      */
     private fun ensureKernelModules() {
-        if (isModuleLoaded("binder_linux") && isModuleLoaded("fuse")) {
-            println("[E2E Setup] Kernel modules already loaded")
+        val satisfied =
+            kernelPrerequisitesSatisfied(
+                procModules = readProcModules(),
+                devFuseExists = File("/dev/fuse").exists(),
+                binderfsMounted = isBinderfsMounted(),
+            )
+        if (satisfied) {
+            println("[E2E Setup] Kernel prerequisites already available (binder, fuse)")
             return
         }
 
@@ -705,22 +713,41 @@ object AndroidContainerSetup {
      * NOTE: Uses `sudo` — same accepted exception as ensureKernelModules.
      */
     private fun ensureBinderfs() {
-        try {
-            runProcess("mountpoint", "-q", "/dev/binderfs")
-            return // Already mounted
-        } catch (_: Exception) {
-            // Not mounted, proceed
-        }
+        if (isBinderfsMounted()) return
 
         println("[E2E Setup] Mounting binderfs at /dev/binderfs/...")
         runProcess("sudo", "mkdir", "-p", "/dev/binderfs")
         runProcess("sudo", "mount", "-t", "binder", "binder", "/dev/binderfs")
     }
 
-    private fun isModuleLoaded(moduleName: String): Boolean =
+    /**
+     * True when binder and fuse are already usable, so the sudo `modprobe` path can be skipped. Binder counts only
+     * when `/dev/binderfs` is mounted, module or built in: [detectBinderDevMajor] reads the device major from that
+     * mount, so a loaded `binder_linux` without it still needs [ensureBinderfs]. Built-in (non-module) fuse never
+     * appears in [procModules], so an existing `/dev/fuse` also counts.
+     */
+    internal fun kernelPrerequisitesSatisfied(
+        procModules: String,
+        devFuseExists: Boolean,
+        binderfsMounted: Boolean,
+    ): Boolean = binderfsMounted && (devFuseExists || procModules.contains("fuse"))
+
+    private fun readProcModules(): String =
         try {
-            File("/proc/modules").readText().contains(moduleName)
-        } catch (_: Exception) {
+            File("/proc/modules").readText()
+        } catch (_: IOException) {
+            ""
+        }
+
+    private fun isBinderfsMounted(): Boolean =
+        try {
+            runProcess("mountpoint", "-q", "/dev/binderfs")
+            true
+        } catch (_: IllegalStateException) {
+            // Non-zero exit (not a mount point) or timeout.
+            false
+        } catch (_: IOException) {
+            // `mountpoint` could not be started.
             false
         }
 
