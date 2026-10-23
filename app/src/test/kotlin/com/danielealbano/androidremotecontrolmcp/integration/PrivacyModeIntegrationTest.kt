@@ -21,6 +21,7 @@ import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerResult
 import com.danielealbano.androidremotecontrolmcp.privacy.ner.NerSegment
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationData
@@ -294,6 +295,42 @@ class PrivacyModeIntegrationTest {
                     )
                 assertNotEquals(true, result.isError)
                 assertEquals("john@example.com", valueSlot.captured)
+            }
+        }
+
+    @Test
+    fun `node selector reverses the placeholder and redacts the ambiguous candidates`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+            McpIntegrationTestHelper.setPrivacy(deps, deterministicEnabled, PrivacyModeStatus.ReadyDeterministicOnly)
+            deps.setupTree(treeWith("john@example.com"))
+            val placeholder = deps.privacyToolGate.text("john@example.com", "seed")!!
+
+            val valueSlot = slot<String>()
+            val match =
+                ElementInfo(
+                    id = "node_field",
+                    text = "john@example.com",
+                    className = "android.widget.TextView",
+                    bounds = BoundsData(100, 200, 900, 260),
+                    visible = true,
+                )
+            every {
+                deps.elementFinder.findElements(any<List<WindowData>>(), any(), capture(valueSlot), any())
+            } returns listOf(match, match.copy(id = "node_field_2"))
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_click_node",
+                        arguments = mapOf("by" to "text", "value" to placeholder),
+                    )
+                assertEquals(true, result.isError)
+                assertEquals("john@example.com", valueSlot.captured)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("node_field_2"), text)
+                assertTrue(text.contains("EMAIL#"), text)
+                assertFalse(text.contains("john@example.com"), text)
             }
         }
 

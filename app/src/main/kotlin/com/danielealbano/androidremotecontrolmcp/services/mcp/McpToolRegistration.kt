@@ -102,6 +102,7 @@ class McpToolRegistration
             registerTextInputTools(
                 registrar,
                 a.treeParser,
+                a.elementFinder,
                 a.actionExecutor,
                 a.accessibilityServiceProvider,
                 a.typeInputController,
