@@ -2198,13 +2198,14 @@ Downloads a file from a URL and saves it to a storage location.
 - Subject to file size limit, download timeout, and HTTP/HTTPS security settings configured in the app.
 - HTTP downloads (non-HTTPS) must be explicitly allowed in app settings.
 - Unverified HTTPS certificates must be explicitly allowed in app settings.
+- When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, private LAN, link-local, CGNAT/Tailscale and their IPv6 equivalents). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
 - Parent directories are created automatically if they don't exist.
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
 - **Invalid params**: Missing `location_id`, `path`, or `url`; invalid URL format
 - **Invalid params**: File MIME type not accepted by the built-in storage location (e.g. writing a text file to `builtin:pictures`; error lists the accepted types)
 - **Permission denied**: Write not allowed
-- **Action failed**: Storage location not found, download failed (network error, timeout, HTTP error status), file exceeds size limit, HTTP not allowed, unverified HTTPS not allowed
+- **Action failed**: Storage location not found, download failed (network error, timeout, HTTP error status), file exceeds size limit, HTTP not allowed, unverified HTTPS not allowed, local network address blocked
 
 ---
 

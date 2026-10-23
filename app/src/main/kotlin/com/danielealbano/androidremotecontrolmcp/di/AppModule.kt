@@ -57,6 +57,8 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileL
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkServiceImpl
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInbox
 import com.danielealbano.androidremotecontrolmcp.services.sharing.SharedContentInboxImpl
+import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClient
+import com.danielealbano.androidremotecontrolmcp.services.storage.DownloadHttpClientImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProviderImpl
 import com.danielealbano.androidremotecontrolmcp.services.storage.MediaStoreFileOperations
@@ -239,6 +241,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindMediaStoreFileOperations(impl: MediaStoreFileOperationsImpl): MediaStoreFileOperations
+
+    @Binds
+    @Singleton
+    abstract fun bindDownloadHttpClient(impl: DownloadHttpClientImpl): DownloadHttpClient
 
     @Binds
     @Singleton

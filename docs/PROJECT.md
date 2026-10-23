@@ -103,7 +103,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **SLF4J-Android**: Routes MCP SDK internal SLF4J logs to `android.util.Log`
 - **Kotlinx Serialization**: JSON serialization for MCP protocol
 - **Kotlinx Coroutines**: Async/concurrency
-- **OkHttp**: 5.5.0, the free E2E tunnel's HTTP/2 duplex control stream, `/issue` and Certificate Transparency calls (duplex request bodies are not expressible through the Ktor client)
+- **OkHttp**: 5.5.0, the free E2E tunnel's HTTP/2 duplex control stream, `/issue` and Certificate Transparency calls (duplex request bodies are not expressible through the Ktor client), and `android_download_from_url` (its socket factory is where "Block Local Network Downloads" checks every connection)
 - **Android Log**: Logging (standard Android Log class)
 - **Accompanist**: Compose utilities (permissions handling)
 - **Google Play Services Location**: Device location via FusedLocationProviderClient
@@ -113,7 +113,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 - **JUnit 5**: Unit test framework
 - **MockK**: Mocking framework for Kotlin
 - **Turbine**: Flow testing library
-- **MockWebServer3 + okhttp-tls**: TLS/HTTP-2 mock server and test certificates for the free E2E tunnel client tests
+- **MockWebServer3 + okhttp-tls**: TLS/HTTP-2 mock server and test certificates for the free E2E tunnel client tests and the download client tests
 - **Compose UI Test**: Jetpack Compose testing
 - **Testcontainers Kotlin**: Container-based E2E tests
 - **MCP Kotlin SDK Client**: SDK `Client` + `StreamableHttpClientTransport` for E2E tests
@@ -132,7 +132,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `McpApplication.kt` — Application class (Hilt setup)
   - `services/accessibility/` — `McpAccessibilityService.kt`, `AccessibilityTreeParser.kt`, `ElementFinder.kt`, `ActionExecutor.kt`, `ActionExecutorImpl.kt`, `AccessibilityServiceProvider.kt`, `AccessibilityServiceProviderImpl.kt`, `TypeInputController.kt`, `TypeInputControllerImpl.kt`, `ScreenInfo.kt`, `CompactTreeFormatter.kt`, `AccessibilityNodeCache.kt`, `AccessibilityNodeCacheImpl.kt`
   - `services/screencapture/` — `ScreenCaptureProvider.kt`, `ScreenCaptureProviderImpl.kt`, `ScreenshotEncoder.kt`, `ScreenshotAnnotator.kt`, `ApiLevelProvider.kt`
-  - `services/storage/` — `StorageLocationProvider.kt`, `StorageLocationProviderImpl.kt`, `FileOperationProvider.kt`, `FileOperationProviderImpl.kt`
+  - `services/storage/` — `StorageLocationProvider.kt`, `StorageLocationProviderImpl.kt`, `FileOperationProvider.kt`, `FileOperationProviderImpl.kt`, `DownloadHttpClient.kt`, `LocalNetworkAddress.kt`, `LocalNetworkBlockingSocketFactory.kt`
   - `services/apps/` — `AppManager.kt`, `AppManagerImpl.kt`
   - `services/camera/` — `CameraProvider.kt`, `CameraProviderImpl.kt`, `ServiceLifecycleOwner.kt`
   - `services/location/` — `LocationProvider.kt`, `LocationProviderImpl.kt`
@@ -147,7 +147,7 @@ The typical startup flow: User opens app → enables Accessibility Service in An
   - `ui/screens/` — `HomeScreen.kt`, `settings/ArcTunnelSettingsSection.kt`
   - `ui/components/` — `ServerStatusCard.kt`, `ConfigurationSection.kt`, `RemoteAccessSection.kt`, `ConnectionInfoCard.kt`, `PermissionsSection.kt`, `ServerLogsSection.kt`, `StorageLocationsSection.kt`, `ArcTunnelRenewalBlock.kt`
   - `ui/viewmodels/` — `MainViewModel.kt`, `ArcTunnelViewModel.kt`, `ArcTunnelRenewalViewModel.kt`
-  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `ArcTunnelSettings.kt`, `ArcTunnelSettingsImpl.kt`
+  - `data/repository/` — `SettingsRepository.kt`, `SettingsRepositoryImpl.kt`, `ArcTunnelSettings.kt`, `ArcTunnelSettingsImpl.kt`, `DownloadSettings.kt`, `DownloadSettingsImpl.kt`
   - `data/model/` — `ServerConfig.kt`, `ServerStatus.kt`, `ServerLogEntry.kt`, `BindingAddress.kt`, `CertificateSource.kt`, `ScreenshotData.kt`, `TunnelProviderType.kt`, `TunnelStatus.kt`, `StorageLocation.kt`, `FileInfo.kt`, `AppInfo.kt`, `AppFilter.kt`, `CameraInfo.kt`, `CameraResolution.kt`, `LocationData.kt`
   - `di/` — `AppModule.kt`
   - `utils/` — `NetworkUtils.kt`, `PermissionUtils.kt`, `Logger.kt`, `RecentsUtils.kt`
@@ -299,7 +299,7 @@ The MCP server exposes 57 tools across 14 categories. For full JSON-RPC schemas,
 
 **Encoding**: All text operations use UTF-8.
 
-**Errors**: Returns `CallToolResult(isError = true)` if location not found, file not found, file exceeds size limit, or operation fails. `android_append_file` returns a hint to use `android_write_file` if the storage provider does not support append mode. `android_download_from_url` returns an error if HTTP downloads are disabled and the URL is HTTP, or if the download times out.
+**Errors**: Returns `CallToolResult(isError = true)` if location not found, file not found, file exceeds size limit, or operation fails. `android_append_file` returns a hint to use `android_write_file` if the storage provider does not support append mode. `android_download_from_url` returns an error if HTTP downloads are disabled and the URL is HTTP, if "Block Local Network Downloads" is enabled and a connection targets a local network address, or if the download times out.
 
 ### 9. App Management Tools (3 tools)
 
@@ -716,6 +716,7 @@ MCP tools return data originating from the Android device (UI element text, cont
 - **File Size Limit**: 50 MB (range 1-500 MB, configurable via UI, applies to all file operations)
 - **Allow HTTP Downloads**: Disabled (must be explicitly enabled to allow non-HTTPS downloads)
 - **Allow Unverified HTTPS Certificates**: Disabled (must be explicitly enabled to accept self-signed/invalid certs for downloads)
+- **Block Local Network Downloads**: Disabled (when enabled, `android_download_from_url` refuses to connect to loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including IPv4-mapped/compatible IPv6 forms; checked on the real address of every connection, redirects included; while it is on downloads connect directly, never through a system proxy, so the real address is always the one checked; affects no other feature)
 - **Download Timeout**: 60 seconds (range 10-300 seconds, configurable via UI)
 - **Device Slug** (`String`, default: `""`): Optional device identifier used as part of the MCP tool name prefix. When empty, tools use the `android_` prefix. When set (e.g., `pixel7`), tools use `android_pixel7_` prefix. Valid characters: letters (a-z, A-Z), digits (0-9), underscores (_). Maximum length: 20 characters.
 

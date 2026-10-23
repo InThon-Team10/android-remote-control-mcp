@@ -13,12 +13,10 @@ import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
 import java.nio.channels.FileChannel
 import javax.inject.Inject
-import javax.net.ssl.HttpsURLConnection
 
 /**
  * Default implementation of [FileOperationProvider] using the Storage Access Framework.
@@ -34,6 +32,7 @@ class FileOperationProviderImpl
         private val storageLocationProvider: StorageLocationProvider,
         private val settingsRepository: SettingsRepository,
         private val mediaStoreFileOperations: MediaStoreFileOperations,
+        private val downloadHttpClient: DownloadHttpClient,
     ) : FileOperationProvider {
         // ─────────────────────────────────────────────────────────────────────
         // listFiles
@@ -311,8 +310,8 @@ class FileOperationProviderImpl
             checkWritePermission(locationId)
             val config = settingsRepository.getServerConfig()
 
-            // Validate URL and open connection
-            val (parsedUrl, rawConnection) = openUrlConnection(url)
+            // Validate URL
+            val parsedUrl = parseDownloadUrl(url)
 
             // Check HTTP permission
             if (parsedUrl.protocol == "http" && !config.allowHttpDownloads) {
@@ -328,87 +327,73 @@ class FileOperationProviderImpl
                 )
             }
 
-            val timeoutMs = config.downloadTimeoutSeconds * MILLIS_PER_SECOND
             val limitBytes = config.fileSizeLimitMb.toLong() * BYTES_PER_MB
-            var connection: HttpURLConnection? = null
 
             try {
-                connection = rawConnection
-                connection.connectTimeout = timeoutMs
-                connection.readTimeout = timeoutMs
-                connection.instanceFollowRedirects = true
+                downloadHttpClient.open(parsedUrl, config).use { response ->
+                    val responseCode = response.code
+                    if (responseCode !in HTTP_SUCCESS_RANGE) {
+                        throw McpToolException.ActionFailed(
+                            "Download failed with HTTP status $responseCode for URL: $url",
+                        )
+                    }
 
-                // Configure permissive SSL if setting is enabled
-                if (config.allowUnverifiedHttpsCerts && connection is HttpsURLConnection) {
-                    SslUtils.configurePermissiveSsl(connection)
-                }
+                    // Pre-check Content-Length header
+                    val contentLength = response.contentLength
+                    if (contentLength > 0 && contentLength > limitBytes) {
+                        throw McpToolException.ActionFailed(
+                            "Server reports file size of $contentLength bytes, which exceeds the " +
+                                "configured limit of ${config.fileSizeLimitMb} MB.",
+                        )
+                    }
 
-                connection.connect()
+                    // Ensure parent directories and create the destination file
+                    val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
 
-                val responseCode = connection.responseCode
-                if (responseCode !in HTTP_SUCCESS_RANGE) {
-                    throw McpToolException.ActionFailed(
-                        "Download failed with HTTP status $responseCode for URL: $url",
-                    )
-                }
-
-                // Pre-check Content-Length header
-                val contentLength = connection.contentLengthLong
-                if (contentLength > 0 && contentLength > limitBytes) {
-                    throw McpToolException.ActionFailed(
-                        "Server reports file size of $contentLength bytes, which exceeds the " +
-                            "configured limit of ${config.fileSizeLimitMb} MB.",
-                    )
-                }
-
-                // Ensure parent directories and create the destination file
-                val documentFile = ensureParentDirectoriesAndCreateFile(locationId, path)
-
-                // Stream to file, checking cumulative size.
-                // Wrap in try-catch to clean up the orphan file on any error.
-                var totalBytesWritten = 0L
-                try {
-                    context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
-                        connection.inputStream.use { inputStream ->
-                            val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
-                            var bytesRead: Int
-                            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                                totalBytesWritten += bytesRead
-                                if (totalBytesWritten > limitBytes) {
-                                    // Clean up partial file
-                                    outputStream.close()
-                                    documentFile.delete()
-                                    throw McpToolException.ActionFailed(
-                                        "Download exceeds the configured file size limit of " +
-                                            "${config.fileSizeLimitMb} MB.",
-                                    )
+                    // Stream to file, checking cumulative size.
+                    // Wrap in try-catch to clean up the orphan file on any error.
+                    var totalBytesWritten = 0L
+                    try {
+                        context.contentResolver.openOutputStream(documentFile.uri, "w")?.use { outputStream ->
+                            response.body.use { inputStream ->
+                                val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
+                                var bytesRead: Int
+                                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                    totalBytesWritten += bytesRead
+                                    if (totalBytesWritten > limitBytes) {
+                                        // Clean up partial file
+                                        outputStream.close()
+                                        documentFile.delete()
+                                        throw McpToolException.ActionFailed(
+                                            "Download exceeds the configured file size limit of " +
+                                                "${config.fileSizeLimitMb} MB.",
+                                        )
+                                    }
+                                    outputStream.write(buffer, 0, bytesRead)
                                 }
-                                outputStream.write(buffer, 0, bytesRead)
                             }
-                        }
-                    } ?: throw McpToolException.ActionFailed(
-                        "Failed to open file for writing: $path in location '$locationId'",
-                    )
-                } catch (e: McpToolException) {
-                    documentFile.delete()
-                    throw e
-                } catch (
-                    @Suppress("TooGenericExceptionCaught") e: Exception,
-                ) {
-                    documentFile.delete()
-                    throw e
-                }
+                        } ?: throw McpToolException.ActionFailed(
+                            "Failed to open file for writing: $path in location '$locationId'",
+                        )
+                    } catch (e: McpToolException) {
+                        documentFile.delete()
+                        throw e
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") e: Exception,
+                    ) {
+                        documentFile.delete()
+                        throw e
+                    }
 
-                Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
-                return totalBytesWritten
+                    Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
+                    return totalBytesWritten
+                }
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
                 throw McpToolException.ActionFailed(
                     "Download failed: ${e.message ?: "Unknown error"}",
                 )
-            } finally {
-                connection?.disconnect()
             }
         }
 
@@ -767,19 +752,13 @@ class FileOperationProviderImpl
             )
         }
 
-        /**
-         * Parses a URL string and opens an [HttpURLConnection].
-         * Extracted for testability (constructor mocking of [URL] is not supported on JDK 17).
-         */
-        internal fun openUrlConnection(urlString: String): Pair<URL, HttpURLConnection> {
-            val parsedUrl =
-                try {
-                    URL(urlString)
-                } catch (e: MalformedURLException) {
-                    throw McpToolException.ActionFailed("Invalid URL: $urlString")
-                }
-            return parsedUrl to (parsedUrl.openConnection() as HttpURLConnection)
-        }
+        /** Parses a download URL string, failing with [McpToolException.ActionFailed] when it is malformed. */
+        private fun parseDownloadUrl(urlString: String): URL =
+            try {
+                URL(urlString)
+            } catch (e: MalformedURLException) {
+                throw McpToolException.ActionFailed("Invalid URL: $urlString")
+            }
 
         companion object {
             private const val TAG = "MCP:FileOpsProvider"
@@ -790,7 +769,6 @@ class FileOperationProviderImpl
                 locationId.take(MAX_LOCATION_ID_LOG_LENGTH).replace(CONTROL_CHAR_REGEX, "")
 
             private const val BYTES_PER_MB = 1024L * 1024L
-            private const val MILLIS_PER_SECOND = 1000
             private const val DOWNLOAD_BUFFER_SIZE = 8192
             private val HTTP_SUCCESS_RANGE = 200..299
         }
