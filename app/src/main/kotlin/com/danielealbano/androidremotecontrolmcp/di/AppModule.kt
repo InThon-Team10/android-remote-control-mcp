@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.OAuthClientRepository
@@ -170,6 +172,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindArcTunnelSettings(impl: ArcTunnelSettingsImpl): ArcTunnelSettings
+
+    @Binds
+    @Singleton
+    abstract fun bindDownloadSettings(impl: DownloadSettingsImpl): DownloadSettings
 
     /** Binds the persisted OAuth client registry. */
     @Binds

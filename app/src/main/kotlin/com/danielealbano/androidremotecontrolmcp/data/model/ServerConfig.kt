@@ -29,6 +29,8 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  * @property fileSizeLimitMb File size limit for file operations (in MB).
  * @property allowHttpDownloads Whether HTTP (non-HTTPS) downloads are allowed.
  * @property allowUnverifiedHttpsCerts Whether unverified HTTPS certs are accepted for downloads.
+ * @property blockLocalNetworkDownloads Whether `download_from_url` refuses to connect to local network addresses
+ *   (loopback, private LAN, link-local, CGNAT and their IPv6 equivalents). Off by default.
  * @property downloadTimeoutSeconds Download timeout in seconds.
  * @property deviceSlug Optional device identifier slug for tool name prefix
  *   (letters, digits, underscores; max 20 chars).
@@ -64,6 +66,7 @@ data class ServerConfig(
     val fileSizeLimitMb: Int = DEFAULT_FILE_SIZE_LIMIT_MB,
     val allowHttpDownloads: Boolean = false,
     val allowUnverifiedHttpsCerts: Boolean = false,
+    val blockLocalNetworkDownloads: Boolean = false,
     val downloadTimeoutSeconds: Int = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
     val deviceSlug: String = "",
     val oauthEnabled: Boolean = true,

@@ -82,6 +82,7 @@ class SettingsRepositoryImplTest {
                 changeLogger,
                 EventChannelSettingsImpl(dataStore, changeLogger),
                 ArcTunnelSettingsImpl(dataStore, changeLogger),
+                DownloadSettingsImpl(dataStore, changeLogger),
             )
     }
 
@@ -306,6 +307,33 @@ class SettingsRepositoryImplTest {
                 val config = repository.getServerConfig()
 
                 assertFalse(config.hideFromRecents)
+            }
+    }
+
+    @Nested
+    @DisplayName("updateBlockLocalNetworkDownloads")
+    inner class UpdateBlockLocalNetworkDownloads {
+        @Test
+        fun `is off by default`() =
+            testScope.runTest {
+                assertFalse(repository.getServerConfig().blockLocalNetworkDownloads)
+            }
+
+        @Test
+        fun `enables the block`() =
+            testScope.runTest {
+                repository.updateBlockLocalNetworkDownloads(true)
+
+                assertTrue(repository.getServerConfig().blockLocalNetworkDownloads)
+            }
+
+        @Test
+        fun `disables the block`() =
+            testScope.runTest {
+                repository.updateBlockLocalNetworkDownloads(true)
+                repository.updateBlockLocalNetworkDownloads(false)
+
+                assertFalse(repository.getServerConfig().blockLocalNetworkDownloads)
             }
     }
 
