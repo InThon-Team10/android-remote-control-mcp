@@ -50,10 +50,12 @@ interface DownloadHttpClient {
  * platform User-Agent.
  */
 class DownloadHttpClientImpl
-    @Inject
-    constructor() : DownloadHttpClient {
-        /** Test seam: the addresses "Block Local Network Downloads" refuses. */
-        internal var isBlockedAddress: (InetAddress) -> Boolean = ::isLocalNetworkAddress
+    internal constructor(
+        /** The addresses "Block Local Network Downloads" refuses; another predicate is for tests only. */
+        private val isBlockedAddress: (InetAddress) -> Boolean,
+    ) : DownloadHttpClient {
+        @Inject
+        constructor() : this(::isLocalNetworkAddress)
 
         override fun open(
             url: URL,
@@ -82,6 +84,8 @@ class DownloadHttpClientImpl
                 .Builder()
                 .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
                 .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                // No write timeout, as HttpURLConnection (OkHttp's own default is 10 s)
+                .writeTimeout(0, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(false)
                 .connectionSpecs(listOf(PLATFORM_TLS, ConnectionSpec.CLEARTEXT))

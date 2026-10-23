@@ -113,6 +113,8 @@ class DownloadHttpClientImplTest {
         val e = assertThrows<IOException> { client.open(url(), ServerConfig(blockLocalNetworkDownloads = true)) }
 
         assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
+        // The callers report the top-level message: it must name the switch
+        assertTrue(e.message!!.contains(SWITCH_NAME), e.message)
         assertEquals(0, server.requestCount)
     }
 
@@ -124,6 +126,8 @@ class DownloadHttpClientImplTest {
         val e = assertThrows<IOException> { client.open(byName, ServerConfig(blockLocalNetworkDownloads = true)) }
 
         assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
+        // The callers report the top-level message: it must name the switch
+        assertTrue(e.message!!.contains(SWITCH_NAME), e.message)
         assertEquals(0, server.requestCount)
     }
 
@@ -135,12 +139,16 @@ class DownloadHttpClientImplTest {
         try {
             target.enqueue(ok())
             server.enqueue(redirectTo(URL("http", BLOCKED_LOOPBACK, target.port, "/inner").toString()))
-            client.isBlockedAddress = { it.hostAddress == BLOCKED_LOOPBACK }
+            val secondLoopbackBlocked = DownloadHttpClientImpl { it.hostAddress == BLOCKED_LOOPBACK }
 
             val e =
-                assertThrows<IOException> { client.open(url(), ServerConfig(blockLocalNetworkDownloads = true)) }
+                assertThrows<IOException> {
+                    secondLoopbackBlocked.open(url(), ServerConfig(blockLocalNetworkDownloads = true))
+                }
 
             assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
+            // The callers report the top-level message: it must name the switch for a redirect hop too
+            assertTrue(e.message!!.contains(SWITCH_NAME), e.message)
             assertEquals(1, server.requestCount)
             assertEquals(0, target.requestCount)
         } finally {
@@ -157,6 +165,8 @@ class DownloadHttpClientImplTest {
         val e = assertThrows<IOException> { client.open(url(), ServerConfig(blockLocalNetworkDownloads = true)) }
 
         assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
+        // The callers report the top-level message: it must name the switch
+        assertTrue(e.message!!.contains(SWITCH_NAME), e.message)
         assertEquals(1, server.requestCount)
     }
 
@@ -181,6 +191,25 @@ class DownloadHttpClientImplTest {
     }
 
     @Test
+    fun `does not follow a redirect from https to http`() {
+        val plain = MockWebServer()
+        plain.start(loopback, 0)
+        try {
+            plain.enqueue(ok())
+            useHttps()
+            server.enqueue(redirectTo(URL("http", loopbackHost, plain.port, "/plain").toString()))
+
+            client.open(url(scheme = "https"), ServerConfig(allowUnverifiedHttpsCerts = true)).use { response ->
+                assertEquals(FOUND, response.code)
+            }
+            assertEquals(1, server.requestCount)
+            assertEquals(0, plain.requestCount)
+        } finally {
+            plain.close()
+        }
+    }
+
+    @Test
     fun `rejects an untrusted certificate unless unverified certificates are allowed`() {
         useHttps()
         server.enqueue(ok())
@@ -195,13 +224,32 @@ class DownloadHttpClientImplTest {
     fun `downloads over HTTPS through the checked sockets when the address is allowed`() {
         useHttps()
         server.enqueue(ok())
-        client.isBlockedAddress = { false }
+        val checked = mutableListOf<InetAddress>()
+        val nothingBlocked =
+            DownloadHttpClientImpl { address ->
+                checked += address
+                false
+            }
         val config = ServerConfig(allowUnverifiedHttpsCerts = true, blockLocalNetworkDownloads = true)
 
-        client.open(url(scheme = "https"), config).use { response ->
+        nothingBlocked.open(url(scheme = "https"), config).use { response ->
             assertEquals(OK, response.code)
             assertEquals(BODY, response.body.readBytes().toString(Charsets.UTF_8))
         }
+        assertEquals(listOf(loopback), checked)
+    }
+
+    @Test
+    fun `refuses an HTTPS IP literal on the local network with the block on`() {
+        useHttps()
+        server.enqueue(ok())
+        val config = ServerConfig(allowUnverifiedHttpsCerts = true, blockLocalNetworkDownloads = true)
+
+        val e = assertThrows<IOException> { client.open(url(scheme = "https"), config) }
+
+        assertTrue(chainOf(e).any { it is LocalNetworkDownloadBlockedException }, "unexpected: $e")
+        assertTrue(e.message!!.contains(SWITCH_NAME), e.message)
+        assertEquals(0, server.requestCount)
     }
 
     @Test
@@ -258,6 +306,7 @@ class DownloadHttpClientImplTest {
 
         assertEquals(TIMEOUT_SECONDS * MS_PER_S, built.connectTimeoutMillis)
         assertEquals(TIMEOUT_SECONDS * MS_PER_S, built.readTimeoutMillis)
+        assertEquals(0, built.writeTimeoutMillis)
         assertTrue(built.followRedirects)
         assertTrue(!built.followSslRedirects)
     }
@@ -268,6 +317,7 @@ class DownloadHttpClientImplTest {
         const val FOUND = 302
         const val NOT_FOUND = 404
         const val BLOCKED_LOOPBACK = "127.0.0.2"
+        const val SWITCH_NAME = "'Block Local Network Downloads' is enabled"
         const val HTTP_AGENT = "http.agent"
         const val TIMEOUT_SECONDS = 42
         const val MS_PER_S = 1000
