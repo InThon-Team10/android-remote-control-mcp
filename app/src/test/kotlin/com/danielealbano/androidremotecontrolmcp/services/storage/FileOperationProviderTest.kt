@@ -19,6 +19,9 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -36,6 +39,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.InetSocketAddress
+import java.util.concurrent.Executors
 
 @ExtendWith(MockKExtension::class)
 @DisplayName("FileOperationProviderImpl")
@@ -83,6 +87,7 @@ class FileOperationProviderTest {
                 mockSettingsRepository,
                 mockMediaStoreFileOperations,
                 mockDownloadHttpClient,
+                Dispatchers.Unconfined,
             )
     }
 
@@ -1060,6 +1065,112 @@ class FileOperationProviderTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // I/O dispatcher
+    // ─────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("I/O dispatcher")
+    inner class RunsOnIoDispatcher {
+        /** Runs [block] with a provider whose I/O dispatcher is a single thread named [IO_THREAD]. */
+        private fun withIoThread(block: suspend (FileOperationProviderImpl) -> Unit) {
+            val executor = Executors.newSingleThreadExecutor { Thread(it, IO_THREAD) }
+            try {
+                val onIoThread =
+                    FileOperationProviderImpl(
+                        mockContext,
+                        mockStorageLocationProvider,
+                        mockSettingsRepository,
+                        mockMediaStoreFileOperations,
+                        mockDownloadHttpClient,
+                        executor.asCoroutineDispatcher(),
+                    )
+                runBlocking { block(onIoThread) }
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+
+        @Test
+        fun `a download runs its network I-O on the I-O dispatcher`() {
+            setupAuthorizedLocation("loc1")
+            coEvery { mockSettingsRepository.getServerConfig() } returns
+                ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
+            var downloadThread: String? = null
+            every { mockDownloadHttpClient.open(any(), any()) } answers {
+                downloadThread = Thread.currentThread().name
+                throw IOException("offline")
+            }
+
+            withIoThread { onIoThread ->
+                runCatching { onIoThread.downloadFromUrl("loc1", "file.txt", "https://example.com/file.txt") }
+            }
+
+            // Coroutine debug mode (on in tests: the JVM runs with assertions enabled) appends " @coroutine#N"
+            assertTrue(downloadThread.orEmpty().startsWith(IO_THREAD), downloadThread)
+        }
+
+        @Test
+        fun `every SAF operation runs on the I-O dispatcher`() {
+            // Each operation checks the location authorization inside its I/O block: refusing it records the thread
+            coEvery { mockSettingsRepository.getServerConfig() } returns
+                ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
+            val threads = mutableMapOf<String, String>()
+            var current = ""
+            coEvery { mockStorageLocationProvider.isLocationAuthorized("loc1") } answers {
+                threads[current] = Thread.currentThread().name
+                false
+            }
+            val operations: List<Pair<String, suspend (FileOperationProviderImpl) -> Unit>> =
+                listOf(
+                    "listFiles" to { it.listFiles("loc1", "", 0, PAGE_LIMIT) },
+                    "readFile" to { it.readFile("loc1", "file.txt", 1, PAGE_LIMIT) },
+                    "readFileBytes" to { it.readFileBytes("loc1", "file.txt", TEN_MB) },
+                    "writeFile" to { it.writeFile("loc1", "file.txt", "x") },
+                    "appendFile" to { it.appendFile("loc1", "file.txt", "x") },
+                    "replaceInFile" to { it.replaceInFile("loc1", "file.txt", "a", "b", false) },
+                    "downloadFromUrl" to { it.downloadFromUrl("loc1", "file.txt", "https://example.com/file.txt") },
+                    "deleteFile" to { it.deleteFile("loc1", "file.txt") },
+                    "createFileUri" to { it.createFileUri("loc1", "file.txt", "text/plain") },
+                )
+
+            withIoThread { onIoThread ->
+                for ((name, operation) in operations) {
+                    current = name
+                    val failure = runCatching { operation(onIoThread) }.exceptionOrNull()
+                    assertTrue(failure is McpToolException.PermissionDenied, "$name: $failure")
+                }
+            }
+
+            for ((name, _) in operations) {
+                assertTrue(threads[name].orEmpty().startsWith(IO_THREAD), "$name ran on ${threads[name]}")
+            }
+        }
+
+        @Test
+        fun `a write runs its content resolver I-O on the I-O dispatcher`() {
+            coEvery { mockSettingsRepository.getServerConfig() } returns
+                ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB)
+            setupAuthorizedLocation("loc1")
+            val mockRootDoc = mockk<DocumentFile>()
+            setupRootDocument(mockRootDoc)
+            val mockCreatedFile = mockk<DocumentFile>()
+            val mockFileUri = mockk<Uri>()
+            every { mockRootDoc.findFile("file.txt") } returns null
+            every { mockRootDoc.createFile("text/plain", "file.txt") } returns mockCreatedFile
+            every { mockCreatedFile.uri } returns mockFileUri
+            var writeThread: String? = null
+            every { mockContentResolver.openOutputStream(mockFileUri, "w") } answers {
+                writeThread = Thread.currentThread().name
+                ByteArrayOutputStream()
+            }
+
+            withIoThread { onIoThread -> onIoThread.writeFile("loc1", "file.txt", "hello") }
+
+            assertTrue(writeThread.orEmpty().startsWith(IO_THREAD), writeThread)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // deleteFile
     // ─────────────────────────────────────────────────────────────────────
 
@@ -1598,5 +1709,7 @@ class FileOperationProviderTest {
         private const val LIST_ENTRIES_ABOVE_MAX = 210
         private const val LINES_ABOVE_MAX = 210
         private const val REQUESTED_LIMIT_ABOVE_MAX = 300
+        private const val IO_THREAD = "saf-io-test"
+        private const val PAGE_LIMIT = 10
     }
 }
