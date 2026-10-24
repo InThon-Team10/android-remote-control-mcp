@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import java.net.URL
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.random.Random
 
 // Preferences keys and shared constants for SettingsRepositoryImpl (file-private; referenced unqualified).
 private const val TAG = "MCP:SettingsRepo"
@@ -38,6 +39,8 @@ private fun sanitizeLocationId(locationId: String) = locationId.take(MAX_LOC_ID_
 
 private val PORT_KEY = intPreferencesKey("port")
 private val BINDING_ADDRESS_KEY = stringPreferencesKey("binding_address")
+private val SPECIFIC_BIND_ADDRESS_KEY = stringPreferencesKey("specific_bind_address")
+private val TUNNEL_LOCAL_PORT_KEY = intPreferencesKey("tunnel_local_port")
 private val BEARER_TOKEN_KEY = stringPreferencesKey("bearer_token")
 private val BEARER_TOKEN_INITIALIZED_KEY = booleanPreferencesKey("bearer_token_initialized")
 private val OAUTH_ENABLED_KEY = booleanPreferencesKey("oauth_enabled")
@@ -110,6 +113,9 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         bindingAddress =
             BindingAddress.entries.firstOrNull { it.name == bindingAddressName }
                 ?: BindingAddress.LOCALHOST,
+        specificBindAddress = prefs[SPECIFIC_BIND_ADDRESS_KEY] ?: "",
+        // Set once by ensureAuthModelMigrated; until then the server port, as for an existing install
+        tunnelLocalPort = prefs[TUNNEL_LOCAL_PORT_KEY] ?: prefs[PORT_KEY] ?: ServerConfig.DEFAULT_PORT,
         bearerToken = prefs[BEARER_TOKEN_KEY] ?: "",
         autoStartOnBoot = prefs[AUTO_START_KEY] ?: false,
         toolCallIndicatorEnabled = prefs[TOOL_CALL_INDICATOR_ENABLED_KEY] ?: true,
@@ -164,19 +170,61 @@ private fun generateTokenString(): String = UUID.randomUUID().toString()
  */
 private fun migrateTunnelProvider(prefs: MutablePreferences) {
     if (prefs[TUNNEL_PROVIDER_MIGRATED_KEY] == true) return
-    val tunnelKeys =
-        listOf(
-            TUNNEL_ENABLED_KEY,
-            NGROK_AUTHTOKEN_KEY,
-            NGROK_DOMAIN_KEY,
-            CLOUDFLARE_TUNNEL_MODE_KEY,
-            CLOUDFLARE_TUNNEL_TOKEN_KEY,
-            CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY,
-        )
-    if (tunnelKeys.any { prefs.contains(it) } && prefs[TUNNEL_PROVIDER_KEY] == null) {
+    if (tunnelSettingKeys().any { prefs.contains(it) } && prefs[TUNNEL_PROVIDER_KEY] == null) {
         prefs[TUNNEL_PROVIDER_KEY] = TunnelProviderType.CLOUDFLARE.name
     }
     prefs[TUNNEL_PROVIDER_MIGRATED_KEY] = true
+}
+
+/** The tunnel settings other than the provider. */
+private fun tunnelSettingKeys(): List<Preferences.Key<*>> =
+    listOf(
+        TUNNEL_ENABLED_KEY,
+        NGROK_AUTHTOKEN_KEY,
+        NGROK_DOMAIN_KEY,
+        CLOUDFLARE_TUNNEL_MODE_KEY,
+        CLOUDFLARE_TUNNEL_TOKEN_KEY,
+        CLOUDFLARE_TUNNEL_EXTRA_ARGS_KEY,
+    )
+
+/**
+ * Whether [prefs] were saved with HTTPS on and a Cloudflare/ngrok tunnel enabled on Localhost or Network: the tunnel
+ * never ran, as it could not while the server served HTTPS. Read after [migrateTunnelProvider].
+ */
+private fun httpsKeptTunnelOff(prefs: Preferences): Boolean =
+    prefs[HTTPS_ENABLED_KEY] == true &&
+        prefs[TUNNEL_ENABLED_KEY] == true &&
+        prefs[TUNNEL_PROVIDER_KEY] in setOf(TunnelProviderType.CLOUDFLARE.name, TunnelProviderType.NGROK.name) &&
+        prefs[BINDING_ADDRESS_KEY] != BindingAddress.SPECIFIC.name
+
+/**
+ * Whether [prefs] were saved by an earlier run of the app: every first run since bearer tokens are generated marks
+ * [BEARER_TOKEN_INITIALIZED_KEY], and a server port or tunnel setting is only saved by a user. MUST be read before
+ * the first-run writes of [SettingsRepositoryImpl.ensureAuthModelMigrated].
+ */
+private fun isExistingInstall(prefs: Preferences): Boolean =
+    prefs[BEARER_TOKEN_INITIALIZED_KEY] == true ||
+        prefs.contains(PORT_KEY) ||
+        prefs.contains(TUNNEL_PROVIDER_KEY) ||
+        tunnelSettingKeys().any { prefs.contains(it) }
+
+/**
+ * One-time tunnel local port. An existing install keeps forwarding its Cloudflare/ngrok tunnel to the server port,
+ * as it did so far (a Cloudflare named tunnel's dashboard points at it); a fresh install gets a random port, so that
+ * a tunnel listener of its own never takes the server port. So does an existing install whose HTTPS kept its
+ * tunnel off ([httpsKeptTunnelOff]): on the server port that tunnel would now keep the server from starting.
+ */
+private fun initTunnelLocalPort(
+    prefs: MutablePreferences,
+    existingInstall: Boolean,
+) {
+    if (prefs.contains(TUNNEL_LOCAL_PORT_KEY)) return
+    prefs[TUNNEL_LOCAL_PORT_KEY] =
+        if (existingInstall && !httpsKeptTunnelOff(prefs)) {
+            prefs[PORT_KEY] ?: ServerConfig.DEFAULT_PORT
+        } else {
+            Random.nextInt(ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MIN, ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MAX + 1)
+        }
 }
 
 private fun getBuiltinLocationPermissionsInternal(prefs: Preferences): Map<String, BuiltinPermissions> {
@@ -276,6 +324,7 @@ class SettingsRepositoryImpl
 
         override suspend fun ensureAuthModelMigrated() {
             dataStore.edit { prefs ->
+                val existingInstall = isExistingInstall(prefs)
                 // One-time bearer-enabled migration (idempotent; guarded).
                 if (prefs[BEARER_TOKEN_ENABLED_INITIALIZED_KEY] != true) {
                     val wasInitialized = prefs[BEARER_TOKEN_INITIALIZED_KEY] == true
@@ -291,6 +340,7 @@ class SettingsRepositoryImpl
                     prefs[BEARER_TOKEN_INITIALIZED_KEY] = true
                 }
                 migrateTunnelProvider(prefs)
+                initTunnelLocalPort(prefs, existingInstall)
             }
         }
 
@@ -394,6 +444,16 @@ class SettingsRepositoryImpl
                 BindingAddress.LOCALHOST.name,
             ) { o, n ->
                 "Binding address changed $o → $n"
+            }
+
+        override suspend fun updateSpecificBindAddress(address: String) =
+            logScalarChange(SPECIFIC_BIND_ADDRESS_KEY, "specific_bind_address", address, "") { o, n ->
+                "Specific bind address changed '$o' → '$n'"
+            }
+
+        override suspend fun updateTunnelLocalPort(port: Int) =
+            logScalarChange(TUNNEL_LOCAL_PORT_KEY, "tunnel_local_port", port, ServerConfig.DEFAULT_PORT) { o, n ->
+                "Tunnel local port changed $o → $n"
             }
 
         override suspend fun updateBearerToken(token: String) =

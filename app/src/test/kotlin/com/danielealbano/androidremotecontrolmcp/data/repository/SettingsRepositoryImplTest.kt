@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
@@ -214,6 +215,179 @@ class SettingsRepositoryImplTest {
                 val config = repository.getServerConfig()
 
                 assertEquals(BindingAddress.LOCALHOST, config.bindingAddress)
+            }
+
+        @Test
+        fun `SPECIFIC binds to the specific address, saved as typed`() =
+            testScope.runTest {
+                repository.updateSpecificBindAddress(" 192.168.1.20")
+                repository.updateBindingAddress(BindingAddress.SPECIFIC)
+                val config = repository.getServerConfig()
+
+                assertEquals(BindingAddress.SPECIFIC, config.bindingAddress)
+                assertEquals(" 192.168.1.20", config.specificBindAddress)
+                assertEquals("192.168.1.20", config.bindHost)
+            }
+    }
+
+    @Nested
+    @DisplayName("tunnel local port")
+    inner class TunnelLocalPort {
+        private val tunnelLocalPortKey = intPreferencesKey("tunnel_local_port")
+
+        @Test
+        fun `a fresh install gets a random port of the dynamic range, chosen once`() =
+            testScope.runTest {
+                val port = repository.getServerConfig().tunnelLocalPort
+
+                assertTrue(
+                    port in ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MIN..ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MAX,
+                    "port $port",
+                )
+                repository.ensureAuthModelMigrated()
+                assertEquals(port, repository.getServerConfig().tunnelLocalPort)
+                assertEquals(port, dataStore.data.first()[tunnelLocalPortKey])
+            }
+
+        @Test
+        fun `an existing install keeps forwarding to the server port`() =
+            testScope.runTest {
+                dataStore.edit { it[booleanPreferencesKey("bearer_token_initialized")] = true }
+
+                assertEquals(ServerConfig.DEFAULT_PORT, repository.getServerConfig().tunnelLocalPort)
+            }
+
+        @Test
+        fun `an existing install with its own server port forwards to it`() =
+            testScope.runTest {
+                dataStore.edit { it[intPreferencesKey("port")] = 9090 }
+
+                assertEquals(9090, repository.getServerConfig().tunnelLocalPort)
+            }
+
+        @Test
+        fun `an install with tunnel settings counts as existing`() =
+            testScope.runTest {
+                dataStore.edit { it[stringPreferencesKey("cloudflare_tunnel_token")] = "token" }
+
+                assertEquals(ServerConfig.DEFAULT_PORT, repository.getServerConfig().tunnelLocalPort)
+            }
+
+        @Test
+        fun `an existing install whose HTTPS kept its Cloudflare or ngrok tunnel off gets a random port`() =
+            testScope.runTest {
+                val cases =
+                    listOf(
+                        TunnelProviderType.CLOUDFLARE to null,
+                        TunnelProviderType.NGROK to BindingAddress.NETWORK,
+                    )
+                for ((provider, binding) in cases) {
+                    dataStore.edit {
+                        it.clear()
+                        it[booleanPreferencesKey("bearer_token_initialized")] = true
+                        it[booleanPreferencesKey("https_enabled")] = true
+                        it[booleanPreferencesKey("tunnel_enabled")] = true
+                        it[stringPreferencesKey("tunnel_provider")] = provider.name
+                        binding?.let { address -> it[stringPreferencesKey("binding_address")] = address.name }
+                    }
+
+                    val port = repository.getServerConfig().tunnelLocalPort
+
+                    assertTrue(
+                        port in ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MIN..ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MAX,
+                        "$provider: port $port",
+                    )
+                }
+            }
+
+        @Test
+        fun `an existing install keeps the server port when HTTPS did not keep a Cloudflare or ngrok tunnel off`() =
+            testScope.runTest {
+                val cases =
+                    listOf(
+                        // HTTPS off, tunnel disabled, the free E2E tunnel: the tunnel ran, or none runs on the port
+                        mapOf("https_enabled" to false, "tunnel_enabled" to true) to TunnelProviderType.CLOUDFLARE,
+                        mapOf("https_enabled" to true, "tunnel_enabled" to false) to TunnelProviderType.NGROK,
+                        mapOf("https_enabled" to true, "tunnel_enabled" to true) to TunnelProviderType.ARC_TUNNEL,
+                    )
+                for ((flags, provider) in cases) {
+                    dataStore.edit {
+                        it.clear()
+                        it[booleanPreferencesKey("bearer_token_initialized")] = true
+                        flags.forEach { (key, value) -> it[booleanPreferencesKey(key)] = value }
+                        it[stringPreferencesKey("tunnel_provider")] = provider.name
+                    }
+
+                    val port = repository.getServerConfig().tunnelLocalPort
+
+                    assertEquals(ServerConfig.DEFAULT_PORT, port, "$flags $provider")
+                }
+            }
+
+        @Test
+        fun `an install from before the provider choice counts with its migrated provider, Cloudflare`() =
+            testScope.runTest {
+                // No tunnel_provider saved yet: it becomes Cloudflare, before the tunnel port is chosen
+                dataStore.edit {
+                    it[booleanPreferencesKey("bearer_token_initialized")] = true
+                    it[booleanPreferencesKey("https_enabled")] = true
+                    it[booleanPreferencesKey("tunnel_enabled")] = true
+                }
+
+                val config = repository.getServerConfig()
+
+                assertEquals(TunnelProviderType.CLOUDFLARE, config.tunnelProvider)
+                assertTrue(
+                    config.tunnelLocalPort in
+                        ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MIN..ServerConfig.TUNNEL_LOCAL_PORT_RANDOM_MAX,
+                    "port ${config.tunnelLocalPort}",
+                )
+            }
+
+        @Test
+        fun `a specific IP binding never counts as one HTTPS kept a tunnel off on`() =
+            testScope.runTest {
+                dataStore.edit {
+                    it[booleanPreferencesKey("bearer_token_initialized")] = true
+                    it[booleanPreferencesKey("https_enabled")] = true
+                    it[booleanPreferencesKey("tunnel_enabled")] = true
+                    it[stringPreferencesKey("tunnel_provider")] = TunnelProviderType.CLOUDFLARE.name
+                    it[stringPreferencesKey("binding_address")] = BindingAddress.SPECIFIC.name
+                }
+
+                assertEquals(ServerConfig.DEFAULT_PORT, repository.getServerConfig().tunnelLocalPort)
+            }
+
+        @Test
+        fun `an install with a saved tunnel provider counts as existing`() =
+            testScope.runTest {
+                dataStore.edit { it[stringPreferencesKey("tunnel_provider")] = TunnelProviderType.NGROK.name }
+
+                assertEquals(ServerConfig.DEFAULT_PORT, repository.getServerConfig().tunnelLocalPort)
+            }
+
+        @Test
+        fun `a saved tunnel local port is kept`() =
+            testScope.runTest {
+                dataStore.edit { it[tunnelLocalPortKey] = 50000 }
+
+                assertEquals(50000, repository.getServerConfig().tunnelLocalPort)
+            }
+
+        @Test
+        fun `updates the tunnel local port`() =
+            testScope.runTest {
+                repository.updateTunnelLocalPort(49200)
+
+                assertEquals(49200, repository.getServerConfig().tunnelLocalPort)
+            }
+
+        @Test
+        fun `until it is chosen the flow shows the server port`() =
+            testScope.runTest {
+                dataStore.edit { it[intPreferencesKey("port")] = 9090 }
+
+                assertEquals(9090, repository.serverConfig.first().tunnelLocalPort)
             }
     }
 
