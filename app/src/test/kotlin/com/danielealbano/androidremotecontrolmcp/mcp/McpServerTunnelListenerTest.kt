@@ -68,6 +68,7 @@ class McpServerTunnelListenerTest {
                 ),
                 RecordingServerLogRepository(),
                 InFlightToolCalls(),
+                null,
             )
     }
 

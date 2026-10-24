@@ -1,10 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel
 
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
-import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +13,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,7 +30,6 @@ import javax.inject.Singleton
 class TunnelManager
     @Inject
     constructor(
-        private val settingsRepository: SettingsRepository,
         private val cloudflareTunnelProviderFactory: Provider<CloudflareTunnelProvider>,
         private val ngrokTunnelProviderFactory: Provider<NgrokTunnelProvider>,
         private val arcTunnelProviderFactory: Provider<ArcTunnelProvider>,
@@ -45,18 +43,16 @@ class TunnelManager
         private var activeProvider: TunnelProvider? = null
         private var statusRelayJob: Job? = null
 
+        /**
+         * Starts the tunnel of [config], the configuration the server started with (its listeners follow it too):
+         * Cloudflare and ngrok forward to its tunnel local port, the free E2E tunnel serves through [listenerHost].
+         */
         suspend fun start(
-            localPort: Int,
+            config: ServerConfig,
             listenerHost: TunnelListenerHost,
         ) {
             mutex.withLock {
-                val config = settingsRepository.serverConfig.first()
-
                 if (!config.tunnelEnabled) return
-
-                // Cloudflare and ngrok forward to an http://localhost origin, so they MUST NOT run while the
-                // server serves HTTPS; the free E2E tunnel terminates TLS on its own loopback listener.
-                if (!tunnelAllowedWithHttps(config)) return
 
                 val provider =
                     when (config.tunnelProvider) {
@@ -71,7 +67,7 @@ class TunnelManager
                     }
 
                 try {
-                    provider.start(localPort, config)
+                    provider.start(config.tunnelLocalPort, config)
                 } catch (
                     @Suppress("TooGenericExceptionCaught")
                     e: Exception,

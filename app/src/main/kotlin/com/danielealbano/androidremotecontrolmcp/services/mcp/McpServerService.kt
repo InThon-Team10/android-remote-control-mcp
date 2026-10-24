@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.danielealbano.androidremotecontrolmcp.McpApplication
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.OptionalToolPermissions
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
@@ -21,6 +22,7 @@ import com.danielealbano.androidremotecontrolmcp.geo.GeoIpResolver
 import com.danielealbano.androidremotecontrolmcp.mcp.CertificateManager
 import com.danielealbano.androidremotecontrolmcp.mcp.HttpsMaterial
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
+import com.danielealbano.androidremotecontrolmcp.mcp.McpListenerRules
 import com.danielealbano.androidremotecontrolmcp.mcp.McpServer
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStore
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
@@ -35,7 +37,6 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenSt
 import com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
-import com.danielealbano.androidremotecontrolmcp.services.tunnel.tunnelAllowedWithHttps
 import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
@@ -83,6 +84,8 @@ class McpServerService : Service() {
     @Inject lateinit var toolRegistration: McpToolRegistration
 
     @Inject lateinit var inFlightToolCalls: InFlightToolCalls
+
+    @Inject lateinit var listenerRules: McpListenerRules
 
     @Inject lateinit var screenStateSnapshotCache: ScreenStateSnapshotCache
 
@@ -177,11 +180,13 @@ class McpServerService : Service() {
             // the auth model (prevents the cleared-token-user open-server regression).
             val config = settingsRepository.getServerConfig()
             activeConfig = config
+            // Listener settings the UI refuses to start with fail every other start (ADB, boot) the same way
+            listenerRules.check(config).startError?.let { throw IllegalStateException(it) }
             val toolNamePrefix = McpToolUtils.buildToolNamePrefix(config.deviceSlug)
             Log.i(
                 TAG,
                 "Starting MCP server with config: port=${config.port}, " +
-                    "binding=${config.bindingAddress.address}, toolNamePrefix=$toolNamePrefix",
+                    "binding=${NetworkUtils.urlHost(config.bindHost)}, toolNamePrefix=$toolNamePrefix",
             )
 
             // Only get/create SSL keystore when HTTPS is enabled
@@ -257,6 +262,7 @@ class McpServerService : Service() {
                         ),
                     serverLog = serverLogRepository,
                     inFlightToolCalls = inFlightToolCalls,
+                    localhostTunnelPort = listenerRules.tunnelListenerPort(config),
                 )
             mcpServer?.start()
 
@@ -276,23 +282,18 @@ class McpServerService : Service() {
             updateStatus(
                 ServerStatus.Running(
                     port = config.port,
-                    bindingAddress = config.bindingAddress.address,
+                    bindingAddress = config.bindHost,
                 ),
             )
 
-            // Start tunnel if remote access is enabled. Cloudflare/ngrok target an http://localhost origin,
-            // so they MUST NOT run while the server serves HTTPS; the free E2E tunnel has its own TLS listener.
-            if (!tunnelAllowedWithHttps(config)) {
-                Log.i(TAG, "Remote access tunnel disabled while HTTPS is enabled")
-                tunnelManager.stop()
-            } else {
-                @Suppress("TooGenericExceptionCaught")
-                try {
-                    tunnelManager.start(config.port, requireNotNull(mcpServer))
-                } catch (e: Exception) {
-                    currentCoroutineContext().ensureActive()
-                    Log.w(TAG, "Failed to start tunnel (server continues without tunnel)", e)
-                }
+            // Start tunnel if remote access is enabled. Cloudflare/ngrok forward to http://localhost:<tunnel local
+            // port>, served by the main listener or by the server's own plain HTTP loopback listener; the free E2E
+            // tunnel has its own TLS listener.
+            try {
+                tunnelManager.start(config, requireNotNull(mcpServer))
+            } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                Log.w(TAG, "Failed to start tunnel (server continues without tunnel)", e)
             }
 
             // Observe tunnel status for logging
@@ -339,33 +340,26 @@ class McpServerService : Service() {
                     }
                 }
 
-            Log.i(TAG, "MCP server started successfully on ${config.bindingAddress.address}:${config.port}")
+            Log.i(TAG, "MCP server started successfully on ${NetworkUtils.urlHost(config.bindHost)}:${config.port}")
         } catch (e: Exception) {
             // A start cancelled by a teardown is not a start failure.
             currentCoroutineContext().ensureActive()
             Log.e(TAG, "Failed to start MCP server", e)
-            updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
+            // Free for a new start before the Error is published: the UI may start again as soon as it sees it
             serverActive.set(false)
+            updateStatus(ServerStatus.Error(e.message ?: "Unknown error starting server"))
         }
     }
 
     /**
      * Externally-reachable base URL for capability links: the tunnel URL when a tunnel is connected,
-     * otherwise the device LAN URL (`scheme://<device-ip>:<port>`).
+     * otherwise the URL of the main listener's address when bound to a specific IP, or else the device LAN URL
+     * (`scheme://<device-ip>:<port>`).
      */
     private val currentBaseUrl: () -> String = {
         val tunnel = tunnelManager.tunnelStatus.value
         val tunnelUrl = (tunnel as? TunnelStatus.Connected)?.endpoints?.firstOrNull { it.valid }?.url
-        if (tunnelUrl != null) {
-            tunnelUrl
-        } else {
-            val cfg = activeConfig
-            val scheme = if (cfg?.httpsEnabled == true) "https" else "http"
-            val host =
-                NetworkUtils.getDeviceIpAddress(applicationContext) ?: cfg?.bindingAddress?.address ?: "127.0.0.1"
-            val port = cfg?.port ?: ServerConfig.DEFAULT_PORT
-            "$scheme://$host:$port"
-        }
+        tunnelUrl ?: fallbackBaseUrl(activeConfig, NetworkUtils.getDeviceIpAddress(applicationContext))
     }
 
     override fun onDestroy() {
@@ -401,7 +395,8 @@ class McpServerService : Service() {
         // Stop tunnel first (with ANR-safe timeout).
         // Worst-case blocking time: START_JOIN_TIMEOUT_MS (5s) + the stop flag write (2s) + TUNNEL_STOP_TIMEOUT_MS
         // (3s) + McpServer.stop: SDK close (SHUTDOWN_TIMEOUT_MS, 5s) + SHUTDOWN_GRACE_PERIOD_MS (1s) +
-        // SHUTDOWN_TIMEOUT_MS (5s) + the tunnel listener stop (0.6s) = ~22s total. This is well within the Android
+        // SHUTDOWN_TIMEOUT_MS (5s) + the Cloudflare/ngrok loopback listener or the free E2E tunnel's listener stop
+        // (0.6s, never both) = ~22s total. This is well within the Android
         // service onDestroy ANR threshold (~200s), so blocking the main thread here is acceptable.
         stopTunnel()
 
@@ -506,11 +501,30 @@ private fun buildHttpsMaterial(
         null
     }
 
+/**
+ * The base URL of capability links without a connected tunnel: the main listener's address when it binds to a
+ * specific IP, otherwise the device's LAN address ([deviceIp]) or, without one, the binding address.
+ */
+internal fun fallbackBaseUrl(
+    config: ServerConfig?,
+    deviceIp: String?,
+): String {
+    val scheme = if (config?.httpsEnabled == true) "https" else "http"
+    val host =
+        if (config != null && config.bindingAddress == BindingAddress.SPECIFIC) {
+            config.bindHost
+        } else {
+            deviceIp ?: config?.bindingAddress?.address ?: "127.0.0.1"
+        }
+    val port = config?.port ?: ServerConfig.DEFAULT_PORT
+    return "$scheme://${NetworkUtils.urlHost(host)}:$port"
+}
+
 /** Human-readable server-log message for a [ServerStatus] transition. */
 internal fun serverStatusLogMessage(status: ServerStatus): String =
     when (status) {
         ServerStatus.Starting -> "Server starting"
-        is ServerStatus.Running -> "Server started on ${status.bindingAddress}:${status.port}"
+        is ServerStatus.Running -> "Server started on ${NetworkUtils.urlHost(status.bindingAddress)}:${status.port}"
         ServerStatus.Stopping -> "Server stopping"
         ServerStatus.Stopped -> "Server stopped"
         is ServerStatus.Error -> "Server error: ${status.message}"

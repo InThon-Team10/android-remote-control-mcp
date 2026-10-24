@@ -24,6 +24,14 @@ class ServerStatusLogMessageTest {
     }
 
     @Test
+    fun `an IPv6 address is bracketed`() {
+        assertEquals(
+            "Server started on [2001:db8::20]:8080",
+            serverStatusLogMessage(ServerStatus.Running(port = 8080, bindingAddress = "2001:db8::20")),
+        )
+    }
+
+    @Test
     fun `tunnel messages for connecting connected error`() {
         assertEquals("Tunnel connecting…", tunnelStatusLogMessage(TunnelStatus.Connecting))
         assertEquals(
