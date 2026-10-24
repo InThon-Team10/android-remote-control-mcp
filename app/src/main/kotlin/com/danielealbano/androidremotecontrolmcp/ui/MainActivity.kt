@@ -1,7 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.ui
 
 import android.Manifest
+import android.net.ConnectivityManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,9 +30,18 @@ class MainActivity : ComponentActivity() {
     private lateinit var microphonePermissionLauncher: ActivityResultLauncher<String>
     private lateinit var locationPermissionLauncher: ActivityResultLauncher<String>
 
+    // The device's addresses also change while the app is visible (a VPN toggled from the quick settings, a new
+    // Wi-Fi lease): the listener check follows every network while the activity is started. On the main thread,
+    // where the view model is used
+    private lateinit var networkChanges: NetworkChangeWatcher
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        networkChanges =
+            NetworkChangeWatcher(getSystemService(ConnectivityManager::class.java), Handler(Looper.getMainLooper())) {
+                viewModel.refreshListenerCheck()
+            }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -84,11 +96,19 @@ class MainActivity : ComponentActivity() {
         // Opportunistic update check each time the app is brought to the foreground (throttled by
         // WorkManager's unique-work policy). Complements the periodic background check.
         UpdateCheckScheduler.checkOnOpen(this)
+        networkChanges.start()
+    }
+
+    override fun onStop() {
+        networkChanges.stop()
+        super.onStop()
     }
 
     override fun onResume() {
         super.onResume()
         viewModel.refreshPermissionStatus(this)
+        // The device's addresses may have changed meanwhile (the Specific IP must be one of them)
+        viewModel.refreshListenerCheck()
     }
     // NOTE: No onPause() needed for broadcast receiver since we use StateFlow
     // for server status, which is collected in MainViewModel via viewModelScope.

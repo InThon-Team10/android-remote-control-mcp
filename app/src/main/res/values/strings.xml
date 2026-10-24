@@ -63,6 +63,7 @@
     <string name="server_status_starting">Starting…</string>
     <string name="server_status_stopping">Stopping…</string>
     <string name="server_status_error">Error: %1$s</string>
+    <string name="server_start_blocked">Cannot start: %1$s</string>
     <string name="server_action_start">Start</string>
     <string name="server_action_stop">Stop</string>
 
@@ -71,6 +72,8 @@
     <string name="config_binding_address_label">Binding Address</string>
     <string name="config_binding_localhost">Localhost (127.0.0.1)</string>
     <string name="config_binding_network">Network (0.0.0.0)</string>
+    <string name="config_binding_specific">Specific IP</string>
+    <string name="config_specific_ip_label">IP address to bind to</string>
     <string name="config_port_label">Port</string>
     <string name="config_device_slug_label">Device Slug (optional)</string>
     <string name="config_device_slug_hint">e.g., pixel7, work_phone</string>
@@ -95,7 +98,7 @@
 
     <!-- Network Security Warning -->
     <string name="network_warning_title">Network Exposure Warning</string>
-    <string name="network_warning_message">Binding to 0.0.0.0 makes the MCP server accessible to:\n\n\u2022 All devices on your current WiFi network\n\u2022 Devices connected to your hotspot\n\u2022 Potentially other devices depending on network configuration\n\nThis is a SECURITY RISK on public/untrusted networks.\n\nOnly use this option on trusted private networks.</string>
+    <string name="network_warning_message">Binding to 0.0.0.0 or to a specific IP address makes the MCP server accessible to:\n\n\u2022 All devices on your current WiFi network, or on the network of that address (a VPN, for example)\n\u2022 Devices connected to your hotspot\n\u2022 Potentially other devices depending on network configuration\n\nThis is a SECURITY RISK on public/untrusted networks.\n\nOnly use this option on trusted private networks.</string>
     <string name="network_warning_confirm">I Understand, Continue</string>
     <string name="network_warning_cancel">Cancel</string>
 
@@ -193,7 +196,8 @@
     <string name="remote_access_cloudflare_extra_args_help">Optional flags passed to cloudflared (e.g. specify --edge to bypass DNS issues)</string>
     <string name="remote_access_cloudflare_service_url_help">In your Cloudflare dashboard, set this tunnel\'s Public Hostname → Service to:</string>
     <string name="remote_access_cloudflare_service_url_copy">Copy service URL</string>
-    <string name="remote_access_https_disabled_warning">Cloudflare and ngrok are unavailable while HTTPS is enabled. Disable HTTPS to use them, or choose the free E2E tunnel.</string>
+    <string name="remote_access_tunnel_local_port_label">Tunnel local port</string>
+    <string name="remote_access_tunnel_local_port_hint">Cloudflare and ngrok forward to %1$s</string>
     <string name="remote_access_no_route_configured">No route configured</string>
     <string name="remote_access_route_misconfigured">Route does not point to this server</string>
     <string name="remote_access_provider_arc_tunnel">Free E2E tunnel</string>

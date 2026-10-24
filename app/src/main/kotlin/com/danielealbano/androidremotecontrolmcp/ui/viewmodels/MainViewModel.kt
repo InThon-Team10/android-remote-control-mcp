@@ -18,6 +18,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
+import com.danielealbano.androidremotecontrolmcp.mcp.ListenerSettingsCheck
+import com.danielealbano.androidremotecontrolmcp.mcp.McpListenerRules
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinator
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
@@ -36,6 +38,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -52,6 +55,7 @@ class MainViewModel
         private val batteryOptimizationManager: BatteryOptimizationManager,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
         private val approvalCoordinator: OAuthApprovalCoordinator,
+        private val listenerRules: McpListenerRules,
     ) : ViewModel() {
         private val _serverConfig = MutableStateFlow(ServerConfig())
         val serverConfig: StateFlow<ServerConfig> = _serverConfig.asStateFlow()
@@ -64,6 +68,23 @@ class MainViewModel
 
         private val _portError = MutableStateFlow<String?>(null)
         val portError: StateFlow<String?> = _portError.asStateFlow()
+
+        private val _specificBindAddressInput = MutableStateFlow("")
+        val specificBindAddressInput: StateFlow<String> = _specificBindAddressInput.asStateFlow()
+
+        private val _tunnelLocalPortInput = MutableStateFlow("")
+        val tunnelLocalPortInput: StateFlow<String> = _tunnelLocalPortInput.asStateFlow()
+
+        private val _tunnelLocalPortError = MutableStateFlow<String?>(null)
+        val tunnelLocalPortError: StateFlow<String?> = _tunnelLocalPortError.asStateFlow()
+
+        private val _listenerCheck = MutableStateFlow(ListenerSettingsCheck())
+
+        // Bumped to check again the same config against the device's addresses, which change
+        private val listenerCheckRefresh = MutableStateFlow(0)
+
+        /** What keeps the listener settings from starting the server (see [McpListenerRules.check]). */
+        val listenerCheck: StateFlow<ListenerSettingsCheck> = _listenerCheck.asStateFlow()
 
         private val _hostnameInput = MutableStateFlow("")
         val hostnameInput: StateFlow<String> = _hostnameInput.asStateFlow()
@@ -145,6 +166,9 @@ class MainViewModel
                     // round-trip through DataStore do not cause extra recompositions.
                     _portInput.value = config.port.toString()
                     _portError.value = null
+                    _specificBindAddressInput.value = config.specificBindAddress
+                    _tunnelLocalPortInput.value = config.tunnelLocalPort.toString()
+                    _tunnelLocalPortError.value = null
                     _hostnameInput.value = config.certificateHostname
                     _hostnameError.value = null
                     _ngrokAuthtokenInput.value = config.ngrokAuthtoken
@@ -158,6 +182,12 @@ class MainViewModel
                     _deviceSlugInput.value = config.deviceSlug
                     _deviceSlugError.value = null
                 }
+            }
+
+            // The only writer of the listener check, so a check of an older config never replaces a newer one
+            viewModelScope.launch(ioDispatcher) {
+                combine(_serverConfig, listenerCheckRefresh) { config, _ -> config }
+                    .collect { config -> _listenerCheck.value = listenerRules.check(config) }
             }
 
             // Collect server status from McpServerService's companion-level StateFlow.
@@ -208,6 +238,37 @@ class MainViewModel
             }
         }
 
+        /** Saves the Specific IP address as typed: [listenerCheck] reports what is wrong with it. */
+        fun updateSpecificBindAddress(address: String) {
+            _specificBindAddressInput.value = address
+            viewModelScope.launch(ioDispatcher) {
+                settingsRepository.updateSpecificBindAddress(address)
+            }
+        }
+
+        /** Saves the tunnel local port when it is valid, reporting the problem otherwise. */
+        fun updateTunnelLocalPort(portString: String) {
+            _tunnelLocalPortInput.value = portString
+            val port = portString.toIntOrNull()
+            val error =
+                when {
+                    portString.isBlank() -> "Port is required"
+                    port == null -> "Port must be a number"
+                    else -> settingsRepository.validatePort(port).exceptionOrNull()?.message
+                }
+            _tunnelLocalPortError.value = error
+            if (error == null && port != null) {
+                viewModelScope.launch(ioDispatcher) {
+                    settingsRepository.updateTunnelLocalPort(port)
+                }
+            }
+        }
+
+        /** Checks the listener settings again, against the addresses the device has now (they change). */
+        fun refreshListenerCheck() {
+            listenerCheckRefresh.update { it + 1 }
+        }
+
         fun updateAutoStartOnBoot(enabled: Boolean) {
             viewModelScope.launch(ioDispatcher) {
                 settingsRepository.updateAutoStartOnBoot(enabled)
@@ -255,7 +316,9 @@ class MainViewModel
 
         fun startServer(context: Context) {
             Logger.i(TAG, "Starting MCP server via McpServerService")
-            _serverStatus.value = ServerStatus.Starting
+            // No optimistic Starting: the status shown is always the service's. After a failed start, a retry that
+            // fails again publishes the same Error, which a StateFlow does not deliver twice, so a Starting set here
+            // would be shown for good (a second tap meanwhile is ignored by the service)
             val intent =
                 Intent(context, McpServerService::class.java).apply {
                     action = McpServerService.ACTION_START

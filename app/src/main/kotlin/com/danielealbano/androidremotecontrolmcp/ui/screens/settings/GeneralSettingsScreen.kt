@@ -3,9 +3,11 @@
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,6 +58,8 @@ fun GeneralSettingsScreen(
     val serverStatus by viewModel.serverStatus.collectAsStateWithLifecycle()
     val portInput by viewModel.portInput.collectAsStateWithLifecycle()
     val portError by viewModel.portError.collectAsStateWithLifecycle()
+    val specificBindAddressInput by viewModel.specificBindAddressInput.collectAsStateWithLifecycle()
+    val listenerCheck by viewModel.listenerCheck.collectAsStateWithLifecycle()
     val deviceSlugInput by viewModel.deviceSlugInput.collectAsStateWithLifecycle()
     val deviceSlugError by viewModel.deviceSlugError.collectAsStateWithLifecycle()
 
@@ -63,23 +67,24 @@ fun GeneralSettingsScreen(
         serverStatus !is ServerStatus.Running &&
             serverStatus !is ServerStatus.Starting
 
-    var showNetworkWarningDialog by remember { mutableStateOf(false) }
+    // All networks and a specific IP expose the server beyond the device: both ask for the same confirmation
+    var pendingExposedBinding by remember { mutableStateOf<BindingAddress?>(null) }
 
-    if (showNetworkWarningDialog) {
+    pendingExposedBinding?.let { pending ->
         AlertDialog(
-            onDismissRequest = { showNetworkWarningDialog = false },
+            onDismissRequest = { pendingExposedBinding = null },
             title = { Text(stringResource(R.string.network_warning_title)) },
             text = { Text(stringResource(R.string.network_warning_message)) },
             confirmButton = {
                 TextButton(onClick = {
-                    showNetworkWarningDialog = false
-                    viewModel.updateBindingAddress(BindingAddress.NETWORK)
+                    pendingExposedBinding = null
+                    viewModel.updateBindingAddress(pending)
                 }) {
                     Text(stringResource(R.string.network_warning_confirm))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showNetworkWarningDialog = false }) {
+                TextButton(onClick = { pendingExposedBinding = null }) {
                     Text(stringResource(R.string.network_warning_cancel))
                 }
             },
@@ -110,15 +115,17 @@ fun GeneralSettingsScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             val options = BindingAddress.entries
+            // Equal heights: some labels wrap on a phone, the others would be shorter
             SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             ) {
                 options.forEachIndexed { index, address ->
                     SegmentedButton(
+                        modifier = Modifier.fillMaxHeight(),
                         selected = address == serverConfig.bindingAddress,
                         onClick = {
-                            if (address == BindingAddress.NETWORK) {
-                                showNetworkWarningDialog = true
+                            if (bindingNeedsExposureWarning(address)) {
+                                pendingExposedBinding = address
                             } else {
                                 viewModel.updateBindingAddress(address)
                             }
@@ -135,10 +142,26 @@ fun GeneralSettingsScreen(
                                 when (address) {
                                     BindingAddress.LOCALHOST -> stringResource(R.string.config_binding_localhost)
                                     BindingAddress.NETWORK -> stringResource(R.string.config_binding_network)
+                                    BindingAddress.SPECIFIC -> stringResource(R.string.config_binding_specific)
                                 },
                         )
                     }
                 }
+            }
+
+            if (serverConfig.bindingAddress == BindingAddress.SPECIFIC) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = specificBindAddressInput,
+                    onValueChange = viewModel::updateSpecificBindAddress,
+                    label = { Text(stringResource(R.string.config_specific_ip_label)) },
+                    isError = listenerCheck.specificAddressError != null,
+                    supportingText = listenerCheck.specificAddressError?.let { { Text(it) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    singleLine = true,
+                    enabled = isEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -242,3 +265,6 @@ fun GeneralSettingsScreen(
         }
     }
 }
+
+/** Whether choosing [address] asks for the exposure warning first: it exposes the server beyond the device. */
+internal fun bindingNeedsExposureWarning(address: BindingAddress): Boolean = address != BindingAddress.LOCALHOST

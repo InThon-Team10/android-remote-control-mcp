@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
@@ -48,6 +49,7 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelRenewalState
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 import com.danielealbano.androidremotecontrolmcp.ui.theme.WarningAmber
+import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 
 private const val TOKEN_MASK = "********-****-****-****-************"
 
@@ -116,28 +118,56 @@ private fun tunnelStatusRowContent(tunnelStatus: TunnelStatus): TunnelRowContent
     }
 
 /**
- * Builds the Copy-all / Share connection string. One tunnel line is included per
- * connected public endpoint in [tunnelEndpoints] (ALL endpoints, including any flagged as invalid;
- * empty when the tunnel is not connected or has no route); the bearer token line is included only
- * when [bearerToken] is non-empty.
+ * The address the main listener is reached at: the one it binds to ([bindHost], see [ServerConfig.bindHost]), or
+ * [ipAddress] (the device's) when it binds to every address. Null when there is none: no device address, or a
+ * Specific IP the listener rules refuse ([specificAddressRefused]).
+ */
+internal fun connectionDisplayAddress(
+    bindingAddress: BindingAddress,
+    bindHost: String,
+    ipAddress: String?,
+    specificAddressRefused: Boolean = false,
+): String? =
+    when (bindingAddress) {
+        BindingAddress.NETWORK -> ipAddress
+        BindingAddress.SPECIFIC -> if (specificAddressRefused) null else bindHost
+        BindingAddress.LOCALHOST -> bindHost
+    }
+
+/** The MCP endpoint URL at [address] (an IPv6 literal in brackets). */
+internal fun connectionServerUrl(
+    address: String,
+    port: Int,
+    httpsEnabled: Boolean,
+): String {
+    val scheme = if (httpsEnabled) "https" else "http"
+    return "$scheme://${NetworkUtils.urlHost(address)}:$port/mcp"
+}
+
+/**
+ * Builds the Copy-all / Share connection string. The URL line is included only when there is a [serverUrl]; one
+ * tunnel line is included per connected public endpoint in [tunnelEndpoints] (ALL endpoints, including any flagged
+ * as invalid; empty when the tunnel is not connected or has no route); the bearer token line is included only when
+ * [bearerToken] is non-empty.
  */
 internal fun buildConnectionString(
-    serverUrl: String,
+    serverUrl: String?,
     tunnelEndpoints: List<TunnelEndpoint>,
     bearerToken: String,
 ): String =
-    buildString {
-        append("URL: $serverUrl")
-        tunnelEndpoints.forEach { append("\nTunnel: ${it.url}/mcp") }
+    buildList {
+        serverUrl?.let { add("URL: $it") }
+        tunnelEndpoints.forEach { add("Tunnel: ${it.url}/mcp") }
         if (bearerToken.isNotEmpty()) {
-            append("\nBearer Token: $bearerToken")
+            add("Bearer Token: $bearerToken")
         }
-    }
+    }.joinToString("\n")
 
 @Composable
 fun ConnectionInfoCard(
     bindingAddress: BindingAddress,
-    ipAddress: String,
+    bindHost: String,
+    ipAddress: String?,
     port: Int,
     httpsEnabled: Boolean,
     bearerToken: String,
@@ -149,17 +179,13 @@ fun ConnectionInfoCard(
     renewal: ArcTunnelRenewalState = ArcTunnelRenewalState.Idle,
     onCancelRenewal: () -> Unit = {},
     onRetryRenewal: () -> Unit = {},
+    specificAddressRefused: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var showToken by remember { mutableStateOf(false) }
 
-    val displayAddress =
-        when (bindingAddress) {
-            BindingAddress.LOCALHOST -> "127.0.0.1"
-            BindingAddress.NETWORK -> ipAddress
-        }
-    val scheme = if (httpsEnabled) "https" else "http"
-    val serverUrl = "$scheme://$displayAddress:$port/mcp"
+    val displayAddress = connectionDisplayAddress(bindingAddress, bindHost, ipAddress, specificAddressRefused)
+    val serverUrl = displayAddress?.let { connectionServerUrl(it, port, httpsEnabled) }
     val displayToken = if (showToken) bearerToken else TOKEN_MASK
 
     val rowContent = tunnelRowContent(tunnelEnabled, serverStatus, tunnelStatus, renewal)
@@ -203,13 +229,13 @@ fun ConnectionInfoCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             ConnectionInfoRow(label = ipLabel, labelWidth = labelColumnWidth) {
-                Text(text = displayAddress, style = MaterialTheme.typography.bodyMedium)
+                Text(text = displayAddress.orEmpty(), style = MaterialTheme.typography.bodyMedium)
             }
             ConnectionInfoRow(label = portLabel, labelWidth = labelColumnWidth) {
                 Text(text = port.toString(), style = MaterialTheme.typography.bodyMedium)
             }
             ConnectionInfoRow(label = urlLabel, labelWidth = labelColumnWidth) {
-                Text(text = serverUrl, style = MaterialTheme.typography.bodyMedium)
+                Text(text = serverUrl.orEmpty(), style = MaterialTheme.typography.bodyMedium)
             }
             if (rowContent != null) {
                 ConnectionInfoRow(label = publicUrlLabel, labelWidth = labelColumnWidth) {
@@ -389,6 +415,7 @@ private fun ConnectionInfoCardPreview() {
     AndroidRemoteControlMcpTheme {
         ConnectionInfoCard(
             bindingAddress = BindingAddress.LOCALHOST,
+            bindHost = "127.0.0.1",
             ipAddress = "192.168.1.100",
             port = 8080,
             httpsEnabled = false,

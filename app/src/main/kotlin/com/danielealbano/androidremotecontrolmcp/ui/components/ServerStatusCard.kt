@@ -48,6 +48,7 @@ fun ServerStatusCard(
     onChannelStopClick: () -> Unit,
     startEnabled: Boolean,
     modifier: Modifier = Modifier,
+    mcpStartBlockedMessage: String? = null,
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
@@ -68,9 +69,16 @@ fun ServerStatusCard(
                 statusText = serverStatusToText(serverStatus),
                 statusColor = serverStatusToColor(serverStatus, isSystemInDarkTheme()),
                 buttonText = if (serverStatus is ServerStatus.Running) "Stop" else "Start",
-                buttonEnabled = mcpStartStopButtonEnabled(serverStatus, startEnabled),
+                buttonEnabled = mcpStartStopButtonEnabled(serverStatus, startEnabled, mcpStartBlockedMessage != null),
                 onButtonClick = if (serverStatus is ServerStatus.Running) onMcpStopClick else onMcpStartClick,
             )
+            if (mcpStartBlockedVisible(serverStatus, mcpStartBlockedMessage)) {
+                Text(
+                    text = stringResource(R.string.server_start_blocked, mcpStartBlockedMessage.orEmpty()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 
@@ -88,18 +96,26 @@ fun ServerStatusCard(
 }
 
 /**
- * Whether the MCP Server start/stop button is enabled. Stop (Running) is always enabled;
- * Start (Stopped) requires [startEnabled] (accessibility granted); transient states are disabled.
+ * Whether the MCP Server start/stop button is enabled. Stop (Running) is always enabled; Start (Stopped, or after a
+ * failed start) requires [startEnabled] (accessibility granted) and listener settings that do not block it
+ * ([startBlocked]); transient states are disabled.
  */
 internal fun mcpStartStopButtonEnabled(
     status: ServerStatus,
     startEnabled: Boolean,
+    startBlocked: Boolean = false,
 ): Boolean =
     when (status) {
         is ServerStatus.Running -> true
-        is ServerStatus.Stopped -> startEnabled
+        is ServerStatus.Stopped, is ServerStatus.Error -> startEnabled && !startBlocked
         else -> false
     }
+
+/** Whether why Start is blocked ([message]) shows: while the server is not running. */
+internal fun mcpStartBlockedVisible(
+    status: ServerStatus,
+    message: String?,
+): Boolean = message != null && status !is ServerStatus.Running
 
 /**
  * Whether the Event Channel start/stop button is enabled. Stop (enabled) is always allowed;
