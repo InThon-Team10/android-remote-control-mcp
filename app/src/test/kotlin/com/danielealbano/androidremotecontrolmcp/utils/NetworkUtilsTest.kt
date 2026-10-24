@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.net.InetAddress
 import java.net.ServerSocket
 
@@ -99,6 +100,49 @@ class NetworkUtilsTest {
             val b = NetworkInterfaceInfo(name = "lo", address = "127.0.0.1", isLoopback = true)
 
             assertEquals(a, b)
+        }
+    }
+
+    @Nested
+    @DisplayName("requireCanListen")
+    inner class RequireCanListen {
+        @Test
+        fun `a free port of an address of the device passes and is left free`() {
+            val freePort = ServerSocket(0).use { it.localPort }
+
+            NetworkUtils.requireCanListen("127.0.0.1", freePort)
+
+            assertTrue(NetworkUtils.isPortAvailable(freePort, "127.0.0.1"))
+        }
+
+        @Test
+        fun `a port in use fails naming the address`() {
+            ServerSocket(0, 0, InetAddress.getLoopbackAddress()).use { held ->
+                val error =
+                    assertThrows<IllegalStateException> { NetworkUtils.requireCanListen("127.0.0.1", held.localPort) }
+
+                assertTrue(error.message!!.startsWith("Cannot listen on 127.0.0.1:${held.localPort}: "), error.message)
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("urlHost")
+    inner class UrlHost {
+        @Test
+        fun `IPv6 literals are bracketed, the rest left as it is`() {
+            assertEquals("[2001:db8::20]", NetworkUtils.urlHost("2001:db8::20"))
+            assertEquals("192.168.1.20", NetworkUtils.urlHost("192.168.1.20"))
+            assertEquals("localhost", NetworkUtils.urlHost("localhost"))
+        }
+    }
+
+    @Nested
+    @DisplayName("deviceAddresses")
+    inner class DeviceAddresses {
+        @Test
+        fun `includes the loopback address`() {
+            assertTrue(NetworkUtils.deviceAddresses().any { it.isLoopbackAddress })
         }
     }
 }
