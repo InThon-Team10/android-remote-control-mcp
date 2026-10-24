@@ -23,6 +23,7 @@ class McpToolRegistrationTest {
     private val registration =
         McpToolRegistration(
             deps.serverLog,
+            deps.inFlightToolCalls,
             AccessibilityToolDeps(
                 deps.actionExecutor,
                 deps.accessibilityServiceProvider,
