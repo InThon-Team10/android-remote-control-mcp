@@ -6,5 +6,34 @@
     <!-- gms: Background Location permission row (geofence-only) -->
     <string name="permission_background_location">Background Location</string>
     <string name="permission_background_location_open_settings">Open Settings</string>
+    <string name="permission_background_location_open_settings_spoken">Not granted, open settings</string>
     <string name="permission_background_location_rationale">Fire geofence events while in the background.</string>
+    <!-- gms: Geofence screens -->
+    <string name="geofence_events">Geofence Events</string>
+    <string name="geofence_add_zone">Add zone</string>
+    <string name="geofence_delete_zone">Delete %1$s</string>
+    <string name="geofence_edit_action">edit</string>
+    <string name="geofence_my_location">My location</string>
+    <string name="geofence_search">Search</string>
+    <string name="geofence_list_title">Geofence Zones</string>
+    <string name="geofence_list_empty">No geofence zones configured</string>
+    <string name="geofence_zone_summary">%1$.4f, %2$.4f — %3$dm</string>
+    <string name="geofence_marker_coordinates">%1$.6f, %2$.6f</string>
+    <string name="geofence_delete_dialog_title">Delete zone?</string>
+    <string name="geofence_delete_dialog_message">Remove \"%1$s\"?</string>
+    <string name="geofence_delete_dialog_confirm">Delete</string>
+    <string name="geofence_delete_dialog_cancel">Cancel</string>
+    <string name="geofence_edit_zone_title">Edit Zone</string>
+    <string name="geofence_add_zone_title">Add Zone</string>
+    <string name="geofence_save">Save</string>
+    <string name="geofence_zone_name_placeholder">Zone name</string>
+    <string name="geofence_notifications_label">Notifications</string>
+    <string name="geofence_notify_enter">Enter</string>
+    <string name="geofence_notify_exit">Exit</string>
+    <string name="geofence_radius">Radius: %1$s</string>
+    <string name="geofence_search_placeholder">Search address</string>
+    <string name="geofence_radius_miles">%1$.1f mi</string>
+    <string name="geofence_radius_feet">%1$d ft</string>
+    <string name="geofence_radius_kilometers">%1$.1f km</string>
+    <string name="geofence_radius_meters">%1$d m</string>
 </resources>

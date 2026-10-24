@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.navigation.SettingsRoute
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,7 +40,7 @@ fun SettingsIndexScreen(
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.tab_settings)) },
+            title = { TopBarTitle(stringResource(R.string.tab_settings)) },
             windowInsets = WindowInsets(0),
         )
         SettingsEntriesColumn(
@@ -108,7 +109,7 @@ private fun SettingsEntriesColumn(
         )
         SettingsEntry(
             icon = Icons.Default.CellTower,
-            title = "Event Channel",
+            title = stringResource(R.string.event_channel_name),
             subtitle = stringResource(R.string.event_channel_subtitle),
             onClick = { onNavigate(SettingsRoute.ChannelSettings.route) },
         )
@@ -129,6 +130,6 @@ private fun SettingsEntry(
         trailingContent = {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         },
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.clickable(onClickLabel = stringResource(R.string.a11y_action_open), onClick = onClick),
     )
 }

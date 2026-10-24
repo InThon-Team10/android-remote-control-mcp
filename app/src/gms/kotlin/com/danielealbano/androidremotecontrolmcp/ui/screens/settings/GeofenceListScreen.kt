@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
@@ -35,8 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.GeofenceZone
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.GeofenceSettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -96,17 +99,13 @@ fun GeofenceListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Geofence Zones") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
+                title = { TopBarTitle(stringResource(R.string.geofence_list_title)) },
+                navigationIcon = { TopBarBackButton(onClick = onNavigateBack) },
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { onNavigateToMap(null) }) {
-                Icon(Icons.Default.Add, "Add zone")
+                Icon(Icons.Default.Add, stringResource(R.string.geofence_add_zone))
             }
         },
     ) { padding ->
@@ -116,7 +115,7 @@ fun GeofenceListScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "No geofence zones configured",
+                    stringResource(R.string.geofence_list_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -125,28 +124,34 @@ fun GeofenceListScreen(
             LazyColumn(modifier = Modifier.padding(padding)) {
                 items(config.zones) { zone ->
                     val street = streetNames[zone.id] ?: ""
+                    val summary =
+                        stringResource(
+                            R.string.geofence_zone_summary,
+                            zone.latitude,
+                            zone.longitude,
+                            zone.radiusMeters.toInt(),
+                        )
                     ListItem(
                         headlineContent = { Text(zone.name) },
                         supportingContent = {
                             Text(
                                 buildString {
                                     if (street.isNotBlank()) append("$street\n")
-                                    append(
-                                        "${"%.4f".format(zone.latitude)}, " +
-                                            "${"%.4f".format(zone.longitude)} — " +
-                                            "${zone.radiusMeters.toInt()}m",
-                                    )
+                                    append(summary)
                                 },
                             )
                         },
                         trailingContent = {
                             Row {
                                 IconButton(onClick = { zoneToDelete = zone }) {
-                                    Icon(Icons.Default.Delete, "Delete")
+                                    Icon(Icons.Default.Delete, stringResource(R.string.geofence_delete_zone, zone.name))
                                 }
                             }
                         },
-                        modifier = Modifier.clickable { onNavigateToMap(zone.id) },
+                        modifier =
+                            Modifier.clickable(onClickLabel = stringResource(R.string.geofence_edit_action)) {
+                                onNavigateToMap(zone.id)
+                            },
                     )
                 }
             }
@@ -155,19 +160,19 @@ fun GeofenceListScreen(
         zoneToDelete?.let { zone ->
             AlertDialog(
                 onDismissRequest = { zoneToDelete = null },
-                title = { Text("Delete zone?") },
-                text = { Text("Remove \"${zone.name}\"?") },
+                title = { Text(stringResource(R.string.geofence_delete_dialog_title)) },
+                text = { Text(stringResource(R.string.geofence_delete_dialog_message, zone.name)) },
                 confirmButton = {
                     TextButton(onClick = {
                         viewModel.removeGeofenceZone(zone.id)
                         zoneToDelete = null
                     }) {
-                        Text("Delete")
+                        Text(stringResource(R.string.geofence_delete_dialog_confirm))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { zoneToDelete = null }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.geofence_delete_dialog_cancel))
                     }
                 },
             )

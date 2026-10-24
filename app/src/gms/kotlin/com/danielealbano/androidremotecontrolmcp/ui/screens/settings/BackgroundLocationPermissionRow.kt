@@ -71,5 +71,12 @@ fun BackgroundLocationPermissionRow() {
             context.startActivity(intent)
         },
         actionEnabled = !granted,
+        // "Open Settings" does not say the state
+        spokenButtonText =
+            if (granted) {
+                stringResource(R.string.permission_granted)
+            } else {
+                stringResource(R.string.permission_background_location_open_settings_spoken)
+            },
     )
 }

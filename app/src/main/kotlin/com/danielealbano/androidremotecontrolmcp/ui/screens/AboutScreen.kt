@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,12 +50,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.BuildConfig
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
+import com.danielealbano.androidremotecontrolmcp.ui.components.rememberChangedSinceShown
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.UpdateCheckUiState
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.UpdateViewModel
 
@@ -65,9 +75,10 @@ fun AboutScreen(
 ) {
     val context = LocalContext.current
 
+    val openLink = stringResource(R.string.a11y_action_open_link)
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.tab_about)) },
+            title = { TopBarTitle(stringResource(R.string.tab_about)) },
             windowInsets = WindowInsets(0),
         )
         Column(
@@ -91,9 +102,10 @@ fun AboutScreen(
                             .background(colorResource(R.color.ic_launcher_background)),
                     contentAlignment = Alignment.Center,
                 ) {
+                    // Decorative: the app's name is the text below
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                        contentDescription = stringResource(R.string.app_name),
+                        contentDescription = null,
                         modifier = Modifier.size(72.dp),
                     )
                 }
@@ -105,7 +117,7 @@ fun AboutScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "v${BuildConfig.VERSION_NAME}",
+                    text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -146,7 +158,7 @@ fun AboutScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
-                    Modifier.clickable {
+                    Modifier.clickable(onClickLabel = openLink) {
                         runCatching {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.LINKEDIN_URL)))
                         }
@@ -159,7 +171,7 @@ fun AboutScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
-                    Modifier.clickable {
+                    Modifier.clickable(onClickLabel = openLink) {
                         runCatching {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.X_URL)))
                         }
@@ -201,7 +213,7 @@ fun AboutScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
-                    Modifier.clickable {
+                    Modifier.clickable(onClickLabel = openLink) {
                         runCatching {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.DBIP_URL)))
                         }
@@ -213,7 +225,7 @@ fun AboutScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier =
-                    Modifier.clickable {
+                    Modifier.clickable(onClickLabel = openLink) {
                         runCatching {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AboutLinks.PRIVACY_MODEL_URL)))
                         }
@@ -247,7 +259,7 @@ private fun AboutLinkItem(
         leadingContent = { Icon(icon, contentDescription = null) },
         trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
         modifier =
-            Modifier.clickable {
+            Modifier.clickable(onClickLabel = stringResource(R.string.a11y_action_open_link)) {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             },
     )
@@ -267,13 +279,25 @@ private fun UpdateSettingsSection(
     )
     Spacer(Modifier.height(8.dp))
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier =
+            Modifier.toggleable(
+                value = autoCheckEnabled,
+                role = Role.Switch,
+                onValueChange = viewModel::setAutoCheckEnabled,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             text = stringResource(R.string.about_auto_update_label),
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = autoCheckEnabled, onCheckedChange = viewModel::setAutoCheckEnabled)
+        Switch(
+            checked = autoCheckEnabled,
+            onCheckedChange = null,
+            modifier = Modifier.minimumInteractiveComponentSize(),
+        )
     }
 
     Spacer(Modifier.height(8.dp))
@@ -282,7 +306,11 @@ private fun UpdateSettingsSection(
         enabled = checkState !is UpdateCheckUiState.Checking,
     ) {
         if (checkState is UpdateCheckUiState.Checking) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            val checking = stringResource(R.string.about_update_checking)
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp).semantics { contentDescription = checking },
+                strokeWidth = 2.dp,
+            )
         } else {
             Text(stringResource(R.string.about_check_updates_button))
         }
@@ -296,34 +324,51 @@ private fun UpdateCheckStatusText(
     state: UpdateCheckUiState,
     onOpenUrl: (String) -> Unit,
 ) {
-    if (state is UpdateCheckUiState.UpdateFound) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.about_update_found, state.update.versionName),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.clickable { onOpenUrl(state.update.releaseUrl) },
-        )
-        return
-    }
+    val found = state as? UpdateCheckUiState.UpdateFound
     val message =
         when (state) {
+            is UpdateCheckUiState.UpdateFound -> stringResource(R.string.about_update_found, state.update.versionName)
             UpdateCheckUiState.UpToDate -> stringResource(R.string.about_update_up_to_date)
             UpdateCheckUiState.Failed -> stringResource(R.string.about_update_check_failed)
             UpdateCheckUiState.DevBuild -> stringResource(R.string.about_update_dev_build)
             else -> null
         }
     if (message != null) {
-        UpdateStatusLine(message)
+        Spacer(Modifier.height(8.dp))
     }
-}
-
-@Composable
-private fun UpdateStatusLine(text: String) {
-    Spacer(Modifier.height(8.dp))
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    // Read as one node carrying the result itself, spoken without the sighted "tap" hint. A polite live region from
+    // the first change on (rememberChangedSinceShown), so a new result is announced and coming back to About reads
+    // nothing extra. While there is no result (every check goes through Checking) the node is empty and not exposed;
+    // when the result appears, Compose reports a subtree change from this node, and TalkBack announces a live-region
+    // node's content on any content change from it. The click goes before the clearing modifier: semantics are
+    // collected from the end of the chain back, and clearAndSetSemantics drops what comes after it.
+    val spoken =
+        if (found != null) stringResource(R.string.about_update_found_spoken, found.update.versionName) else message
+    val announceChanges = rememberChangedSinceShown(spoken)
+    val openLink = stringResource(R.string.a11y_action_open_link)
+    Box(
+        modifier =
+            Modifier
+                .then(
+                    if (found != null) {
+                        Modifier.clickable(onClickLabel = openLink) { onOpenUrl(found.update.releaseUrl) }
+                    } else {
+                        Modifier
+                    },
+                ).clearAndSetSemantics {
+                    spoken?.let { contentDescription = it }
+                    if (announceChanges) {
+                        liveRegion = LiveRegionMode.Polite
+                    }
+                },
+    ) {
+        if (message != null) {
+            val colors = MaterialTheme.colorScheme
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (found != null) colors.primary else colors.onSurfaceVariant,
+            )
+        }
+    }
 }

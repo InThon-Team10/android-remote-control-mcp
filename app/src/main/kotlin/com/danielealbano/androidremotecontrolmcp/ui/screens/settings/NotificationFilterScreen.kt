@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,13 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -25,6 +25,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,9 +34,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.NotificationFilterMode
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,12 +60,8 @@ fun NotificationFilterScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Notification Filter") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
+                title = { TopBarTitle(stringResource(R.string.notification_filter_title)) },
+                navigationIcon = { TopBarBackButton(onClick = onNavigateBack) },
             )
         },
     ) { padding ->
@@ -73,7 +76,7 @@ fun NotificationFilterScreen(
                         onClick = { viewModel.updateNotificationFilterMode(mode) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
                     ) {
-                        Text(mode.name)
+                        Text(stringResource(notificationFilterModeLabel(mode)))
                     }
                 }
             }
@@ -82,13 +85,17 @@ fun NotificationFilterScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    label = { Text("Search apps") },
+                    label = { Text(stringResource(R.string.notification_filter_search_label)) },
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     singleLine = true,
                 )
 
                 Text(
-                    "${config.notifications.filterApps.size} apps selected",
+                    pluralStringResource(
+                        R.plurals.notification_filter_selected_count,
+                        config.notifications.filterApps.size,
+                        config.notifications.filterApps.size,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
@@ -102,6 +109,14 @@ fun NotificationFilterScreen(
                 LazyColumn {
                     items(filtered, key = { it.packageId }) { app ->
                         ListItem(
+                            modifier =
+                                Modifier.toggleable(
+                                    value = app.packageId in config.notifications.filterApps,
+                                    role = Role.Checkbox,
+                                    onValueChange = { checked ->
+                                        viewModel.toggleNotificationFilterApp(app.packageId, checked)
+                                    },
+                                ),
                             headlineContent = { Text(app.name) },
                             supportingContent = {
                                 Text(app.packageId, style = MaterialTheme.typography.bodySmall)
@@ -111,13 +126,15 @@ fun NotificationFilterScreen(
                                 if (bitmap != null) {
                                     Image(
                                         bitmap = bitmap.asImageBitmap(),
-                                        contentDescription = app.name,
+                                        // Decorative: the app's name is the row's headline
+                                        contentDescription = null,
                                         modifier = Modifier.size(40.dp),
                                     )
                                 } else {
                                     Icon(
                                         imageVector = Icons.Default.Android,
-                                        contentDescription = app.name,
+                                        // Decorative: the app's name is the row's headline
+                                        contentDescription = null,
                                         modifier = Modifier.size(40.dp),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -126,9 +143,8 @@ fun NotificationFilterScreen(
                             trailingContent = {
                                 Checkbox(
                                     checked = app.packageId in config.notifications.filterApps,
-                                    onCheckedChange = { checked ->
-                                        viewModel.toggleNotificationFilterApp(app.packageId, checked)
-                                    },
+                                    onCheckedChange = null,
+                                    modifier = Modifier.minimumInteractiveComponentSize(),
                                 )
                             },
                         )
@@ -138,3 +154,11 @@ fun NotificationFilterScreen(
         }
     }
 }
+
+@StringRes
+private fun notificationFilterModeLabel(mode: NotificationFilterMode): Int =
+    when (mode) {
+        NotificationFilterMode.ALL -> R.string.notification_filter_mode_all
+        NotificationFilterMode.WHITELIST -> R.string.notification_filter_mode_whitelist
+        NotificationFilterMode.BLACKLIST -> R.string.notification_filter_mode_blacklist
+    }
