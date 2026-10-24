@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.ui.components
 
+import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType.ARC_TUNNEL
@@ -343,5 +344,40 @@ class ConnectionInfoCardTest {
     fun `tunnelRowContent hides the start renewal while the server is stopped`() {
         val renewing = ArcTunnelRenewalState.Renewing
         assertNull(tunnelRowContent(true, ServerStatus.Stopped, TunnelStatus.Connecting, renewing))
+    }
+
+    @Test
+    fun `the display address follows the binding address`() {
+        assertEquals("127.0.0.1", connectionDisplayAddress(BindingAddress.LOCALHOST, "127.0.0.1", "192.168.1.20"))
+        assertEquals("192.168.1.20", connectionDisplayAddress(BindingAddress.NETWORK, "0.0.0.0", "192.168.1.20"))
+        assertEquals("10.0.0.9", connectionDisplayAddress(BindingAddress.SPECIFIC, "10.0.0.9", "192.168.1.20"))
+    }
+
+    @Test
+    fun `no address for a refused Specific IP or a device without one`() {
+        assertNull(connectionDisplayAddress(BindingAddress.SPECIFIC, "", "192.168.1.20", true))
+        assertNull(connectionDisplayAddress(BindingAddress.SPECIFIC, "phone.local", null, true))
+        assertNull(connectionDisplayAddress(BindingAddress.NETWORK, "0.0.0.0", null))
+        // Localhost needs no device address, and only a Specific IP is ever refused
+        assertEquals("127.0.0.1", connectionDisplayAddress(BindingAddress.LOCALHOST, "127.0.0.1", null))
+        assertEquals("192.168.1.20", connectionDisplayAddress(BindingAddress.NETWORK, "0.0.0.0", "192.168.1.20", true))
+    }
+
+    @Test
+    fun `buildConnectionString leaves the URL line out without a URL`() {
+        val endpoint = TunnelEndpoint("https://t.example.com", valid = true)
+
+        assertEquals(
+            "Tunnel: https://t.example.com/mcp\nBearer Token: tok",
+            buildConnectionString(serverUrl = null, tunnelEndpoints = listOf(endpoint), bearerToken = "tok"),
+        )
+        assertEquals("Bearer Token: tok", buildConnectionString(null, emptyList(), "tok"))
+        assertEquals("", buildConnectionString(null, emptyList(), ""))
+    }
+
+    @Test
+    fun `the server URL brackets an IPv6 address`() {
+        assertEquals("http://192.168.1.20:8080/mcp", connectionServerUrl("192.168.1.20", 8080, httpsEnabled = false))
+        assertEquals("https://[2001:db8::20]:8443/mcp", connectionServerUrl("2001:db8::20", 8443, httpsEnabled = true))
     }
 }

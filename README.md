@@ -55,7 +55,7 @@ The app runs directly on your Android device (or emulator) and exposes an HTTP s
 - Streamable HTTP transport at `/mcp` (MCP specification compliant, JSON-only, no SSE)
 - Combined authentication: static bearer token and/or a self-contained OAuth 2.1 server (Claude.ai / Claude Desktop custom connectors, with on-device approval)
 - Auto-generated self-signed TLS certificates (or custom certificate upload)
-- Configurable binding: localhost (127.0.0.1) or network (0.0.0.0)
+- Configurable binding: localhost (127.0.0.1), network (0.0.0.0) or a specific IP address of the device
 - Auto-start on boot
 - Remote access tunnels via the free end-to-end encrypted tunnel (no account), Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
 
@@ -314,7 +314,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Port | `8080` | HTTP/HTTPS server port |
-| Binding Address | `127.0.0.1` | `127.0.0.1` (localhost, use with adb port forwarding) or `0.0.0.0` (network, all interfaces) |
+| Binding Address | `127.0.0.1` | `127.0.0.1` (localhost, use with adb port forwarding), `0.0.0.0` (network, all interfaces) or a specific IP address of the device (IPv4 or IPv6, not IPv6 link-local, without a zone index such as `%3`; the server does not start while the device does not have it) |
 | Bearer Token | Enabled, auto-generated UUID | Static token for MCP requests (Settings → Access). Enforcement is set by the Bearer toggle, not by clearing the value. |
 | OAuth | Enabled | Self-contained OAuth 2.1 server for Claude.ai / Claude Desktop custom connectors (Settings → Access). |
 | Public URL override | Empty (auto-detect) | Pin the public host used for OAuth metadata and share links. |
@@ -322,6 +322,7 @@ The bearer token is shown in the app's connection info and can be copied directl
 | Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
 | Device Slug | Empty | Optional device identifier for tool name prefix (e.g., `pixel7` makes tools `android_pixel7_tap`) |
 | Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (free E2E tunnel by default; Cloudflare Quick Tunnels or ngrok) |
+| Tunnel Local Port | The server port on installs from before this setting (unless their HTTPS kept their Cloudflare/ngrok tunnel off), a random port of 61000-65535 otherwise | The port Cloudflare and ngrok forward to (`http://localhost:<port>`). When the server serves plain HTTP on `127.0.0.1` on that same port (Localhost, Network, or the Specific IP 127.0.0.1), the tunnel uses it; otherwise the server opens a plain HTTP listener of its own on `127.0.0.1:<port>`, with the same authentication. With HTTPS on and such a binding, choose a port other than the server port |
 | Tool Permissions | All enabled | Per-tool and per-parameter enable/disable (Settings > MCP Tools) |
 | File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
 | Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
@@ -354,6 +355,8 @@ When the server is bound to `0.0.0.0`:
 
 **Warning**: Binding to `0.0.0.0` exposes the server to all devices on the same network. Only use on trusted private networks.
 
+To listen on one address only (the device's address on a VPN such as Tailscale, for example), choose **Specific IP** and enter an IP address of the device: the server listens on that address alone (plus `127.0.0.1` when a tunnel is enabled, for the tunnel), so normally only the network of that address reaches it, and does not start while the device does not have it.
+
 ### Using Remote Access Tunnels
 
 For connecting from outside the local network without port forwarding:
@@ -361,6 +364,8 @@ For connecting from outside the local network without port forwarding:
 1. **Free E2E tunnel** (default, no account required): end-to-end encrypted. The phone enrolls with hardware key attestation, gets a name under `d.arc-tunnel.io` and a public certificate (Let's Encrypt, Google Trust Services or ZeroSSL) issued to its own key, and terminates TLS itself — the tunnel service only relays ciphertext (unlike Cloudflare or ngrok, which read the traffic). The refresh icon next to the URL re-enrolls under a new name. A Certificate Transparency check (on by default) warns if a certificate for your name is ever issued to another key. Self-hosters change the base address.
 2. **Cloudflare Quick Tunnels** (no account required): Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL.
 3. **ngrok** (account required): Supports optional custom domains. Requires an ngrok authtoken (free tier available). Available on arm64-v8a and x86_64 devices.
+
+Cloudflare and ngrok forward to `http://localhost:<tunnel local port>` (Settings → Tunnel), so they also work while the server serves HTTPS: the server then gives them a plain HTTP listener of its own on `127.0.0.1`.
 
 Enable the tunnel in the app's "Remote Access" section. The public URL is displayed in the connection info and server logs.
 
@@ -438,6 +443,7 @@ adb shell am broadcast \
   --es cloudflare_tunnel_extra_args "--edge region1.v2.argotunnel.com:7844" \
   --es ngrok_authtoken "your-ngrok-token" \
   --es ngrok_domain "your-domain.ngrok-free.app" \
+  --ei tunnel_local_port 61200 \
   --ei file_size_limit_mb 50 \
   --ez allow_http_downloads false \
   --ez allow_unverified_https_certs false \
@@ -464,7 +470,7 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 | `bearer_token_enabled` | boolean | Enable/disable bearer-token authentication (controls enforcement, independent of the value) |
 | `oauth_enabled` | boolean | Enable/disable the self-contained OAuth 2.1 server (Claude.ai / Claude Desktop connectors) |
 | `public_url_override` | string | Pin the public host used for OAuth metadata and share links (empty = auto-detect from the request) |
-| `binding_address` | string | `127.0.0.1` (localhost) or `0.0.0.0` (network) |
+| `binding_address` | string | `127.0.0.1` (localhost), `0.0.0.0` (network) or another IP address literal of the device (specific IP) |
 | `port` | int | HTTP/HTTPS server port (1-65535) |
 | `auto_start_on_boot` | boolean | Start MCP server when device boots |
 | `hide_from_recents` | boolean | Exclude the app from the Android Recent Tasks list |
@@ -481,6 +487,7 @@ Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by c
 | `cloudflare_tunnel_extra_args` | string | Optional extra arguments passed to cloudflared (e.g. `--edge region1.v2.argotunnel.com:7844`) |
 | `ngrok_authtoken` | string | ngrok authentication token |
 | `ngrok_domain` | string | ngrok custom domain (optional) |
+| `tunnel_local_port` | int | Port Cloudflare and ngrok forward to on `localhost` (1-65535) |
 | `file_size_limit_mb` | int | Max file size for file operations (1-500) |
 | `allow_http_downloads` | boolean | Allow non-HTTPS downloads |
 | `allow_unverified_https_certs` | boolean | Allow unverified HTTPS certificates for downloads |
@@ -570,6 +577,7 @@ Authentication is combined (dual-accept): a `/mcp` request is authorized by a va
 
 - **Default binding `127.0.0.1`**: Only accessible via adb port forwarding or tunnels (most secure)
 - **Optional binding `0.0.0.0`**: Accessible over network (use only on trusted networks; security warning displayed when enabling)
+- **Optional specific IP**: Listens on that address only (plus `127.0.0.1` for an enabled tunnel), so normally only the network of that address reaches it (same security warning)
 - **HTTPS**: Optional, disabled by default. When enabled, uses auto-generated self-signed certificates or upload your own CA-signed certificate. Certificate is stored in app-private storage.
 
 ### Permissions

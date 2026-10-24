@@ -48,13 +48,15 @@ graph TB
 
         subgraph McpServerSvc["McpServerService (Foreground Service)"]
             subgraph Ktor["McpServer (Ktor)"]
-                HTTP["HTTP :8080 (HTTPS optional)"]
+                HTTP["Main listener :8080 (HTTPS optional)\n127.0.0.1, 0.0.0.0 or a specific IP"]
                 StreamHTTP["Streamable HTTP /mcp\n(stateless, POST only; JSON-only, no SSE)"]
                 Auth["BearerTokenAuth (global)"]
                 SDK["SDK Server → Server.addTool()"]
                 HTTP --> StreamHTTP --> Auth --> SDK
                 TLSL["Loopback TLS listener\n(TunnelListenerHost, free E2E tunnel)"]
                 TLSL --> StreamHTTP
+                LocalL["Plain HTTP listener\n127.0.0.1:tunnel local port\n(Cloudflare/ngrok, when needed)"]
+                LocalL --> StreamHTTP
             end
             subgraph Tunnel["TunnelManager (optional)"]
                 Arc["ArcTunnelProvider\n(free E2E tunnel, in-process)"]
@@ -66,6 +68,10 @@ graph TB
                 Ngrok --> PubURL
             end
             Arc -. "dial-back splice" .-> TLSL
+            CF -. "localhost:tunnel local port" .-> LocalL
+            Ngrok -. "localhost:tunnel local port" .-> LocalL
+            CF -. "or, same port, plain HTTP on 127.0.0.1" .-> HTTP
+            Ngrok -. "or, same port, plain HTTP on 127.0.0.1" .-> HTTP
         end
 
         MainAct -->|"StateFlow (status)"| McpServerSvc
@@ -91,12 +97,12 @@ graph TB
    - Sends `ACTION_START` intent to `McpServerService`
    - `McpServerService.onStartCommand()`:
      a. Calls `startForeground()` with notification (within 5 seconds)
-     b. Reads `ServerConfig` from `SettingsRepository`
+     b. Reads `ServerConfig` from `SettingsRepository`, and refuses the start with `ServerStatus.Error` when `McpListenerRules` refuses its listener settings (Specific IP, tunnel local port)
      c. Gets/creates SSL keystore from `CertificateManager` (only if HTTPS enabled)
-     d. Creates `McpServer` with config, keystore, and SDK `Server` (MCP Kotlin SDK)
-     e. Starts Ktor server (HTTP by default, HTTPS if enabled)
+     d. Creates `McpServer` with config, keystore, SDK `Server` (MCP Kotlin SDK) and the port of the Cloudflare/ngrok loopback listener when one is needed (`McpListenerRules.tunnelListenerPort`)
+     e. Starts Ktor: the main listener on the chosen address and port (HTTP by default, HTTPS if enabled) and the Cloudflare/ngrok loopback listener (plain HTTP on `127.0.0.1:<tunnel local port>`), each bind probed first so a taken port fails the start at once
      f. Updates `ServerStatus.Running` via companion-level StateFlow
-     g. If tunnel enabled: starts `TunnelManager` with the `McpServer` as `TunnelListenerHost` (free E2E tunnel: resumes the saved identity, renews a missing or expired certificate (shown in the UI through `ArcTunnelRenewals`), opens the loopback TLS listener and the control stream; Cloudflare/ngrok: as before)
+     g. If tunnel enabled: starts `TunnelManager` with the same `ServerConfig` and the `McpServer` as `TunnelListenerHost` (free E2E tunnel: resumes the saved identity, renews a missing or expired certificate (shown in the UI through `ArcTunnelRenewals`), opens the loopback TLS listener and the control stream; Cloudflare/ngrok: forward to `http://localhost:<tunnel local port>`)
      h. Tunnel status and URL logged to UI via `serverLogEvents` SharedFlow
 
 ### Shutdown Sequence
@@ -273,6 +279,9 @@ sequenceDiagram
 
 - Default: `127.0.0.1` (localhost only, requires `adb forward`)
 - Optional: `0.0.0.0` (all interfaces, with security warning)
+- Optional: a specific IP of the device (IPv4 or IPv6, not IPv6 link-local, without a zone index; the main listener listens on that address only, so normally only its network reaches it, while an enabled tunnel adds its own listener on 127.0.0.1; the same warning). `McpListenerRules` checks it against the device's addresses: the UI disables Start with the error on the field, ADB and boot starts fail fast with the same error
+- Cloudflare and ngrok forward to `http://localhost:<tunnel local port>`. The main listener serves them when it already holds 127.0.0.1 on that port with plain HTTP (Localhost, Network, or the specific IP 127.0.0.1); otherwise a plain HTTP listener of its own on `127.0.0.1:<tunnel local port>` does, with the same application and authentication. With HTTPS on, that port must differ from the server port on such a binding (`McpListenerRules`)
+- The main listener or the Cloudflare/ngrok loopback listener failing to bind fails the start at once, naming its address; no retries (the free E2E tunnel's own listener keeps its retries)
 - No external firewall; relies on Android's app sandbox, the network-binding choice (loopback by default), and the combined auth. When both auth methods are disabled, the network binding is the only remaining layer — stay on loopback unless you trust the network.
 
 ---

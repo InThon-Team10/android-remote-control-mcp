@@ -23,12 +23,32 @@ class ServerStatusCardTest {
     }
 
     @Test
-    fun `mcp disabled while starting or stopping or error`() {
+    fun `mcp disabled while starting or stopping`() {
         assertFalse(mcpStartStopButtonEnabled(ServerStatus.Starting, startEnabled = true))
         assertFalse(mcpStartStopButtonEnabled(ServerStatus.Starting, startEnabled = false))
         assertFalse(mcpStartStopButtonEnabled(ServerStatus.Stopping, startEnabled = true))
         assertFalse(mcpStartStopButtonEnabled(ServerStatus.Stopping, startEnabled = false))
-        assertFalse(mcpStartStopButtonEnabled(ServerStatus.Error("boom"), startEnabled = true))
+    }
+
+    @Test
+    fun `mcp start is disabled while the listener settings block it, stop is not`() {
+        assertFalse(mcpStartStopButtonEnabled(ServerStatus.Stopped, startEnabled = true, startBlocked = true))
+        assertFalse(mcpStartStopButtonEnabled(ServerStatus.Error("boom"), startEnabled = true, startBlocked = true))
+        assertTrue(mcpStartStopButtonEnabled(running, startEnabled = true, startBlocked = true))
+    }
+
+    @Test
+    fun `why start is blocked shows while the server is not running`() {
+        assertTrue(mcpStartBlockedVisible(ServerStatus.Stopped, "blocked"))
+        assertTrue(mcpStartBlockedVisible(ServerStatus.Error("boom"), "blocked"))
+        assertFalse(mcpStartBlockedVisible(running, "blocked"))
+        assertFalse(mcpStartBlockedVisible(ServerStatus.Stopped, null))
+    }
+
+    @Test
+    fun `mcp start after a failed start requires startEnabled, as when stopped`() {
+        assertTrue(mcpStartStopButtonEnabled(ServerStatus.Error("boom"), startEnabled = true))
+        assertFalse(mcpStartStopButtonEnabled(ServerStatus.Error("boom"), startEnabled = false))
     }
 
     @Test

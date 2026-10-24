@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.debug
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.InetAddresses
 import android.util.Base64
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
@@ -296,6 +297,59 @@ class E2EConfigReceiverTest {
             mockSettingsRepository.ensureAuthModelMigrated()
             mockSettingsRepository.updateBearerToken("t")
         }
+    }
+
+    @Test
+    fun `handleConfigure binds to another IP literal as the specific IP`() {
+        mockkStatic(InetAddresses::class)
+        every { InetAddresses.isNumericAddress("192.168.1.20") } returns true
+        val intent = configureIntent()
+        every { intent.getStringExtra("binding_address") } returns "192.168.1.20"
+
+        receiver.onReceive(mockContext, intent)
+
+        coVerify(timeout = VERIFY_TIMEOUT_MS) { mockSettingsRepository.updateBindingAddress(BindingAddress.SPECIFIC) }
+        coVerify(exactly = 1) { mockSettingsRepository.updateSpecificBindAddress("192.168.1.20") }
+    }
+
+    @Test
+    fun `handleConfigure keeps a zone index on the specific IP, for the start to refuse`() {
+        mockkStatic(InetAddresses::class)
+        every { InetAddresses.isNumericAddress("2001:db8::20") } returns true
+        val intent = configureIntent()
+        every { intent.getStringExtra("binding_address") } returns "2001:db8::20%wlan0"
+
+        receiver.onReceive(mockContext, intent)
+
+        coVerify(timeout = VERIFY_TIMEOUT_MS) { mockSettingsRepository.updateBindingAddress(BindingAddress.SPECIFIC) }
+        coVerify(exactly = 1) { mockSettingsRepository.updateSpecificBindAddress("2001:db8::20%wlan0") }
+    }
+
+    @Test
+    fun `handleConfigure ignores a binding address that is not an IP literal`() {
+        mockkStatic(InetAddresses::class)
+        every { InetAddresses.isNumericAddress(any()) } returns false
+        val intent = configureIntent()
+        every { intent.getStringExtra("binding_address") } returns "phone.local"
+        every { intent.hasExtra("tunnel_enabled") } returns true
+        every { intent.getBooleanExtra("tunnel_enabled", false) } returns true
+
+        receiver.onReceive(mockContext, intent)
+
+        // The configuration as a whole is still applied
+        coVerify(timeout = VERIFY_TIMEOUT_MS) { mockSettingsRepository.updateTunnelEnabled(true) }
+        coVerify(exactly = 0) { mockSettingsRepository.updateBindingAddress(any()) }
+        coVerify(exactly = 0) { mockSettingsRepository.updateSpecificBindAddress(any()) }
+    }
+
+    @Test
+    fun `handleConfigure updates the tunnel local port`() {
+        val intent = configureIntent()
+        every { intent.getIntExtra("tunnel_local_port", -1) } returns 49200
+
+        receiver.onReceive(mockContext, intent)
+
+        coVerify(timeout = VERIFY_TIMEOUT_MS) { mockSettingsRepository.updateTunnelLocalPort(49200) }
     }
 
     @Test

@@ -3,15 +3,21 @@ package com.danielealbano.androidremotecontrolmcp.utils
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.LinkProperties
+import android.util.Log
+import java.io.IOException
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
+import java.net.SocketException
 
 /**
  * Utility functions for network operations.
  */
 object NetworkUtils {
+    private const val TAG = "MCP:NetworkUtils"
+
     /**
      * Returns the device's primary IPv4 address, or `null` if unavailable.
      *
@@ -60,6 +66,48 @@ object NetworkUtils {
         ) {
             false
         }
+
+    /**
+     * Every IPv4 and IPv6 address assigned to the device right now, loopback included; empty when the interfaces
+     * cannot be listed.
+     */
+    fun deviceAddresses(): List<InetAddress> =
+        try {
+            NetworkInterface
+                .getNetworkInterfaces()
+                ?.asSequence()
+                ?.flatMap { it.inetAddresses.asSequence() }
+                ?.toList()
+                .orEmpty()
+        } catch (e: SocketException) {
+            Log.w(TAG, "Cannot list the network interfaces", e)
+            emptyList()
+        }
+
+    /**
+     * Throws [IllegalStateException] naming [host]:[port] and the reason when a listener cannot bind there (in use,
+     * or not an address of the device); the probe socket is closed at once.
+     */
+    fun requireCanListen(
+        host: String,
+        port: Int,
+    ) {
+        try {
+            ServerSocket().use { it.bind(InetSocketAddress(host, port)) }
+        } catch (e: IOException) {
+            throw cannotListen(host, port, e)
+        }
+    }
+
+    /** The error of a listener that could not bind [host]:[port], naming the address and the [cause]. */
+    fun cannotListen(
+        host: String,
+        port: Int,
+        cause: IOException,
+    ): IllegalStateException = IllegalStateException("Cannot listen on ${urlHost(host)}:$port: ${cause.message}", cause)
+
+    /** [host] as the host part of a URL: an IPv6 literal in brackets, anything else as it is. */
+    fun urlHost(host: String): String = if (host.contains(':')) "[$host]" else host
 
     /**
      * Lists all available network interfaces with their IPv4 addresses.

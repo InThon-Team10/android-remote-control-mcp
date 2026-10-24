@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.debug
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.InetAddresses
 import android.util.Base64
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
@@ -54,8 +55,11 @@ import javax.inject.Inject
  *   --es bearer_token "test-token-uuid" \
  *   --es binding_address "0.0.0.0" \
  *   --ei port 8080 \
+ *   --ei tunnel_local_port 61200 \
  *   --ez auto_start_on_boot true \
  *   --ez hide_from_recents false
+ *
+ * (`binding_address`: `127.0.0.1`, `0.0.0.0`, or another IP address literal of the device for Specific IP)
  *
  * # Start the MCP server (runs inside app process, avoids exported=false restriction)
  * adb shell am broadcast \
@@ -133,16 +137,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
                 settingsRepository.updateBearerToken(bearerToken)
                 Log.i(TAG, "Bearer token updated (length=${bearerToken.length})")
             }
-            if (!bindingAddress.isNullOrEmpty()) {
-                val address =
-                    if (bindingAddress == "0.0.0.0") {
-                        BindingAddress.NETWORK
-                    } else {
-                        BindingAddress.LOCALHOST
-                    }
-                settingsRepository.updateBindingAddress(address)
-                Log.i(TAG, "Binding address updated to $address")
-            }
+            if (!bindingAddress.isNullOrEmpty()) applyBindingAddress(bindingAddress.trim())
             if (port in ServerConfig.MIN_PORT..ServerConfig.MAX_PORT) {
                 settingsRepository.updatePort(port)
                 Log.i(TAG, "Port updated to $port")
@@ -181,6 +176,27 @@ class E2EConfigReceiver : BroadcastReceiver() {
         }
     }
 
+    private suspend fun applyBindingAddress(value: String) {
+        when {
+            value == BindingAddress.NETWORK.address || value == BindingAddress.LOCALHOST.address -> {
+                val address = BindingAddress.fromAddress(value)
+                settingsRepository.updateBindingAddress(address)
+                Log.i(TAG, "Binding address updated to $address")
+            }
+
+            // Without its zone index, which the start refuses with a clear error
+            InetAddresses.isNumericAddress(value.substringBefore('%')) -> {
+                settingsRepository.updateSpecificBindAddress(value)
+                settingsRepository.updateBindingAddress(BindingAddress.SPECIFIC)
+                Log.i(TAG, "Binding address updated to the specific IP $value")
+            }
+
+            else -> {
+                Log.w(TAG, "Ignoring unrecognized binding_address '$value'")
+            }
+        }
+    }
+
     private suspend fun applyAuthFlags(intent: Intent) {
         if (intent.hasExtra(EXTRA_OAUTH_ENABLED)) {
             val oauthEnabled = intent.getBooleanExtra(EXTRA_OAUTH_ENABLED, false)
@@ -215,6 +231,11 @@ class E2EConfigReceiver : BroadcastReceiver() {
     }
 
     private suspend fun applyTunnelSettings(intent: Intent) {
+        val tunnelLocalPort = intent.getIntExtra(EXTRA_TUNNEL_LOCAL_PORT, -1)
+        if (tunnelLocalPort in ServerConfig.MIN_PORT..ServerConfig.MAX_PORT) {
+            settingsRepository.updateTunnelLocalPort(tunnelLocalPort)
+            Log.i(TAG, "Tunnel local port updated to $tunnelLocalPort")
+        }
         if (intent.hasExtra(EXTRA_TUNNEL_ENABLED)) {
             val enabled = intent.getBooleanExtra(EXTRA_TUNNEL_ENABLED, false)
             settingsRepository.updateTunnelEnabled(enabled)
@@ -339,6 +360,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
         const val ACTION_E2E_ARC_TUNNEL_QUERY = "com.danielealbano.androidremotecontrolmcp.debug.E2E_ARC_TUNNEL_QUERY"
         private const val CLEAR = "-"
         private const val EXTRA_TUNNEL_ENABLED = "tunnel_enabled"
+        private const val EXTRA_TUNNEL_LOCAL_PORT = "tunnel_local_port"
         private const val EXTRA_TUNNEL_PROVIDER = "tunnel_provider"
         private const val EXTRA_ARC_TUNNEL_BASE_ADDRESS = "arc_tunnel_base_address"
         private const val EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED = "arc_tunnel_ct_check_enabled"

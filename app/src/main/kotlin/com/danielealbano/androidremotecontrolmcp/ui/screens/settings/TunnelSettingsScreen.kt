@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -54,9 +55,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.CloudflareTunnelMode
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
+import com.danielealbano.androidremotecontrolmcp.mcp.ListenerSettingsCheck
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
@@ -81,14 +84,14 @@ fun TunnelSettingsScreen(
     val ngrokDomainInput by viewModel.ngrokDomainInput.collectAsStateWithLifecycle()
     val cloudflareTokenInput by viewModel.cloudflareTokenInput.collectAsStateWithLifecycle()
     val cloudflareExtraArgsInput by viewModel.cloudflareExtraArgsInput.collectAsStateWithLifecycle()
+    val tunnelLocalPortInput by viewModel.tunnelLocalPortInput.collectAsStateWithLifecycle()
+    val tunnelLocalPortError by viewModel.tunnelLocalPortError.collectAsStateWithLifecycle()
+    val listenerCheck by viewModel.listenerCheck.collectAsStateWithLifecycle()
 
     val isEnabled =
         serverStatus !is ServerStatus.Running &&
             serverStatus !is ServerStatus.Starting
     val arcSelected = serverConfig.tunnelProvider == TunnelProviderType.ARC_TUNNEL
-    // The toggle, the provider list and the free E2E tunnel fields are editable whenever the server is
-    // stopped; HTTPS only disables the Cloudflare/ngrok fields (they target http://localhost).
-    val proxyFieldsEnabled = isEnabled && !serverConfig.httpsEnabled
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
@@ -107,21 +110,6 @@ fun TunnelSettingsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
         ) {
-            if (serverConfig.httpsEnabled && !arcSelected) {
-                ElevatedCard(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.remote_access_https_disabled_warning),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
             if (serverConfig.httpsEnabled && arcSelected) {
                 Text(
                     text = stringResource(R.string.remote_access_https_note_arc_tunnel),
@@ -212,7 +200,7 @@ fun TunnelSettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     CloudflareModeSelector(
                         selectedMode = serverConfig.cloudflareTunnelMode,
-                        enabled = proxyFieldsEnabled,
+                        enabled = isEnabled,
                         onModeSelected = viewModel::updateCloudflareTunnelMode,
                     )
                 }
@@ -228,8 +216,8 @@ fun TunnelSettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     CloudflareTokenFields(
                         token = cloudflareTokenInput,
-                        serviceUrl = "http://localhost:${serverConfig.port}",
-                        enabled = proxyFieldsEnabled,
+                        serviceUrl = tunnelForwardUrl(serverConfig),
+                        enabled = isEnabled,
                         onTokenChange = viewModel::updateCloudflareTunnelToken,
                     )
                 }
@@ -243,7 +231,7 @@ fun TunnelSettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     CloudflareExtraArgsField(
                         extraArgs = cloudflareExtraArgsInput,
-                        enabled = proxyFieldsEnabled,
+                        enabled = isEnabled,
                         onExtraArgsChange = viewModel::updateCloudflareTunnelExtraArgs,
                     )
                 }
@@ -256,9 +244,34 @@ fun TunnelSettingsScreen(
                     NgrokConfigFields(
                         authtoken = ngrokAuthtokenInput,
                         domain = ngrokDomainInput,
-                        enabled = proxyFieldsEnabled,
+                        enabled = isEnabled,
                         onAuthtokenChange = viewModel::updateNgrokAuthtoken,
                         onDomainChange = viewModel::updateNgrokDomain,
+                    )
+                }
+            }
+
+            // Cloudflare and ngrok forward to http://localhost:<tunnel local port>
+            AnimatedVisibility(visible = !arcSelected) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val portError = tunnelLocalPortFieldError(tunnelLocalPortError, listenerCheck)
+                    val forwardUrl = tunnelForwardUrl(serverConfig)
+                    OutlinedTextField(
+                        value = tunnelLocalPortInput,
+                        onValueChange = viewModel::updateTunnelLocalPort,
+                        label = { Text(stringResource(R.string.remote_access_tunnel_local_port_label)) },
+                        isError = portError != null,
+                        supportingText = {
+                            Text(
+                                portError
+                                    ?: stringResource(R.string.remote_access_tunnel_local_port_hint, forwardUrl),
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        enabled = isEnabled,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -282,6 +295,18 @@ fun TunnelSettingsScreen(
         }
     }
 }
+
+/**
+ * Where Cloudflare and ngrok forward, also the service URL to enter in the Cloudflare dashboard for a token-mode
+ * tunnel. Digits as ASCII whatever the locale: it is a URL to type.
+ */
+internal fun tunnelForwardUrl(config: ServerConfig): String = "http://localhost:${config.tunnelLocalPort}"
+
+/** The tunnel local port field's error: the input's own first, then the listener check's. */
+internal fun tunnelLocalPortFieldError(
+    inputError: String?,
+    check: ListenerSettingsCheck,
+): String? = inputError ?: check.tunnelPortError
 
 @Composable
 private fun providerTitle(provider: TunnelProviderType): String =

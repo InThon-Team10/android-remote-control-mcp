@@ -51,6 +51,19 @@ interface SettingsRepository :
     suspend fun updateBindingAddress(bindingAddress: BindingAddress)
 
     /**
+     * Updates the IP address the server binds to when the binding address is [BindingAddress.SPECIFIC]. It is saved
+     * as typed: the listener checks validate it before the server starts.
+     */
+    suspend fun updateSpecificBindAddress(address: String)
+
+    /**
+     * Updates the loopback port Cloudflare and ngrok forward to.
+     *
+     * @param port The new port value. Must pass [validatePort] first.
+     */
+    suspend fun updateTunnelLocalPort(port: Int)
+
+    /**
      * Updates the bearer token used for MCP request authentication.
      * Passing an empty string clears the value. Whether bearer authentication is enforced is controlled
      * by [updateBearerTokenEnabled], not by the value: clearing the token while bearer is enabled makes
@@ -101,7 +114,8 @@ interface SettingsRepository :
      * previously-cleared-token user is not regressed into a token-required state.
      *
      * Also runs the one-time tunnel-provider migration (an install that ever wrote a tunnel setting without
-     * choosing a provider keeps Cloudflare).
+     * choosing a provider keeps Cloudflare), and sets the tunnel local port once: the server port for an existing
+     * install (unless its HTTPS kept its Cloudflare/ngrok tunnel off), otherwise a random port of 61000-65535.
      */
     suspend fun ensureAuthModelMigrated()
 

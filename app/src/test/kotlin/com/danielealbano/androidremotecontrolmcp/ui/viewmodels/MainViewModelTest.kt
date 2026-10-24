@@ -15,8 +15,11 @@ import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
+import com.danielealbano.androidremotecontrolmcp.mcp.ListenerSettingsCheck
+import com.danielealbano.androidremotecontrolmcp.mcp.McpListenerRules
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordinator
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PendingApproval
+import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
 import com.danielealbano.androidremotecontrolmcp.services.power.BatteryOptimizationManager
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
@@ -59,6 +62,7 @@ class MainViewModelTest {
     private lateinit var storageLocationProvider: StorageLocationProvider
     private lateinit var batteryOptimizationManager: BatteryOptimizationManager
     private lateinit var approvalCoordinator: OAuthApprovalCoordinator
+    private lateinit var listenerRules: McpListenerRules
     private lateinit var configFlow: MutableStateFlow<ServerConfig>
     private lateinit var tunnelStatusFlow: MutableStateFlow<TunnelStatus>
     private lateinit var pendingApprovalsFlow: MutableStateFlow<List<PendingApproval>>
@@ -105,6 +109,9 @@ class MainViewModelTest {
         approvalCoordinator = mockk(relaxed = true)
         every { approvalCoordinator.observePending() } returns pendingApprovalsFlow
 
+        listenerRules = mockk()
+        every { listenerRules.check(any()) } returns ListenerSettingsCheck()
+
         viewModel =
             MainViewModel(
                 settingsRepository,
@@ -113,6 +120,7 @@ class MainViewModelTest {
                 batteryOptimizationManager,
                 testDispatcher,
                 approvalCoordinator,
+                listenerRules,
             )
     }
 
@@ -180,6 +188,105 @@ class MainViewModelTest {
     fun `initial server status is Stopped`() =
         runTest {
             assertEquals(ServerStatus.Stopped, viewModel.serverStatus.value)
+        }
+
+    @Test
+    fun `a retry that fails again shows the error, never a Starting the service did not publish`() =
+        runTest {
+            val failed = ServerStatus.Error("Cannot listen on 0.0.0.0:8080: Address already in use")
+            val serviceStatus = MutableStateFlow<ServerStatus>(failed)
+            mockkObject(McpServerService.Companion)
+            every { McpServerService.serverStatus } returns serviceStatus
+            try {
+                viewModel =
+                    MainViewModel(
+                        settingsRepository,
+                        tunnelManager,
+                        storageLocationProvider,
+                        batteryOptimizationManager,
+                        testDispatcher,
+                        approvalCoordinator,
+                        listenerRules,
+                    )
+                advanceUntilIdle()
+
+                viewModel.startServer(mockk<Context>(relaxed = true))
+                // The retry fails again before the status is collected: Starting and the same Error back to back
+                serviceStatus.value = ServerStatus.Starting
+                serviceStatus.value = failed
+                advanceUntilIdle()
+
+                assertEquals(failed, viewModel.serverStatus.value)
+            } finally {
+                unmockkObject(McpServerService.Companion)
+            }
+        }
+
+    @Test
+    fun `serverConfig collection sets the specific address and tunnel port inputs`() =
+        runTest {
+            configFlow.value = configFlow.value.copy(specificBindAddress = "192.168.1.20", tunnelLocalPort = 49200)
+            advanceUntilIdle()
+
+            assertEquals("192.168.1.20", viewModel.specificBindAddressInput.value)
+            assertEquals("49200", viewModel.tunnelLocalPortInput.value)
+        }
+
+    @Test
+    fun `updateSpecificBindAddress saves the address as typed`() =
+        runTest {
+            viewModel.updateSpecificBindAddress(" 192.168.")
+            advanceUntilIdle()
+
+            assertEquals(" 192.168.", viewModel.specificBindAddressInput.value)
+            coVerify { settingsRepository.updateSpecificBindAddress(" 192.168.") }
+        }
+
+    @Test
+    fun `updateTunnelLocalPort saves a valid port`() =
+        runTest {
+            every { settingsRepository.validatePort(49200) } returns Result.success(49200)
+
+            viewModel.updateTunnelLocalPort("49200")
+            advanceUntilIdle()
+
+            assertNull(viewModel.tunnelLocalPortError.value)
+            coVerify { settingsRepository.updateTunnelLocalPort(49200) }
+        }
+
+    @Test
+    fun `updateTunnelLocalPort reports an invalid port and saves nothing`() =
+        runTest {
+            every { settingsRepository.validatePort(70000) } returns
+                Result.failure(IllegalArgumentException("Port must be between 1 and 65535"))
+
+            viewModel.updateTunnelLocalPort("70000")
+            assertEquals("Port must be between 1 and 65535", viewModel.tunnelLocalPortError.value)
+            viewModel.updateTunnelLocalPort("")
+            assertEquals("Port is required", viewModel.tunnelLocalPortError.value)
+            viewModel.updateTunnelLocalPort("49x")
+            assertEquals("Port must be a number", viewModel.tunnelLocalPortError.value)
+            advanceUntilIdle()
+
+            assertEquals("49x", viewModel.tunnelLocalPortInput.value)
+            coVerify(exactly = 0) { settingsRepository.updateTunnelLocalPort(any()) }
+        }
+
+    @Test
+    fun `the listener check follows the config and is refreshed on demand`() =
+        runTest {
+            val blocked = ListenerSettingsCheck(specificAddressError = "10.0.0.9 is not an address of this device")
+            every { listenerRules.check(match { it.specificBindAddress == "10.0.0.9" }) } returns blocked
+
+            configFlow.value = configFlow.value.copy(specificBindAddress = "10.0.0.9")
+            advanceUntilIdle()
+            assertEquals(blocked, viewModel.listenerCheck.value)
+
+            // The device got the address meanwhile
+            every { listenerRules.check(any()) } returns ListenerSettingsCheck()
+            viewModel.refreshListenerCheck()
+            advanceUntilIdle()
+            assertEquals(ListenerSettingsCheck(), viewModel.listenerCheck.value)
         }
 
     @Test
@@ -483,6 +590,7 @@ class MainViewModelTest {
                     batteryOptimizationManager,
                     testDispatcher,
                     approvalCoordinator,
+                    listenerRules,
                 )
             advanceUntilIdle()
 
@@ -537,6 +645,7 @@ class MainViewModelTest {
                     batteryOptimizationManager,
                     testDispatcher,
                     approvalCoordinator,
+                    listenerRules,
                 )
             advanceUntilIdle()
 
@@ -1100,6 +1209,7 @@ class MainViewModelTest {
                     batteryOptimizationManager,
                     testDispatcher,
                     approvalCoordinator,
+                    listenerRules,
                 )
             advanceUntilIdle()
 

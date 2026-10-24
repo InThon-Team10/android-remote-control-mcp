@@ -9,6 +9,10 @@ package com.danielealbano.androidremotecontrolmcp.data.model
  *
  * @property port The server port (1-65535).
  * @property bindingAddress The network binding address.
+ * @property specificBindAddress The IP address literal the server binds to when [bindingAddress] is
+ *   [BindingAddress.SPECIFIC], saved as typed (validated before the server starts).
+ * @property tunnelLocalPort The loopback port Cloudflare and ngrok forward to (`http://localhost:<port>`): the main
+ *   listener's when it already serves plain HTTP there, otherwise a plain HTTP listener of its own on 127.0.0.1.
  * @property bearerToken The bearer token for MCP request authentication.
  * @property autoStartOnBoot Whether to start the MCP server on device boot.
  * @property toolCallIndicatorEnabled Whether to show an on-device overlay during MCP tool calls.
@@ -47,6 +51,8 @@ package com.danielealbano.androidremotecontrolmcp.data.model
 data class ServerConfig(
     val port: Int = DEFAULT_PORT,
     val bindingAddress: BindingAddress = BindingAddress.LOCALHOST,
+    val specificBindAddress: String = "",
+    val tunnelLocalPort: Int = DEFAULT_PORT,
     val bearerToken: String = "",
     val autoStartOnBoot: Boolean = false,
     val toolCallIndicatorEnabled: Boolean = true,
@@ -77,6 +83,10 @@ data class ServerConfig(
     val privacyModeConfig: PrivacyModeConfig = PrivacyModeConfig(),
     val hideFromRecents: Boolean = false,
 ) {
+    /** The address the main listener binds to. */
+    val bindHost: String
+        get() = if (bindingAddress == BindingAddress.SPECIFIC) specificBindAddress.trim() else bindingAddress.address
+
     companion object {
         /** Default server port. */
         const val DEFAULT_PORT = 8080
@@ -89,6 +99,16 @@ data class ServerConfig(
 
         /** Maximum valid port number. */
         const val MAX_PORT = 65535
+
+        /**
+         * Lowest port of the random tunnel local port of a fresh install, or of one whose HTTPS kept its Cloudflare or
+         * ngrok tunnel off: the dynamic port range above the Linux ephemeral ports (32768-60999), which an outgoing
+         * connection could be holding.
+         */
+        const val TUNNEL_LOCAL_PORT_RANDOM_MIN = 61000
+
+        /** Highest port of the random tunnel local port (see [TUNNEL_LOCAL_PORT_RANDOM_MIN]). */
+        const val TUNNEL_LOCAL_PORT_RANDOM_MAX = 65535
 
         /** Default hostname for auto-generated certificates. */
         const val DEFAULT_CERTIFICATE_HOSTNAME = "android-mcp.local"

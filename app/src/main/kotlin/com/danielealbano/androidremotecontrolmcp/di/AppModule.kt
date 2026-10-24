@@ -18,6 +18,8 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsReposit
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.geo.DbIpGeoResolver
 import com.danielealbano.androidremotecontrolmcp.geo.GeoIpResolver
+import com.danielealbano.androidremotecontrolmcp.mcp.McpListenerRules
+import com.danielealbano.androidremotecontrolmcp.mcp.McpListenerRulesImpl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStore
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.AuthorizationCodeStoreImpl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.JwtTokenService
@@ -245,6 +247,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindDownloadHttpClient(impl: DownloadHttpClientImpl): DownloadHttpClient
+
+    @Binds
+    @Singleton
+    abstract fun bindMcpListenerRules(impl: McpListenerRulesImpl): McpListenerRules
 
     @Binds
     @Singleton

@@ -208,6 +208,21 @@ class ServerConfigTest {
         fun `fromAddress returns LOCALHOST for unknown address`() {
             assertEquals(BindingAddress.LOCALHOST, BindingAddress.fromAddress("192.168.1.1"))
         }
+
+        @Test
+        fun `fromAddress never returns SPECIFIC, which has no fixed address`() {
+            assertEquals(BindingAddress.LOCALHOST, BindingAddress.fromAddress(""))
+        }
+
+        @Test
+        fun `bindHost is the fixed address, or the trimmed specific one`() {
+            assertEquals("127.0.0.1", ServerConfig(specificBindAddress = "10.0.0.1").bindHost)
+            assertEquals("0.0.0.0", ServerConfig(bindingAddress = BindingAddress.NETWORK).bindHost)
+            assertEquals(
+                "192.168.1.20",
+                ServerConfig(bindingAddress = BindingAddress.SPECIFIC, specificBindAddress = " 192.168.1.20 ").bindHost,
+            )
+        }
     }
 
     @Nested

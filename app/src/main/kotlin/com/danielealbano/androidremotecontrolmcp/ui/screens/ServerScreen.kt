@@ -93,6 +93,7 @@ fun ServerScreen(
     val serverStatus by viewModel.serverStatus.collectAsStateWithLifecycle()
     val recentServerLogs by logsViewModel.recentServerLogs.collectAsStateWithLifecycle()
     val tunnelStatus by viewModel.tunnelStatus.collectAsStateWithLifecycle()
+    val listenerCheck by viewModel.listenerCheck.collectAsStateWithLifecycle()
 
     val isAccessibilityEnabled by viewModel.isAccessibilityEnabled.collectAsStateWithLifecycle()
     val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsStateWithLifecycle()
@@ -103,7 +104,7 @@ fun ServerScreen(
     val ctAlert by arcTunnelViewModel.ctAlert.collectAsStateWithLifecycle()
     val renewal by arcTunnelRenewalViewModel.renewal.collectAsStateWithLifecycle()
 
-    val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) ?: "N/A" }
+    val deviceIp = remember(context) { NetworkUtils.getDeviceIpAddress(context) }
     val copiedToClipboardMessage = stringResource(R.string.copied_to_clipboard)
     var showChannelNotConfiguredDialog by remember { mutableStateOf(false) }
 
@@ -192,12 +193,14 @@ fun ServerScreen(
                 },
                 onChannelStopClick = { channelViewModel.stopChannel() },
                 startEnabled = isAccessibilityEnabled,
+                mcpStartBlockedMessage = listenerCheck.startError,
             )
 
             Spacer(Modifier.height(16.dp))
 
             ConnectionInfoCard(
                 bindingAddress = serverConfig.bindingAddress,
+                bindHost = serverConfig.bindHost,
                 ipAddress = deviceIp,
                 port = serverConfig.port,
                 httpsEnabled = serverConfig.httpsEnabled,
@@ -208,6 +211,7 @@ fun ServerScreen(
                 renewal = renewal,
                 onCancelRenewal = { viewModel.stopServer(context) },
                 onRetryRenewal = arcTunnelRenewalViewModel::retry,
+                specificAddressRefused = listenerCheck.specificAddressError != null,
                 onCopyAll = { text ->
                     scope.launch {
                         clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Server details", text)))

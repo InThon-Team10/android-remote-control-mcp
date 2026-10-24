@@ -5,7 +5,6 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelEndpoint
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
-import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTunnelProvider
 import com.danielealbano.androidremotecontrolmcp.testutil.RecordingServerLogRepository
 import io.mockk.Runs
@@ -18,7 +17,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
@@ -29,7 +27,6 @@ import javax.inject.Provider
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("TunnelManager")
 class TunnelManagerTest {
-    private val mockSettingsRepository = mockk<SettingsRepository>()
     private val mockCloudflareProvider = mockk<CloudflareTunnelProvider>(relaxed = true)
     private val mockNgrokProvider = mockk<NgrokTunnelProvider>(relaxed = true)
 
@@ -56,7 +53,6 @@ class TunnelManagerTest {
 
     private fun createManager(): TunnelManager =
         TunnelManager(
-            settingsRepository = mockSettingsRepository,
             cloudflareTunnelProviderFactory = cloudflareFactory,
             ngrokTunnelProviderFactory = ngrokFactory,
             arcTunnelProviderFactory = arcFactory,
@@ -74,13 +70,12 @@ class TunnelManagerTest {
                         tunnelEnabled = true,
                         tunnelProvider = TunnelProviderType.CLOUDFLARE,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
                 every { mockCloudflareProvider.status } returns
                     MutableStateFlow(TunnelStatus.Disconnected)
                 coEvery { mockCloudflareProvider.start(8080, config) } just Runs
 
                 val manager = createManager()
-                manager.start(8080, listenerHost)
+                manager.start(config, listenerHost)
 
                 coVerify { mockCloudflareProvider.start(8080, config) }
             }
@@ -93,13 +88,12 @@ class TunnelManagerTest {
                         tunnelEnabled = true,
                         tunnelProvider = TunnelProviderType.NGROK,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
                 every { mockNgrokProvider.status } returns
                     MutableStateFlow(TunnelStatus.Disconnected)
                 coEvery { mockNgrokProvider.start(8080, config) } just Runs
 
                 val manager = createManager()
-                manager.start(8080, listenerHost)
+                manager.start(config, listenerHost)
 
                 coVerify { mockNgrokProvider.start(8080, config) }
             }
@@ -108,30 +102,29 @@ class TunnelManagerTest {
         fun `start with tunnel disabled is no-op`() =
             runTest {
                 val config = ServerConfig(tunnelEnabled = false)
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
 
                 val manager = createManager()
-                manager.start(8080, listenerHost)
+                manager.start(config, listenerHost)
 
                 coVerify(exactly = 0) { mockCloudflareProvider.start(any(), any()) }
                 coVerify(exactly = 0) { mockNgrokProvider.start(any(), any()) }
             }
 
         @Test
-        fun `start with https enabled does not start tunnel`() =
+        fun `start with HTTPS enabled starts Cloudflare on the tunnel local port`() =
             runTest {
                 val config =
                     ServerConfig(
                         tunnelEnabled = true,
                         httpsEnabled = true,
                         tunnelProvider = TunnelProviderType.CLOUDFLARE,
+                        tunnelLocalPort = 49200,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
+                every { mockCloudflareProvider.status } returns MutableStateFlow(TunnelStatus.Connecting)
 
-                val manager = createManager()
-                manager.start(8080, listenerHost)
+                createManager().start(config, listenerHost)
 
-                coVerify(exactly = 0) { mockCloudflareProvider.start(any(), any()) }
+                coVerify { mockCloudflareProvider.start(49200, config) }
                 coVerify(exactly = 0) { mockNgrokProvider.start(any(), any()) }
             }
 
@@ -139,10 +132,9 @@ class TunnelManagerTest {
         fun `start with ARC_TUNNEL binds the listener host and starts the provider`() =
             runTest {
                 val config = ServerConfig(tunnelEnabled = true, tunnelProvider = TunnelProviderType.ARC_TUNNEL)
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
                 every { mockArcProvider.status } returns MutableStateFlow(TunnelStatus.Connecting)
 
-                createManager().start(8080, listenerHost)
+                createManager().start(config, listenerHost)
 
                 coVerifyOrder {
                     mockArcProvider.bind(listenerHost)
@@ -159,29 +151,29 @@ class TunnelManagerTest {
                         httpsEnabled = true,
                         tunnelProvider = TunnelProviderType.ARC_TUNNEL,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
                 every { mockArcProvider.status } returns MutableStateFlow(TunnelStatus.Connecting)
 
-                createManager().start(8080, listenerHost)
+                createManager().start(config, listenerHost)
 
                 verify { mockArcProvider.bind(listenerHost) }
                 coVerify { mockArcProvider.start(8080, config) }
             }
 
         @Test
-        fun `start with NGROK and HTTPS enabled does nothing`() =
+        fun `start with NGROK and HTTPS enabled starts ngrok on the tunnel local port`() =
             runTest {
                 val config =
                     ServerConfig(
                         tunnelEnabled = true,
                         httpsEnabled = true,
                         tunnelProvider = TunnelProviderType.NGROK,
+                        tunnelLocalPort = 49200,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
+                every { mockNgrokProvider.status } returns MutableStateFlow(TunnelStatus.Connecting)
 
-                createManager().start(8080, listenerHost)
+                createManager().start(config, listenerHost)
 
-                coVerify(exactly = 0) { mockNgrokProvider.start(any(), any()) }
+                coVerify { mockNgrokProvider.start(49200, config) }
                 coVerify(exactly = 0) { mockArcProvider.start(any(), any()) }
             }
 
@@ -195,12 +187,11 @@ class TunnelManagerTest {
                         tunnelEnabled = true,
                         tunnelProvider = TunnelProviderType.CLOUDFLARE,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
                 every { mockCloudflareProvider.status } returns providerStatus
                 coEvery { mockCloudflareProvider.start(8080, config) } just Runs
 
                 val manager = createManager()
-                manager.start(8080, listenerHost)
+                manager.start(config, listenerHost)
 
                 // Give the relay coroutine (on Dispatchers.IO) time to start collecting
                 Thread.sleep(RELAY_PROPAGATION_DELAY_MS)
@@ -237,14 +228,13 @@ class TunnelManagerTest {
                         tunnelEnabled = true,
                         tunnelProvider = TunnelProviderType.CLOUDFLARE,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
                 every { mockCloudflareProvider.status } returns
                     MutableStateFlow(TunnelStatus.Disconnected)
                 coEvery { mockCloudflareProvider.start(8080, config) } just Runs
                 coEvery { mockCloudflareProvider.stop() } just Runs
 
                 val manager = createManager()
-                manager.start(8080, listenerHost)
+                manager.start(config, listenerHost)
                 manager.stop()
 
                 coVerify { mockCloudflareProvider.stop() }
@@ -269,14 +259,13 @@ class TunnelManagerTest {
                         tunnelEnabled = true,
                         tunnelProvider = TunnelProviderType.CLOUDFLARE,
                     )
-                every { mockSettingsRepository.serverConfig } returns flowOf(config)
                 val providerStatus = MutableStateFlow<TunnelStatus>(TunnelStatus.Disconnected)
                 every { mockCloudflareProvider.status } returns providerStatus
                 coEvery { mockCloudflareProvider.start(8080, config) } just Runs
                 coEvery { mockCloudflareProvider.stop() } just Runs
 
                 val manager = createManager()
-                manager.start(8080, listenerHost)
+                manager.start(config, listenerHost)
                 Thread.sleep(RELAY_PROPAGATION_DELAY_MS)
                 providerStatus.value =
                     TunnelStatus.Connected(

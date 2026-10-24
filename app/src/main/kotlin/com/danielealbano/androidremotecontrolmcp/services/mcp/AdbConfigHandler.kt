@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.services.mcp
 
 import android.content.Context
 import android.content.Intent
+import android.net.InetAddresses
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.BindingAddress
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
@@ -23,6 +24,8 @@ import com.danielealbano.androidremotecontrolmcp.utils.RecentsUtils
  *
  * Extracted from [AdbConfigReceiver] to allow unit testing without
  * Hilt's [dagger.hilt.android.AndroidEntryPoint] injection lifecycle.
+ *
+ * [isIpLiteral] tells an IP address literal from anything else, never resolving a host name.
  */
 @Suppress("TooManyFunctions")
 class AdbConfigHandler(
@@ -30,6 +33,7 @@ class AdbConfigHandler(
     private val storageLocationProvider: StorageLocationProvider,
     private val serverLogRepository: ServerLogRepository,
     private val arcTunnelEnrollment: ArcTunnelEnrollment,
+    private val isIpLiteral: (String) -> Boolean = InetAddresses::isNumericAddress,
 ) {
     /**
      * Dispatches the intent to the appropriate handler based on its action.
@@ -75,6 +79,7 @@ class AdbConfigHandler(
         applyCloudflareTunnelExtraArgs(intent)
         applyNgrokAuthtoken(intent)
         applyNgrokDomain(intent)
+        applyTunnelLocalPort(intent)
         applyArcTunnelBaseAddress(intent)
         applyArcTunnelCtCheckEnabled(intent)
         applyFileSizeLimit(intent)
@@ -141,30 +146,35 @@ class AdbConfigHandler(
         )
     }
 
+    /**
+     * `127.0.0.1` selects Localhost, `0.0.0.0` All networks, any other IP address literal Specific IP with that
+     * address, as given: the server start checks it, refusing one the device does not have or one with a zone index.
+     */
     private suspend fun applyBindingAddress(intent: Intent) {
-        val value = intent.getStringExtra(EXTRA_BINDING_ADDRESS) ?: return
-        val address =
-            when (value) {
-                BindingAddress.NETWORK.address -> {
-                    BindingAddress.NETWORK
-                }
-
-                BindingAddress.LOCALHOST.address -> {
-                    BindingAddress.LOCALHOST
-                }
-
-                else -> {
-                    Log.w(
-                        TAG,
-                        "Ignoring unrecognized binding_address '$value' " +
-                            "(valid: ${BindingAddress.LOCALHOST.address}, " +
-                            "${BindingAddress.NETWORK.address})",
-                    )
-                    return
-                }
+        val value = intent.getStringExtra(EXTRA_BINDING_ADDRESS)?.trim() ?: return
+        when {
+            value == BindingAddress.NETWORK.address || value == BindingAddress.LOCALHOST.address -> {
+                val address = BindingAddress.fromAddress(value)
+                settingsRepository.updateBindingAddress(address)
+                Log.i(TAG, "Binding address updated to $address")
             }
-        settingsRepository.updateBindingAddress(address)
-        Log.i(TAG, "Binding address updated to $address")
+
+            // Without its zone index, which the start refuses with a clear error
+            isIpLiteral(value.substringBefore('%')) -> {
+                settingsRepository.updateSpecificBindAddress(value)
+                settingsRepository.updateBindingAddress(BindingAddress.SPECIFIC)
+                Log.i(TAG, "Binding address updated to the specific IP $value")
+            }
+
+            else -> {
+                Log.w(
+                    TAG,
+                    "Ignoring unrecognized binding_address '$value' " +
+                        "(valid: ${BindingAddress.LOCALHOST.address}, ${BindingAddress.NETWORK.address} " +
+                        "or an IP address of the device)",
+                )
+            }
+        }
     }
 
     private suspend fun applyPort(intent: Intent) {
@@ -176,6 +186,18 @@ class AdbConfigHandler(
                 Log.i(TAG, "Port updated to $it")
             },
             onFailure = { Log.w(TAG, "Ignoring invalid port $value: ${it.message}") },
+        )
+    }
+
+    private suspend fun applyTunnelLocalPort(intent: Intent) {
+        if (!intent.hasExtra(EXTRA_TUNNEL_LOCAL_PORT)) return
+        val value = intent.getIntExtra(EXTRA_TUNNEL_LOCAL_PORT, -1)
+        settingsRepository.validatePort(value).fold(
+            onSuccess = {
+                settingsRepository.updateTunnelLocalPort(it)
+                Log.i(TAG, "Tunnel local port updated to $it")
+            },
+            onFailure = { Log.w(TAG, "Ignoring invalid tunnel_local_port $value: ${it.message}") },
         )
     }
 
@@ -467,6 +489,7 @@ class AdbConfigHandler(
         internal const val EXTRA_CLOUDFLARE_TUNNEL_EXTRA_ARGS = "cloudflare_tunnel_extra_args"
         internal const val EXTRA_NGROK_AUTHTOKEN = "ngrok_authtoken"
         internal const val EXTRA_NGROK_DOMAIN = "ngrok_domain"
+        internal const val EXTRA_TUNNEL_LOCAL_PORT = "tunnel_local_port"
         internal const val EXTRA_ARC_TUNNEL_BASE_ADDRESS = "arc_tunnel_base_address"
         internal const val EXTRA_ARC_TUNNEL_CT_CHECK_ENABLED = "arc_tunnel_ct_check_enabled"
         internal const val EXTRA_ARC_TUNNEL_ENROLL = "arc_tunnel_enroll"

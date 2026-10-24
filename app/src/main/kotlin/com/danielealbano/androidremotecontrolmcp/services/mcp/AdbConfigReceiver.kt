@@ -36,6 +36,9 @@ import javax.inject.Inject
  *
  * All configuration logic is delegated to [AdbConfigHandler] for testability.
  *
+ * `binding_address` takes `127.0.0.1` (Localhost), `0.0.0.0` (All networks) or any other IP address literal of the
+ * device (Specific IP). `tunnel_local_port` is the loopback port Cloudflare and ngrok forward to.
+ *
  * **Usage** (from adb):
  * ```
  * # Configure settings (all extras are optional — only provided ones are updated)
@@ -54,6 +57,7 @@ import javax.inject.Inject
  *   --es tunnel_provider "android-remote-control-mcp-tunneld" \
  *   --es ngrok_authtoken "your-ngrok-token" \
  *   --es ngrok_domain "your-domain.ngrok-free.app" \
+ *   --ei tunnel_local_port 61200 \
  *   --es arc_tunnel_base_address "arc-tunnel.io" \
  *   --ez arc_tunnel_ct_check_enabled true \
  *   --ez arc_tunnel_enroll true \

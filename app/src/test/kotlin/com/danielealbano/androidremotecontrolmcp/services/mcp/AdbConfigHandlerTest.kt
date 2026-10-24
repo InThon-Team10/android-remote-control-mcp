@@ -112,7 +112,13 @@ class AdbConfigHandlerTest {
 
         context = mockk(relaxed = true)
         arcTunnelEnrollment = mockk(relaxed = true)
-        handler = AdbConfigHandler(settingsRepository, storageLocationProvider, serverLog, arcTunnelEnrollment)
+        handler = newHandler()
+    }
+
+    private fun newHandler(): AdbConfigHandler {
+        val isIpLiteral: (String) -> Boolean = { it in IP_LITERALS }
+        val locations = storageLocationProvider
+        return AdbConfigHandler(settingsRepository, locations, serverLog, arcTunnelEnrollment, isIpLiteral)
     }
 
     @AfterEach
@@ -235,6 +241,62 @@ class AdbConfigHandlerTest {
                     }
                 handler.handle(context, intent)
                 coVerify { settingsRepository.updateBindingAddress(BindingAddress.LOCALHOST) }
+            }
+
+        @Test
+        @DisplayName("binding_address with another IP literal selects SPECIFIC with that address")
+        fun bindingAddressSpecific() =
+            runTest {
+                for (literal in IP_LITERALS) {
+                    val intent =
+                        createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                            string(AdbConfigHandler.EXTRA_BINDING_ADDRESS, " $literal ")
+                        }
+                    handler.handle(context, intent)
+                    coVerifyOrder {
+                        settingsRepository.updateSpecificBindAddress(literal)
+                        settingsRepository.updateBindingAddress(BindingAddress.SPECIFIC)
+                    }
+                }
+            }
+
+        @Test
+        @DisplayName("binding_address with a zone index selects SPECIFIC as given, for the start to refuse")
+        fun bindingAddressSpecificWithZoneIndex() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        string(AdbConfigHandler.EXTRA_BINDING_ADDRESS, "2001:db8::20%wlan0")
+                    }
+                handler.handle(context, intent)
+                coVerifyOrder {
+                    settingsRepository.updateSpecificBindAddress("2001:db8::20%wlan0")
+                    settingsRepository.updateBindingAddress(BindingAddress.SPECIFIC)
+                }
+            }
+
+        @Test
+        @DisplayName("valid tunnel_local_port is applied")
+        fun validTunnelLocalPortApplied() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        int(AdbConfigHandler.EXTRA_TUNNEL_LOCAL_PORT, 49200)
+                    }
+                handler.handle(context, intent)
+                coVerify { settingsRepository.updateTunnelLocalPort(49200) }
+            }
+
+        @Test
+        @DisplayName("invalid tunnel_local_port is rejected")
+        fun invalidTunnelLocalPortRejected() =
+            runTest {
+                val intent =
+                    createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
+                        int(AdbConfigHandler.EXTRA_TUNNEL_LOCAL_PORT, 70000)
+                    }
+                handler.handle(context, intent)
+                coVerify(exactly = 0) { settingsRepository.updateTunnelLocalPort(any()) }
             }
 
         @Test
@@ -895,15 +957,16 @@ class AdbConfigHandlerTest {
             }
 
         @Test
-        @DisplayName("unrecognized binding_address is rejected")
+        @DisplayName("a binding_address that is not an IP literal is rejected")
         fun unrecognizedBindingAddressRejected() =
             runTest {
                 val intent =
                     createIntent(AdbConfigReceiver.ACTION_CONFIGURE) {
-                        string(AdbConfigHandler.EXTRA_BINDING_ADDRESS, "192.168.1.100")
+                        string(AdbConfigHandler.EXTRA_BINDING_ADDRESS, "phone.local")
                     }
                 handler.handle(context, intent)
                 coVerify(exactly = 0) { settingsRepository.updateBindingAddress(any()) }
+                coVerify(exactly = 0) { settingsRepository.updateSpecificBindAddress(any()) }
             }
 
         @Test
@@ -1259,5 +1322,9 @@ class AdbConfigHandlerTest {
         ) {
             booleanExtras[key] = value
         }
+    }
+
+    private companion object {
+        val IP_LITERALS = setOf("192.168.1.100", "2001:db8::20")
     }
 }

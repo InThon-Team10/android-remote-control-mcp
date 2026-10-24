@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileL
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelListenerHost
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsContext
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelTlsMaterial
+import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCallPipeline
@@ -60,6 +61,9 @@ class HttpsMaterial(
  * @param serverLog Disk-backed server log sink (auth-failure and, via collaborators, OAuth events).
  * @param inFlightToolCalls The running tool calls `notifications/cancelled` cancels; MUST be the instance the tools
  *   are registered with.
+ * @param localhostTunnelPort The port of the plain HTTP listener on 127.0.0.1 a Cloudflare or ngrok tunnel forwards
+ *   to, serving the same application as the main listener; null when none is needed
+ *   (see [McpListenerRules.tunnelListenerPort]).
  */
 class McpServer(
     private val config: ServerConfig,
@@ -69,15 +73,23 @@ class McpServer(
     private val oauth: OAuthServerDeps,
     private val serverLog: ServerLogRepository,
     private val inFlightToolCalls: InFlightToolCalls,
+    private val localhostTunnelPort: Int?,
 ) : TunnelListenerHost {
     @Volatile
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
+
+    /** The plain HTTP loopback listener a Cloudflare or ngrok tunnel forwards to, when one is needed. */
+    @Volatile
+    private var localhostListener: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
     @Volatile
     private var tunnelListener: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
     /** Test seam: the random loopback port source of the tunnel listener. */
     internal var tunnelPortChooser: () -> Int = ::randomPort
+
+    /** Test seam: runs between the bind probes and the start of the listeners. */
+    internal var afterBindProbes: () -> Unit = {}
     private val running = AtomicBoolean(false)
 
     private val accessValidator = OAuthAccessValidator(oauth.jwtTokenService, oauth.oauthClientRepository, serverLog)
@@ -92,24 +104,61 @@ class McpServer(
             return
         }
 
-        Log.i(TAG, "Starting MCP server on ${config.bindingAddress.address}:${config.port}")
+        Log.i(TAG, "Starting MCP server on ${NetworkUtils.urlHost(config.bindHost)}:${config.port}")
+
+        // A port taken between its probe and the bind fails naming the address too
+        fun EmbeddedServer<*, *>.listen(
+            host: String,
+            port: Int,
+        ) {
+            try {
+                start(wait = false)
+            } catch (e: IOException) {
+                throw NetworkUtils.cannotListen(host, port, e)
+            }
+        }
 
         try {
+            // A bind failure fails the start at once, with the address in the message: a Netty engine that cannot bind
+            // takes seconds to shut its event loops down, and reports a bare "Address already in use"
+            NetworkUtils.requireCanListen(config.bindHost, config.port)
+            localhostTunnelPort?.let { NetworkUtils.requireCanListen(LOOPBACK, it) }
+            afterBindProbes()
             server =
                 if (config.httpsEnabled && httpsMaterial != null) {
                     createHttpsServer()
                 } else {
-                    createHttpServer()
+                    createHttpServer(config.bindHost, config.port)
                 }
 
-            server?.start(wait = false)
+            server?.listen(config.bindHost, config.port)
+            // Same application, same authentication: plain HTTP on 127.0.0.1:<tunnel local port>
+            localhostTunnelPort?.let { port ->
+                val listener = createHttpServer(LOOPBACK, port)
+                localhostListener = listener
+                listener.listen(LOOPBACK, port)
+            }
             Log.i(TAG, "MCP server started successfully")
         } catch (e: Exception) {
-            server = null
+            stopListeners(0, 0)
             running.set(false)
             Log.e(TAG, "Failed to start MCP server", e)
             throw e
         }
+    }
+
+    private fun stopListeners(
+        gracePeriodMillis: Long,
+        timeoutMillis: Long,
+    ) {
+        server?.stop(gracePeriodMillis, timeoutMillis)
+        server = null
+        // Like the free E2E tunnel's listener: the tunnel it serves is stopped before the server
+        localhostListener?.stop(
+            TUNNEL_STOP_GRACE_MS.coerceAtMost(gracePeriodMillis),
+            TUNNEL_STOP_TIMEOUT_MS.coerceAtMost(timeoutMillis),
+        )
+        localhostListener = null
     }
 
     /**
@@ -135,19 +184,21 @@ class McpServer(
         ) {
             Log.w(TAG, "MCP SDK server close did not complete within ${timeoutMillis}ms", e)
         }
-        server?.stop(gracePeriodMillis, timeoutMillis)
-        server = null
+        stopListeners(gracePeriodMillis, timeoutMillis)
         stopTlsListener()
         Log.i(TAG, "MCP server stopped")
     }
 
     fun isRunning(): Boolean = running.get()
 
-    private fun createHttpServer(): EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> =
+    private fun createHttpServer(
+        host: String,
+        port: Int,
+    ): EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> =
         embeddedServer(
             factory = Netty,
-            port = config.port,
-            host = config.bindingAddress.address,
+            port = port,
+            host = host,
             module = { configureApplication() },
         )
 
@@ -162,7 +213,7 @@ class McpServer(
                     keyStorePassword = { material.keyStorePassword },
                     privateKeyPassword = { material.keyStorePassword },
                 ) {
-                    host = config.bindingAddress.address
+                    host = config.bindHost
                     port = config.port
                 }
             },
