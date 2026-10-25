@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -20,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
@@ -157,7 +160,16 @@ fun ArcTunnelSettingsContent(
                     .onFocusChanged { if (!it.isFocused) actions.onBaseAddressCommit() },
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier =
+                Modifier.fillMaxWidth().toggleable(
+                    value = state.ctCheckEnabled,
+                    enabled = state.enabled,
+                    role = Role.Switch,
+                    onValueChange = actions.onCtCheckChange,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.remote_access_arc_tunnel_ct_check_label),
@@ -169,7 +181,12 @@ fun ArcTunnelSettingsContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(checked = state.ctCheckEnabled, onCheckedChange = actions.onCtCheckChange, enabled = state.enabled)
+            Switch(
+                checked = state.ctCheckEnabled,
+                onCheckedChange = null,
+                enabled = state.enabled,
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
         UrlRow(state, enrolling, onRotate = { showRotateDialog = true }, onEnroll = actions.onEnroll)

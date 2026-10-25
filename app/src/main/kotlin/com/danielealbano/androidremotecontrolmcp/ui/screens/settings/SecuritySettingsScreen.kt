@@ -15,18 +15,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.CertificateSource
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,12 +59,8 @@ fun SecuritySettingsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.settings_security_title)) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                }
-            },
+            title = { TopBarTitle(stringResource(R.string.settings_security_title)) },
+            navigationIcon = { TopBarBackButton(onClick = onBack) },
             windowInsets = WindowInsets(0),
         )
         Column(
@@ -76,7 +72,13 @@ fun SecuritySettingsScreen(
         ) {
             // HTTPS Toggle
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier.fillMaxWidth().toggleable(
+                        value = serverConfig.httpsEnabled,
+                        enabled = isEnabled,
+                        role = Role.Switch,
+                        onValueChange = viewModel::updateHttpsEnabled,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -86,8 +88,9 @@ fun SecuritySettingsScreen(
                 )
                 Switch(
                     checked = serverConfig.httpsEnabled,
-                    onCheckedChange = viewModel::updateHttpsEnabled,
+                    onCheckedChange = null,
                     enabled = isEnabled,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 )
             }
 

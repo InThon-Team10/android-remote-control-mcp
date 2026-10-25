@@ -58,6 +58,7 @@ import com.danielealbano.androidremotecontrolmcp.ui.components.ConnectionInfoCar
 import com.danielealbano.androidremotecontrolmcp.ui.components.PrivacyModeCard
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerLogsSection
 import com.danielealbano.androidremotecontrolmcp.ui.components.ServerStatusCard
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ChannelViewModel
@@ -101,6 +102,7 @@ fun ServerScreen(
 
     val channelConfig by channelViewModel.eventChannelConfig.collectAsStateWithLifecycle()
     val channelStatus by channelViewModel.channelConnectionStatus.collectAsStateWithLifecycle()
+    val channelEnabled by channelViewModel.channelEnabled.collectAsStateWithLifecycle()
     val ctAlert by arcTunnelViewModel.ctAlert.collectAsStateWithLifecycle()
     val renewal by arcTunnelRenewalViewModel.renewal.collectAsStateWithLifecycle()
 
@@ -110,7 +112,7 @@ fun ServerScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.tab_server)) },
+            title = { TopBarTitle(stringResource(R.string.tab_server)) },
             windowInsets = WindowInsets(0),
         )
         Column(
@@ -181,7 +183,9 @@ fun ServerScreen(
             ServerStatusCard(
                 serverStatus = serverStatus,
                 channelStatus = channelStatus,
-                channelEnabled = channelConfig.enabled,
+                // Off until the saved configuration is read, and only from then on a state worth announcing
+                channelEnabled = channelEnabled ?: false,
+                channelStatusKnown = channelEnabled != null,
                 onMcpStartClick = { viewModel.startServer(context) },
                 onMcpStopClick = { viewModel.stopServer(context) },
                 onChannelStartClick = {

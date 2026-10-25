@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,17 +12,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -41,165 +45,167 @@ import com.danielealbano.androidremotecontrolmcp.data.model.OptionalToolPermissi
 import com.danielealbano.androidremotecontrolmcp.data.model.OptionalToolPermissions
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.theme.WarningAmber
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 
 private data class ParamEntry(
     val paramName: String,
-    val displayName: String,
+    @StringRes val displayName: Int,
 )
 
 private data class ToolEntry(
     val toolName: String,
-    val displayName: String,
+    @StringRes val displayName: Int,
     val params: List<ParamEntry> = emptyList(),
 )
 
 private data class ToolCategory(
-    val header: String,
+    @StringRes val header: Int,
     val tools: List<ToolEntry>,
 )
 
 private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
     listOf(
         ToolCategory(
-            "Screen",
+            R.string.mcp_tools_category_screen,
             listOf(
                 ToolEntry(
                     "get_screen_state",
-                    "Get screen state",
-                    listOf(ParamEntry("include_screenshot", "Include screenshot")),
+                    R.string.mcp_tool_get_screen_state,
+                    listOf(ParamEntry("include_screenshot", R.string.mcp_tool_param_include_screenshot)),
                 ),
             ),
         ),
         ToolCategory(
-            "System",
+            R.string.mcp_tools_category_system,
             listOf(
-                ToolEntry("press_back", "Press Back"),
-                ToolEntry("press_home", "Press Home"),
-                ToolEntry("press_recents", "Press Recents"),
-                ToolEntry("open_notifications", "Open Notifications"),
-                ToolEntry("open_quick_settings", "Open Quick Settings"),
-                ToolEntry("dismiss_keyboard", "Dismiss Keyboard"),
+                ToolEntry("press_back", R.string.mcp_tool_press_back),
+                ToolEntry("press_home", R.string.mcp_tool_press_home),
+                ToolEntry("press_recents", R.string.mcp_tool_press_recents),
+                ToolEntry("open_notifications", R.string.mcp_tool_open_notifications),
+                ToolEntry("open_quick_settings", R.string.mcp_tool_open_quick_settings),
+                ToolEntry("dismiss_keyboard", R.string.mcp_tool_dismiss_keyboard),
             ),
         ),
         ToolCategory(
-            "Touch",
+            R.string.mcp_tools_category_touch,
             listOf(
-                ToolEntry("tap", "Tap"),
-                ToolEntry("long_press", "Long Press"),
-                ToolEntry("double_tap", "Double Tap"),
-                ToolEntry("swipe", "Swipe"),
-                ToolEntry("scroll", "Scroll"),
+                ToolEntry("tap", R.string.mcp_tool_tap),
+                ToolEntry("long_press", R.string.mcp_tool_long_press),
+                ToolEntry("double_tap", R.string.mcp_tool_double_tap),
+                ToolEntry("swipe", R.string.mcp_tool_swipe),
+                ToolEntry("scroll", R.string.mcp_tool_scroll),
             ),
         ),
         ToolCategory(
-            "Gestures",
+            R.string.mcp_tools_category_gestures,
             listOf(
-                ToolEntry("pinch", "Pinch"),
-                ToolEntry("custom_gesture", "Custom Gesture"),
+                ToolEntry("pinch", R.string.mcp_tool_pinch),
+                ToolEntry("custom_gesture", R.string.mcp_tool_custom_gesture),
             ),
         ),
         ToolCategory(
-            "Node Actions",
+            R.string.mcp_tools_category_node_actions,
             listOf(
-                ToolEntry("find_nodes", "Find Nodes"),
-                ToolEntry("click_node", "Click Node"),
-                ToolEntry("long_click_node", "Long Click Node"),
-                ToolEntry("tap_node", "Tap Node"),
-                ToolEntry("scroll_to_node", "Scroll to Node"),
-                ToolEntry("scroll_node", "Scroll Node"),
+                ToolEntry("find_nodes", R.string.mcp_tool_find_nodes),
+                ToolEntry("click_node", R.string.mcp_tool_click_node),
+                ToolEntry("long_click_node", R.string.mcp_tool_long_click_node),
+                ToolEntry("tap_node", R.string.mcp_tool_tap_node),
+                ToolEntry("scroll_to_node", R.string.mcp_tool_scroll_to_node),
+                ToolEntry("scroll_node", R.string.mcp_tool_scroll_node),
             ),
         ),
         ToolCategory(
-            "Text Input",
+            R.string.mcp_tools_category_text_input,
             listOf(
-                ToolEntry("type_append_text", "Type Append Text"),
-                ToolEntry("type_insert_text", "Type Insert Text"),
-                ToolEntry("type_replace_text", "Type Replace Text"),
-                ToolEntry("type_clear_text", "Type Clear Text"),
-                ToolEntry("press_key", "Press Key"),
+                ToolEntry("type_append_text", R.string.mcp_tool_type_append_text),
+                ToolEntry("type_insert_text", R.string.mcp_tool_type_insert_text),
+                ToolEntry("type_replace_text", R.string.mcp_tool_type_replace_text),
+                ToolEntry("type_clear_text", R.string.mcp_tool_type_clear_text),
+                ToolEntry("press_key", R.string.mcp_tool_press_key),
             ),
         ),
         ToolCategory(
-            "Utility",
+            R.string.mcp_tools_category_utility,
             listOf(
-                ToolEntry("get_clipboard", "Get Clipboard"),
-                ToolEntry("set_clipboard", "Set Clipboard"),
-                ToolEntry("wait_for_node", "Wait for Node"),
-                ToolEntry("wait_for_idle", "Wait for Idle"),
-                ToolEntry("get_node_details", "Get Node Details"),
+                ToolEntry("get_clipboard", R.string.mcp_tool_get_clipboard),
+                ToolEntry("set_clipboard", R.string.mcp_tool_set_clipboard),
+                ToolEntry("wait_for_node", R.string.mcp_tool_wait_for_node),
+                ToolEntry("wait_for_idle", R.string.mcp_tool_wait_for_idle),
+                ToolEntry("get_node_details", R.string.mcp_tool_get_node_details),
             ),
         ),
         ToolCategory(
-            "File Operations",
+            R.string.mcp_tools_category_file_operations,
             listOf(
-                ToolEntry("list_storage_locations", "List Storage Locations"),
-                ToolEntry("list_files", "List Files"),
-                ToolEntry("read_file", "Read File"),
-                ToolEntry("write_file", "Write File"),
-                ToolEntry("append_file", "Append File"),
-                ToolEntry("file_replace", "File Replace"),
-                ToolEntry("download_from_url", "Download from URL"),
-                ToolEntry("delete_file", "Delete File"),
+                ToolEntry("list_storage_locations", R.string.mcp_tool_list_storage_locations),
+                ToolEntry("list_files", R.string.mcp_tool_list_files),
+                ToolEntry("read_file", R.string.mcp_tool_read_file),
+                ToolEntry("write_file", R.string.mcp_tool_write_file),
+                ToolEntry("append_file", R.string.mcp_tool_append_file),
+                ToolEntry("file_replace", R.string.mcp_tool_file_replace),
+                ToolEntry("download_from_url", R.string.mcp_tool_download_from_url),
+                ToolEntry("delete_file", R.string.mcp_tool_delete_file),
             ),
         ),
         ToolCategory(
-            "App Management",
+            R.string.mcp_tools_category_app_management,
             listOf(
-                ToolEntry("open_app", "Open App"),
-                ToolEntry("list_apps", "List Apps"),
-                ToolEntry("close_app", "Close App"),
+                ToolEntry("open_app", R.string.mcp_tool_open_app),
+                ToolEntry("list_apps", R.string.mcp_tool_list_apps),
+                ToolEntry("close_app", R.string.mcp_tool_close_app),
             ),
         ),
         ToolCategory(
-            "Camera",
+            R.string.mcp_tools_category_camera,
             listOf(
-                ToolEntry("list_cameras", "List Cameras"),
-                ToolEntry("list_camera_photo_resolutions", "List Camera Photo Resolutions"),
-                ToolEntry("list_camera_video_resolutions", "List Camera Video Resolutions"),
-                ToolEntry("take_camera_photo", "Take Camera Photo"),
-                ToolEntry("save_camera_photo", "Save Camera Photo"),
+                ToolEntry("list_cameras", R.string.mcp_tool_list_cameras),
+                ToolEntry("list_camera_photo_resolutions", R.string.mcp_tool_list_camera_photo_resolutions),
+                ToolEntry("list_camera_video_resolutions", R.string.mcp_tool_list_camera_video_resolutions),
+                ToolEntry("take_camera_photo", R.string.mcp_tool_take_camera_photo),
+                ToolEntry("save_camera_photo", R.string.mcp_tool_save_camera_photo),
                 ToolEntry(
                     "save_camera_video",
-                    "Save Camera Video",
-                    listOf(ParamEntry("audio", "Include audio")),
+                    R.string.mcp_tool_save_camera_video,
+                    listOf(ParamEntry("audio", R.string.mcp_tool_param_audio)),
                 ),
             ),
         ),
         ToolCategory(
-            "Intent",
+            R.string.mcp_tools_category_intent,
             listOf(
-                ToolEntry("send_intent", "Send Intent"),
-                ToolEntry("open_uri", "Open URI"),
+                ToolEntry("send_intent", R.string.mcp_tool_send_intent),
+                ToolEntry("open_uri", R.string.mcp_tool_open_uri),
             ),
         ),
         ToolCategory(
-            "Notifications",
+            R.string.mcp_tools_category_notifications,
             listOf(
-                ToolEntry("notification_list", "Notification List"),
-                ToolEntry("notification_open", "Notification Open"),
-                ToolEntry("notification_dismiss", "Notification Dismiss"),
-                ToolEntry("notification_snooze", "Notification Snooze"),
-                ToolEntry("notification_action", "Notification Action"),
-                ToolEntry("notification_reply", "Notification Reply"),
+                ToolEntry("notification_list", R.string.mcp_tool_notification_list),
+                ToolEntry("notification_open", R.string.mcp_tool_notification_open),
+                ToolEntry("notification_dismiss", R.string.mcp_tool_notification_dismiss),
+                ToolEntry("notification_snooze", R.string.mcp_tool_notification_snooze),
+                ToolEntry("notification_action", R.string.mcp_tool_notification_action),
+                ToolEntry("notification_reply", R.string.mcp_tool_notification_reply),
             ),
         ),
         ToolCategory(
-            "Location",
+            R.string.mcp_tools_category_location,
             listOf(
                 ToolEntry(
                     "get_location",
-                    "Get Location",
-                    listOf(ParamEntry("fresh_fix", "Allow fresh GPS fix")),
+                    R.string.mcp_tool_get_location,
+                    listOf(ParamEntry("fresh_fix", R.string.mcp_tool_param_fresh_fix)),
                 ),
             ),
         ),
         ToolCategory(
-            "Sharing",
+            R.string.mcp_tools_category_sharing,
             listOf(
-                ToolEntry("get_shared_content", "Get Shared Content"),
-                ToolEntry("share_file_via_web", "Share File via Web"),
+                ToolEntry("get_shared_content", R.string.mcp_tool_get_shared_content),
+                ToolEntry("share_file_via_web", R.string.mcp_tool_share_file_via_web),
             ),
         ),
     )
@@ -246,18 +252,14 @@ fun McpToolsSettingsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.settings_mcp_tools_title)) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                }
-            },
+            title = { TopBarTitle(stringResource(R.string.settings_mcp_tools_title)) },
+            navigationIcon = { TopBarBackButton(onClick = onBack) },
             windowInsets = WindowInsets(0),
         )
         LazyColumn(modifier = Modifier.weight(1f)) {
             item {
                 Text(
-                    text = "Changes take effect on server restart",
+                    text = stringResource(R.string.settings_mcp_tools_restart_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -268,7 +270,7 @@ fun McpToolsSettingsScreen(
                     category.tools.mapNotNull { OptionalToolPermissions.permissionForTool(it.toolName) }.distinct()
                 item(key = "header_${category.header}") {
                     ToolCategoryHeader(
-                        header = category.header,
+                        header = stringResource(category.header),
                         missingPermission = categoryPermissions.any { !isGranted(it) },
                         onNavigateToPermissions = onNavigateToPermissions,
                     )
@@ -326,7 +328,12 @@ private fun ToolCategoryHeader(
         )
         return
     }
-    Column(modifier = Modifier.clickable { onNavigateToPermissions() }) {
+    Column(
+        modifier =
+            Modifier.clickable(onClickLabel = stringResource(R.string.a11y_action_open_permissions)) {
+                onNavigateToPermissions()
+            },
+    ) {
         Row(
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -366,12 +373,20 @@ private fun ToolRow(
 ) {
     val toolEnabled = perms.isToolEnabled(tool.toolName)
     ListItem(
-        headlineContent = { Text(tool.displayName) },
+        modifier =
+            Modifier.toggleable(
+                value = toolEnabled,
+                enabled = controlsEnabled && categoryGranted,
+                role = Role.Switch,
+                onValueChange = { onToolToggle(tool.toolName, it) },
+            ),
+        headlineContent = { Text(stringResource(tool.displayName)) },
         trailingContent = {
             Switch(
                 checked = toolEnabled,
-                onCheckedChange = { onToolToggle(tool.toolName, it) },
+                onCheckedChange = null,
                 enabled = controlsEnabled && categoryGranted,
+                modifier = Modifier.minimumInteractiveComponentSize(),
             )
         },
     )
@@ -422,21 +437,39 @@ private fun ToolParamRow(
         } else {
             null
         }
+    val paramEnabled = perms.isParamEnabled(toolName, param.paramName)
+    val switchEnabled = controlsEnabled && categoryGranted && paramGranted
+    val onToggle: (Boolean) -> Unit = { onParamToggle(toolName, param.paramName, it) }
+    val openPermissions = stringResource(R.string.a11y_action_open_permissions)
+    val paramName = stringResource(param.displayName)
     ListItem(
-        headlineContent = { Text(param.displayName) },
+        headlineContent = { Text(paramName) },
+        // Without its permission the row opens the permission settings and the switch stands alone, named after the
+        // row; otherwise the whole row toggles
         modifier =
             if (showParamNote) {
-                Modifier.padding(start = 32.dp).clickable { onNavigateToPermissions() }
+                Modifier.padding(start = 32.dp).clickable(onClickLabel = openPermissions) { onNavigateToPermissions() }
             } else {
-                Modifier.padding(start = 32.dp)
+                Modifier.padding(start = 32.dp).toggleable(
+                    value = paramEnabled,
+                    enabled = switchEnabled,
+                    role = Role.Switch,
+                    onValueChange = onToggle,
+                )
             },
         leadingContent = leadingIcon,
         supportingContent = supportingNote,
         trailingContent = {
             Switch(
-                checked = perms.isParamEnabled(toolName, param.paramName),
-                onCheckedChange = { onParamToggle(toolName, param.paramName, it) },
-                enabled = controlsEnabled && categoryGranted && paramGranted,
+                checked = paramEnabled,
+                onCheckedChange = if (showParamNote) onToggle else null,
+                enabled = switchEnabled,
+                modifier =
+                    if (showParamNote) {
+                        Modifier.semantics { contentDescription = paramName }
+                    } else {
+                        Modifier.minimumInteractiveComponentSize()
+                    },
             )
         },
     )

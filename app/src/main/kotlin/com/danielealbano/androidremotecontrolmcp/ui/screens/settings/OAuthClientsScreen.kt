@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -50,6 +50,8 @@ import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.LogoUrlPolicy
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.OAuthClientsViewModel
 import okhttp3.OkHttpClient
 import java.net.URI
@@ -68,12 +70,8 @@ fun OAuthClientsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.oauth_clients_title)) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                }
-            },
+            title = { TopBarTitle(stringResource(R.string.oauth_clients_title)) },
+            navigationIcon = { TopBarBackButton(onClick = onBack) },
             windowInsets = WindowInsets(0),
         )
         if (clients.isEmpty()) {
@@ -124,11 +122,15 @@ private fun ClientRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val clientLabel =
+            client.clientName
+                ?: hostOf(client.redirectUris.firstOrNull())
+                ?: stringResource(R.string.oauth_clients_unknown_client)
         ClientAvatar(client)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = client.clientName ?: hostOf(client.redirectUris.firstOrNull()) ?: "Unknown",
+                text = clientLabel,
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
@@ -148,7 +150,10 @@ private fun ClientRow(
             )
         }
         IconButton(onClick = { showConfirm = true }) {
-            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.oauth_clients_revoke))
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = stringResource(R.string.oauth_clients_revoke_named, clientLabel),
+            )
         }
     }
 }
@@ -183,8 +188,14 @@ private fun ClientAvatar(client: OAuthClient) {
             .take(2)
             .uppercase()
 
+    // Decorative: the client's name is read next to it
     Box(
-        modifier = Modifier.size(AVATAR_SIZE_DP.dp).clip(CircleShape).background(badgeColor),
+        modifier =
+            Modifier
+                .size(AVATAR_SIZE_DP.dp)
+                .clip(CircleShape)
+                .background(badgeColor)
+                .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
         // Initials sit behind; a successfully-loaded safe logo covers them.

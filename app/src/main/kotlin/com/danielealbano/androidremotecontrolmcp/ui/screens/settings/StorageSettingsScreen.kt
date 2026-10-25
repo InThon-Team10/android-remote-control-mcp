@@ -22,7 +22,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -40,6 +39,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -63,6 +65,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinAccessLevel
 import com.danielealbano.androidremotecontrolmcp.data.model.BuiltinStorageLocation
 import com.danielealbano.androidremotecontrolmcp.data.model.StorageLocation
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -112,6 +116,7 @@ fun StorageSettingsScreen(
             contract = ActivityResultContracts.RequestMultiplePermissions(),
         ) { _ -> viewModel.refreshStorageLocations() }
 
+    val unknownLocationName = stringResource(R.string.storage_location_unknown_name)
     val documentTreeLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocumentTree(),
@@ -119,7 +124,7 @@ fun StorageSettingsScreen(
             if (uri != null) {
                 addDialogSelectedUri = uri
                 val docFile = DocumentFile.fromTreeUri(context, uri)
-                addDialogSelectedName = docFile?.name ?: uri.lastPathSegment ?: "Unknown"
+                addDialogSelectedName = docFile?.name ?: uri.lastPathSegment ?: unknownLocationName
                 addDialogDuplicateChecking = true
                 addDialogDuplicateError = false
                 scope.launch {
@@ -132,12 +137,8 @@ fun StorageSettingsScreen(
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings_storage_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
+                title = { TopBarTitle(stringResource(R.string.settings_storage_title)) },
+                navigationIcon = { TopBarBackButton(onClick = onBack) },
                 windowInsets = WindowInsets(0),
             )
             Column(
@@ -281,7 +282,12 @@ fun StorageSettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier.fillMaxWidth().toggleable(
+                            value = serverConfig.allowHttpDownloads,
+                            role = Role.Switch,
+                            onValueChange = viewModel::updateAllowHttpDownloads,
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -297,14 +303,20 @@ fun StorageSettingsScreen(
                     }
                     Switch(
                         checked = serverConfig.allowHttpDownloads,
-                        onCheckedChange = viewModel::updateAllowHttpDownloads,
+                        onCheckedChange = null,
+                        modifier = Modifier.minimumInteractiveComponentSize(),
                     )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier.fillMaxWidth().toggleable(
+                            value = serverConfig.allowUnverifiedHttpsCerts,
+                            role = Role.Switch,
+                            onValueChange = viewModel::updateAllowUnverifiedHttpsCerts,
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -320,14 +332,20 @@ fun StorageSettingsScreen(
                     }
                     Switch(
                         checked = serverConfig.allowUnverifiedHttpsCerts,
-                        onCheckedChange = viewModel::updateAllowUnverifiedHttpsCerts,
+                        onCheckedChange = null,
+                        modifier = Modifier.minimumInteractiveComponentSize(),
                     )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier.fillMaxWidth().toggleable(
+                            value = serverConfig.blockLocalNetworkDownloads,
+                            role = Role.Switch,
+                            onValueChange = viewModel::updateBlockLocalNetworkDownloads,
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -343,7 +361,8 @@ fun StorageSettingsScreen(
                     }
                     Switch(
                         checked = serverConfig.blockLocalNetworkDownloads,
-                        onCheckedChange = viewModel::updateBlockLocalNetworkDownloads,
+                        onCheckedChange = null,
+                        modifier = Modifier.minimumInteractiveComponentSize(),
                     )
                 }
             }
@@ -566,13 +585,13 @@ private fun StorageLocationRow(
             IconButton(onClick = onEdit) {
                 Icon(
                     imageVector = Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.storage_location_edit_dialog_title),
+                    contentDescription = stringResource(R.string.storage_location_edit_description_of, location.name),
                 )
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.storage_location_delete_dialog_title),
+                    contentDescription = stringResource(R.string.storage_location_remove_named, location.name),
                 )
             }
         }
@@ -584,6 +603,8 @@ private fun StorageLocationRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Spoken with the location's name, on the label (the row reads it): rows of several locations look alike
+            val allowWriteOn = stringResource(R.string.storage_location_allow_write_on, location.name)
             Row(
                 modifier =
                     Modifier.toggleable(
@@ -597,6 +618,7 @@ private fun StorageLocationRow(
                     text = stringResource(R.string.storage_location_allow_write_label),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = allowWriteOn },
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Switch(
@@ -604,6 +626,7 @@ private fun StorageLocationRow(
                     onCheckedChange = null,
                 )
             }
+            val allowDeleteOn = stringResource(R.string.storage_location_allow_delete_on, location.name)
             Row(
                 modifier =
                     Modifier.toggleable(
@@ -617,6 +640,7 @@ private fun StorageLocationRow(
                     text = stringResource(R.string.storage_location_allow_delete_label),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = allowDeleteOn },
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Switch(
@@ -663,6 +687,8 @@ private fun BuiltinStorageLocationRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Spoken with the location's name, on the label (the row reads it): rows of several locations look alike
+            val allowWriteOn = stringResource(R.string.storage_location_allow_write_on, location.name)
             Row(
                 modifier =
                     Modifier.toggleable(
@@ -676,6 +702,7 @@ private fun BuiltinStorageLocationRow(
                     text = stringResource(R.string.storage_location_allow_write_label),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = allowWriteOn },
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Switch(
@@ -683,6 +710,7 @@ private fun BuiltinStorageLocationRow(
                     onCheckedChange = null,
                 )
             }
+            val allowDeleteOn = stringResource(R.string.storage_location_allow_delete_on, location.name)
             Row(
                 modifier =
                     Modifier.toggleable(
@@ -696,6 +724,7 @@ private fun BuiltinStorageLocationRow(
                     text = stringResource(R.string.storage_location_allow_delete_label),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = allowDeleteOn },
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Switch(

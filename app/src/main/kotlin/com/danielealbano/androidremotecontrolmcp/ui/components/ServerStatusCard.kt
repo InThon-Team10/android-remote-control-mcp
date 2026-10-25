@@ -25,7 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,7 @@ fun ServerStatusCard(
     startEnabled: Boolean,
     modifier: Modifier = Modifier,
     mcpStartBlockedMessage: String? = null,
+    channelStatusKnown: Boolean = true,
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
@@ -57,7 +61,7 @@ fun ServerStatusCard(
             modifier = Modifier.padding(16.dp),
         ) {
             Text(
-                text = "Services Status",
+                text = stringResource(R.string.server_services_status_title),
                 style = MaterialTheme.typography.titleLarge,
             )
 
@@ -65,10 +69,11 @@ fun ServerStatusCard(
 
             // MCP Server row
             ServiceRow(
-                label = "MCP Server",
+                label = stringResource(R.string.server_service_mcp),
                 statusText = serverStatusToText(serverStatus),
                 statusColor = serverStatusToColor(serverStatus, isSystemInDarkTheme()),
-                buttonText = if (serverStatus is ServerStatus.Running) "Stop" else "Start",
+                running = serverStatus is ServerStatus.Running,
+                transientStatus = serverStatus is ServerStatus.Starting || serverStatus is ServerStatus.Stopping,
                 buttonEnabled = mcpStartStopButtonEnabled(serverStatus, startEnabled, mcpStartBlockedMessage != null),
                 onButtonClick = if (serverStatus is ServerStatus.Running) onMcpStopClick else onMcpStartClick,
             )
@@ -84,10 +89,11 @@ fun ServerStatusCard(
 
             // Event Channel row
             ServiceRow(
-                label = "Event Channel",
+                label = stringResource(R.string.event_channel_name),
                 statusText = channelStatusToText(channelStatus, channelEnabled),
                 statusColor = channelStatusToColor(channelStatus, channelEnabled, isSystemInDarkTheme()),
-                buttonText = if (channelEnabled) "Stop" else "Start",
+                running = channelEnabled,
+                statusKnown = channelStatusKnown,
                 buttonEnabled = channelStartStopButtonEnabled(channelEnabled, startEnabled),
                 onButtonClick = if (channelEnabled) onChannelStopClick else onChannelStartClick,
             )
@@ -131,10 +137,17 @@ private fun ServiceRow(
     label: String,
     statusText: String,
     statusColor: Color,
-    buttonText: String,
+    running: Boolean,
+    statusKnown: Boolean = true,
+    transientStatus: Boolean = false,
     buttonEnabled: Boolean,
     onButtonClick: () -> Unit,
 ) {
+    // Spoken: the action and the service ("Stop MCP Server"); the service and its status as one ("MCP Server, Running")
+    val buttonDescription =
+        stringResource(if (running) R.string.server_service_stop else R.string.server_service_start, label)
+    val statusDescription = stringResource(R.string.server_service_status, label, statusText)
+    val announceChanges = rememberChangedSinceShown(statusDescription, ready = statusKnown)
     val animatedColor by animateColorAsState(
         targetValue = statusColor,
         animationSpec = tween(durationMillis = ANIMATION_DURATION_MS),
@@ -150,18 +163,26 @@ private fun ServiceRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f),
         ) {
-            Canvas(
-                modifier =
-                    Modifier
-                        .size(STATUS_DOT_SIZE_DP.dp)
-                        .semantics {
-                            contentDescription = "$label status: $statusText"
-                        },
-            ) {
+            // Decorative: the status is the text next to it
+            Canvas(modifier = Modifier.size(STATUS_DOT_SIZE_DP.dp)) {
                 drawCircle(color = animatedColor)
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Column {
+            // Read as one node carrying "<label>, <status>" itself. A polite live region from the first status
+            // change on (rememberChangedSinceShown), so a change is announced without interrupting and showing the
+            // card again reads nothing extra: TalkBack announces a live region when the node's own description
+            // changes (Compose reports the change from the node that changed, not from a container). Not during a
+            // transient status (Starting, Stopping): only the state it settles on is announced, which TalkBack's
+            // optional limit of one announcement per node every 30 s would otherwise drop
+            Column(
+                modifier =
+                    Modifier.clearAndSetSemantics {
+                        contentDescription = statusDescription
+                        if (announceChanges && !transientStatus) {
+                            liveRegion = LiveRegionMode.Polite
+                        }
+                    },
+            ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.bodyLarge,
@@ -178,7 +199,11 @@ private fun ServiceRow(
             onClick = onButtonClick,
             enabled = buttonEnabled,
         ) {
-            Text(text = buttonText)
+            // On the text: the button reads its content, and the description replaces the bare "Stop"
+            Text(
+                text = stringResource(if (running) R.string.server_action_stop else R.string.server_action_start),
+                modifier = Modifier.semantics { contentDescription = buttonDescription },
+            )
         }
     }
 }
@@ -221,11 +246,11 @@ private fun channelStatusToText(
     enabled: Boolean,
 ): String =
     if (!enabled) {
-        "Stopped"
+        stringResource(R.string.server_status_stopped)
     } else {
         when (status) {
-            is ChannelConnectionStatus.Idle -> "Idle"
-            is ChannelConnectionStatus.Active -> "Active"
+            is ChannelConnectionStatus.Idle -> stringResource(R.string.channel_status_idle)
+            is ChannelConnectionStatus.Active -> stringResource(R.string.channel_status_active)
             is ChannelConnectionStatus.Error -> status.message
         }
     }

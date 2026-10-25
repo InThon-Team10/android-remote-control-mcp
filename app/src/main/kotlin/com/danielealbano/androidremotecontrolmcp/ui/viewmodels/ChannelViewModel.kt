@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,6 +39,15 @@ class ChannelViewModel
         val eventChannelConfig: StateFlow<EventChannelConfig> =
             settingsRepository.eventChannelConfig
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), EventChannelConfig())
+
+        /**
+         * Whether the Event Channel is enabled, or null until the saved configuration is read: unlike
+         * [eventChannelConfig], whose first value is a default, it tells the first real state apart.
+         */
+        val channelEnabled: StateFlow<Boolean?> =
+            settingsRepository.eventChannelConfig
+                .map { it.enabled }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
         val channelConnectionStatus: StateFlow<ChannelConnectionStatus> =
             EventChannelService.serviceStatus

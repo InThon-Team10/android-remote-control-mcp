@@ -42,6 +42,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +60,7 @@ import com.danielealbano.androidremotecontrolmcp.geo.CountryDisplay
 import com.danielealbano.androidremotecontrolmcp.geo.GeoLocation
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientIconUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PendingApproval
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ApprovalViewModel
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
@@ -83,7 +87,7 @@ fun ApprovalScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.approval_title)) },
+            title = { TopBarTitle(stringResource(R.string.approval_title)) },
             windowInsets = WindowInsets(0),
         )
         if (pending.isEmpty()) {
@@ -177,15 +181,39 @@ private fun ApprovalCard(
             Spacer(Modifier.height(12.dp))
             ExpiryCountdown(remaining = remaining)
             Spacer(Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedButton(onClick = onDeny) { Text(stringResource(R.string.approval_deny)) }
-                Spacer(Modifier.width(12.dp))
-                Button(onClick = onApprove, enabled = !expired) { Text(stringResource(R.string.approval_approve)) }
-            }
+            ApprovalActions(clientName = approval.clientName, expired = expired, onApprove = onApprove, onDeny = onDeny)
+        }
+    }
+}
+
+/** Deny and Approve, spoken with the client's name: several requests can be pending at once. */
+@Composable
+private fun ApprovalActions(
+    clientName: String,
+    expired: Boolean,
+    onApprove: () -> Unit,
+    onDeny: () -> Unit,
+) {
+    val denyDescription = stringResource(R.string.approval_deny_named, clientName)
+    val approveDescription = stringResource(R.string.approval_approve_named, clientName)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // On the texts: a button reads its content, and the description replaces the bare "Deny" / "Approve"
+        OutlinedButton(onClick = onDeny) {
+            Text(
+                text = stringResource(R.string.approval_deny),
+                modifier = Modifier.semantics { contentDescription = denyDescription },
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Button(onClick = onApprove, enabled = !expired) {
+            Text(
+                text = stringResource(R.string.approval_approve),
+                modifier = Modifier.semantics { contentDescription = approveDescription },
+            )
         }
     }
 }
@@ -208,8 +236,14 @@ private fun ClientIcon(
             .ifEmpty { "?" }
     val iconUrl = ClientIconUrl.resolve(approval.logoUri, approval.redirectHost)
 
+    // Decorative: the client's name is read next to it
     Box(
-        modifier = Modifier.size(ICON_SIZE_DP.dp).clip(CircleShape).background(ICON_DISC_COLOR),
+        modifier =
+            Modifier
+                .size(ICON_SIZE_DP.dp)
+                .clip(CircleShape)
+                .background(ICON_DISC_COLOR)
+                .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
         // Initials sit behind; a successfully-loaded icon covers them.

@@ -14,13 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -28,6 +25,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -43,6 +41,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.RedactionMode
 import com.danielealbano.androidremotecontrolmcp.privacy.PiiCategory
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyModeStatus
 import com.danielealbano.androidremotecontrolmcp.privacy.model.DownloadState
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.PrivacyViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,12 +82,8 @@ fun PrivacySettingsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.settings_privacy_title)) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                }
-            },
+            title = { TopBarTitle(stringResource(R.string.settings_privacy_title)) },
+            navigationIcon = { TopBarBackButton(onClick = onBack) },
             windowInsets = WindowInsets(0),
         )
         Column(
@@ -99,7 +95,19 @@ fun PrivacySettingsScreen(
         ) {
             // 1. Master enable toggle
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier.fillMaxWidth().toggleable(
+                        value = config.enabled,
+                        enabled = !downloadInProgress && !enableInProgress,
+                        role = Role.Switch,
+                        onValueChange = { requested ->
+                            if (requested) {
+                                viewModel.requestEnablePrivacyMode()
+                            } else {
+                                viewModel.disablePrivacyMode()
+                            }
+                        },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -109,17 +117,12 @@ fun PrivacySettingsScreen(
                 )
                 Switch(
                     checked = config.enabled,
-                    onCheckedChange = { requested ->
-                        if (requested) {
-                            viewModel.requestEnablePrivacyMode()
-                        } else {
-                            viewModel.disablePrivacyMode()
-                        }
-                    },
+                    onCheckedChange = null,
                     // Disabled through the WHOLE enable window (request -> download -> warm-up), not
                     // just while DownloadState reports progress; stays usable during the benchmark,
                     // which finishes and stores its result even if Privacy Mode is toggled off.
                     enabled = !downloadInProgress && !enableInProgress,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 )
             }
 
@@ -143,7 +146,15 @@ fun PrivacySettingsScreen(
             )
             PiiCategory.entries.forEach { category ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = config.isCategoryEnabled(category),
+                                enabled = config.enabled && !downloadInProgress && !enableInProgress,
+                                role = Role.Switch,
+                                onValueChange = { viewModel.updatePrivacyCategoryEnabled(category, it) },
+                            ).padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -153,11 +164,12 @@ fun PrivacySettingsScreen(
                     )
                     Switch(
                         checked = config.isCategoryEnabled(category),
-                        onCheckedChange = { enabled -> viewModel.updatePrivacyCategoryEnabled(category, enabled) },
+                        onCheckedChange = null,
                         // Categories are only editable while Privacy Mode is ON and not mid-enable:
                         // toggling them while disabled or during the download would silently change
                         // what gets protected once the mode comes up.
                         enabled = config.enabled && !downloadInProgress && !enableInProgress,
+                        modifier = Modifier.minimumInteractiveComponentSize(),
                     )
                 }
             }

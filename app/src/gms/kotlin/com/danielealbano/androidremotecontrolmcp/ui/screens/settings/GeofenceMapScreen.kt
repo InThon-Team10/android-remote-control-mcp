@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.screens.settings
 
+import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -21,10 +22,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -56,11 +58,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.createBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.GeofenceZone
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.GeofenceSettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,7 +103,10 @@ private fun createCircleMarkerIcon(context: android.content.Context): BitmapDraw
     return BitmapDrawable(context.resources, bitmap)
 }
 
-private fun formatRadius(meters: Float): String {
+private fun formatRadius(
+    meters: Float,
+    resources: Resources,
+): String {
     val measureSystem =
         android.icu.util.LocaleData.getMeasurementSystem(
             android.icu.util.ULocale
@@ -105,15 +116,15 @@ private fun formatRadius(meters: Float): String {
     return if (useImperial) {
         val feet = meters * METERS_TO_FEET
         if (feet >= FEET_PER_MILE) {
-            "${"%.1f".format(feet / FEET_PER_MILE)} mi"
+            resources.getString(R.string.geofence_radius_miles, feet / FEET_PER_MILE)
         } else {
-            "${feet.roundToInt()} ft"
+            resources.getString(R.string.geofence_radius_feet, feet.roundToInt())
         }
     } else {
         if (meters >= METERS_PER_KM) {
-            "${"%.1f".format(meters / METERS_PER_KM)} km"
+            resources.getString(R.string.geofence_radius_kilometers, meters / METERS_PER_KM)
         } else {
-            "${meters.roundToInt()} m"
+            resources.getString(R.string.geofence_radius_meters, meters.roundToInt())
         }
     }
 }
@@ -143,6 +154,7 @@ fun GeofenceMapScreen(
     val canSave = name.isNotBlank() && hasPin
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val markerIcon = remember { createCircleMarkerIcon(context) }
 
     // Stable reference — created once, updated via `update` lambda
@@ -203,11 +215,11 @@ fun GeofenceMapScreen(
         marker.position = point
         marker.icon = markerIcon
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-        marker.title = formatRadius(radiusMeters)
+        marker.title = formatRadius(radiusMeters, resources)
         marker.snippet =
             buildString {
                 if (streetName.isNotBlank()) append("$streetName\n")
-                append("${"%.6f".format(latitude)}, ${"%.6f".format(longitude)}")
+                append(resources.getString(R.string.geofence_marker_coordinates, latitude, longitude))
             }
         marker.showInfoWindow()
         map.overlays.add(marker)
@@ -217,12 +229,12 @@ fun GeofenceMapScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (zoneId != null) "Edit Zone" else "Add Zone") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
+                title = {
+                    TopBarTitle(
+                        stringResource(if (zoneId != null) R.string.geofence_edit_zone_title else R.string.geofence_add_zone_title),
+                    )
                 },
+                navigationIcon = { TopBarBackButton(onClick = onNavigateBack) },
                 actions = {
                     TextButton(
                         onClick = {
@@ -248,7 +260,7 @@ fun GeofenceMapScreen(
                         },
                         enabled = canSave,
                     ) {
-                        Text("Save")
+                        Text(stringResource(R.string.geofence_save))
                     }
                 },
                 colors =
@@ -263,7 +275,7 @@ fun GeofenceMapScreen(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text("Zone name") },
+                placeholder = { Text(stringResource(R.string.geofence_zone_name_placeholder)) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 singleLine = true,
             )
@@ -339,24 +351,50 @@ fun GeofenceMapScreen(
                             ).padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        "Notifications",
+                        stringResource(R.string.geofence_notifications_label),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier =
+                            Modifier.fillMaxWidth().toggleable(
+                                value = notifyOnEnter,
+                                role = Role.Switch,
+                                onValueChange = { notifyOnEnter = it },
+                            ),
                     ) {
-                        Text("Enter", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                        Switch(checked = notifyOnEnter, onCheckedChange = { notifyOnEnter = it })
+                        Text(
+                            stringResource(R.string.geofence_notify_enter),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = notifyOnEnter,
+                            onCheckedChange = null,
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        )
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier =
+                            Modifier.fillMaxWidth().toggleable(
+                                value = notifyOnExit,
+                                role = Role.Switch,
+                                onValueChange = { notifyOnExit = it },
+                            ),
                     ) {
-                        Text("Exit", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                        Switch(checked = notifyOnExit, onCheckedChange = { notifyOnExit = it })
+                        Text(
+                            stringResource(R.string.geofence_notify_exit),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = notifyOnExit,
+                            onCheckedChange = null,
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        )
                     }
                 }
 
@@ -378,7 +416,7 @@ fun GeofenceMapScreen(
                     containerColor = MaterialTheme.colorScheme.surface,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
                 ) {
-                    Icon(Icons.Default.MyLocation, "My location")
+                    Icon(Icons.Default.MyLocation, stringResource(R.string.geofence_my_location))
                 }
             }
 
@@ -392,7 +430,7 @@ fun GeofenceMapScreen(
             ) {
                 // Radius slider
                 Text(
-                    "Radius: ${formatRadius(radiusMeters)}",
+                    stringResource(R.string.geofence_radius, formatRadius(radiusMeters, resources)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
@@ -410,7 +448,7 @@ fun GeofenceMapScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search address") },
+                    placeholder = { Text(stringResource(R.string.geofence_search_placeholder)) },
                     trailingIcon = {
                         IconButton(onClick = {
                             coroutineScope.launch(Dispatchers.IO) {
@@ -434,7 +472,7 @@ fun GeofenceMapScreen(
                                 }
                             }
                         }) {
-                            Icon(Icons.Default.Search, "Search")
+                            Icon(Icons.Default.Search, stringResource(R.string.geofence_search))
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

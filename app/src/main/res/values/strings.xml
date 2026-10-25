@@ -19,6 +19,19 @@
     <string name="tab_settings">Settings</string>
     <string name="tab_about">About</string>
 
+    <!-- Accessibility: spoken labels -->
+    <string name="navigate_back">Back</string>
+    <!-- The action a screen reader names for a row or a link ("double tap to open") -->
+    <string name="a11y_action_open">open</string>
+    <string name="a11y_action_open_permissions">open permission settings</string>
+    <string name="a11y_action_open_link">open in browser</string>
+    <!-- A service on the server card, read as one ("MCP Server, Running"), and its button ("Stop MCP Server") -->
+    <string name="server_service_status">%1$s, %2$s</string>
+    <string name="server_service_start">Start %1$s</string>
+    <string name="server_service_stop">Stop %1$s</string>
+    <!-- A permission's action button, with the permission's name ("Camera: Grant") -->
+    <string name="permission_action_description">%1$s: %2$s</string>
+
     <!-- Settings Sub-pages -->
     <string name="settings_general_title">General</string>
     <string name="settings_general_subtitle">Port, address, device, auto-start</string>
@@ -33,12 +46,91 @@
     <string name="settings_mcp_tools_placeholder">Tool permissions — available in next update</string>
     <string name="settings_mcp_tools_missing_permission">Permission not granted — these tools are hidden from clients. Tap to grant.</string>
     <string name="settings_mcp_tools_param_missing_permission">Permission not granted — this option is unavailable. Tap to grant.</string>
+    <string name="settings_mcp_tools_restart_note">Changes take effect on server restart</string>
+
+    <!-- MCP Tools settings: categories, tools and their options -->
+    <string name="mcp_tools_category_screen">Screen</string>
+    <string name="mcp_tools_category_system">System</string>
+    <string name="mcp_tools_category_touch">Touch</string>
+    <string name="mcp_tools_category_gestures">Gestures</string>
+    <string name="mcp_tools_category_node_actions">Node Actions</string>
+    <string name="mcp_tools_category_text_input">Text Input</string>
+    <string name="mcp_tools_category_utility">Utility</string>
+    <string name="mcp_tools_category_file_operations">File Operations</string>
+    <string name="mcp_tools_category_app_management">App Management</string>
+    <string name="mcp_tools_category_camera">Camera</string>
+    <string name="mcp_tools_category_intent">Intent</string>
+    <string name="mcp_tools_category_notifications">Notifications</string>
+    <string name="mcp_tools_category_location">Location</string>
+    <string name="mcp_tools_category_sharing">Sharing</string>
+    <string name="mcp_tool_press_back">Press Back</string>
+    <string name="mcp_tool_press_home">Press Home</string>
+    <string name="mcp_tool_press_recents">Press Recents</string>
+    <string name="mcp_tool_open_notifications">Open Notifications</string>
+    <string name="mcp_tool_open_quick_settings">Open Quick Settings</string>
+    <string name="mcp_tool_dismiss_keyboard">Dismiss Keyboard</string>
+    <string name="mcp_tool_tap">Tap</string>
+    <string name="mcp_tool_long_press">Long Press</string>
+    <string name="mcp_tool_double_tap">Double Tap</string>
+    <string name="mcp_tool_swipe">Swipe</string>
+    <string name="mcp_tool_scroll">Scroll</string>
+    <string name="mcp_tool_pinch">Pinch</string>
+    <string name="mcp_tool_custom_gesture">Custom Gesture</string>
+    <string name="mcp_tool_find_nodes">Find Nodes</string>
+    <string name="mcp_tool_click_node">Click Node</string>
+    <string name="mcp_tool_long_click_node">Long Click Node</string>
+    <string name="mcp_tool_tap_node">Tap Node</string>
+    <string name="mcp_tool_scroll_to_node">Scroll to Node</string>
+    <string name="mcp_tool_scroll_node">Scroll Node</string>
+    <string name="mcp_tool_type_append_text">Type Append Text</string>
+    <string name="mcp_tool_type_insert_text">Type Insert Text</string>
+    <string name="mcp_tool_type_replace_text">Type Replace Text</string>
+    <string name="mcp_tool_type_clear_text">Type Clear Text</string>
+    <string name="mcp_tool_press_key">Press Key</string>
+    <string name="mcp_tool_get_clipboard">Get Clipboard</string>
+    <string name="mcp_tool_set_clipboard">Set Clipboard</string>
+    <string name="mcp_tool_wait_for_node">Wait for Node</string>
+    <string name="mcp_tool_wait_for_idle">Wait for Idle</string>
+    <string name="mcp_tool_get_node_details">Get Node Details</string>
+    <string name="mcp_tool_list_storage_locations">List Storage Locations</string>
+    <string name="mcp_tool_list_files">List Files</string>
+    <string name="mcp_tool_read_file">Read File</string>
+    <string name="mcp_tool_write_file">Write File</string>
+    <string name="mcp_tool_append_file">Append File</string>
+    <string name="mcp_tool_file_replace">File Replace</string>
+    <string name="mcp_tool_download_from_url">Download from URL</string>
+    <string name="mcp_tool_delete_file">Delete File</string>
+    <string name="mcp_tool_open_app">Open App</string>
+    <string name="mcp_tool_list_apps">List Apps</string>
+    <string name="mcp_tool_close_app">Close App</string>
+    <string name="mcp_tool_list_cameras">List Cameras</string>
+    <string name="mcp_tool_list_camera_photo_resolutions">List Camera Photo Resolutions</string>
+    <string name="mcp_tool_list_camera_video_resolutions">List Camera Video Resolutions</string>
+    <string name="mcp_tool_take_camera_photo">Take Camera Photo</string>
+    <string name="mcp_tool_save_camera_photo">Save Camera Photo</string>
+    <string name="mcp_tool_send_intent">Send Intent</string>
+    <string name="mcp_tool_open_uri">Open URI</string>
+    <string name="mcp_tool_notification_list">Notification List</string>
+    <string name="mcp_tool_notification_open">Notification Open</string>
+    <string name="mcp_tool_notification_dismiss">Notification Dismiss</string>
+    <string name="mcp_tool_notification_snooze">Notification Snooze</string>
+    <string name="mcp_tool_notification_action">Notification Action</string>
+    <string name="mcp_tool_notification_reply">Notification Reply</string>
+    <string name="mcp_tool_get_shared_content">Get Shared Content</string>
+    <string name="mcp_tool_share_file_via_web">Share File via Web</string>
+    <string name="mcp_tool_get_screen_state">Get screen state</string>
+    <string name="mcp_tool_save_camera_video">Save Camera Video</string>
+    <string name="mcp_tool_get_location">Get Location</string>
+    <string name="mcp_tool_param_include_screenshot">Include screenshot</string>
+    <string name="mcp_tool_param_audio">Include audio</string>
+    <string name="mcp_tool_param_fresh_fix">Allow fresh GPS fix</string>
     <string name="settings_permissions_title">Permissions</string>
     <string name="settings_permissions_subtitle">Accessibility, camera, microphone</string>
     <string name="settings_storage_title">Storage</string>
     <string name="settings_storage_subtitle">Storage locations, file limits</string>
 
     <!-- About Screen -->
+    <string name="about_version">v%1$s</string>
     <string name="about_author_section">Author</string>
     <string name="about_author_name">Daniele Salvatore Albano</string>
     <string name="about_author_linkedin">linkedin.com/in/danielesalvatorealbano</string>
@@ -58,6 +150,11 @@
 
     <!-- Server Status -->
     <string name="server_status_title">Server Status</string>
+    <string name="server_service_mcp">MCP Server</string>
+    <string name="event_channel_name">Event Channel</string>
+    <string name="server_services_status_title">Services Status</string>
+    <string name="channel_status_idle">Idle</string>
+    <string name="channel_status_active">Active</string>
     <string name="server_status_running">Running</string>
     <string name="server_status_stopped">Stopped</string>
     <string name="server_status_starting">Starting…</string>
@@ -152,6 +249,7 @@
 
     <!-- Server Logs -->
     <string name="server_logs_title">Server Logs</string>
+    <string name="server_logs_duration_ms">%1$dms</string>
     <string name="server_logs_empty">No log entries yet</string>
     <string name="server_logs_show_more">Show more</string>
     <string name="server_logs_clear">Clear logs</string>
@@ -177,6 +275,8 @@
     <string name="remote_access_provider_ngrok">ngrok</string>
     <string name="remote_access_provider_ngrok_desc">Account required</string>
     <string name="remote_access_ngrok_authtoken_label">ngrok Authtoken</string>
+    <string name="remote_access_ngrok_authtoken_show">Show authtoken</string>
+    <string name="remote_access_ngrok_authtoken_hide">Hide authtoken</string>
     <string name="remote_access_ngrok_domain_label">Domain (optional)</string>
     <string name="remote_access_ngrok_domain_hint">Leave empty for auto-assigned</string>
     <string name="remote_access_status_disconnected">Disconnected</string>
@@ -248,6 +348,7 @@
     <string name="storage_location_add_dialog_add">Add</string>
     <string name="storage_location_add_dialog_cancel">Cancel</string>
     <string name="storage_location_add_dialog_duplicate">This directory is already added.</string>
+    <string name="storage_location_unknown_name">Unknown</string>
     <string name="storage_location_description_counter">%1$d / %2$d</string>
     <string name="storage_location_edit_dialog_title">Edit Description</string>
     <string name="storage_location_edit_dialog_save">Save</string>
@@ -257,6 +358,10 @@
     <string name="storage_location_delete_dialog_cancel">Cancel</string>
     <string name="storage_location_allow_write_label">Allow Write</string>
     <string name="storage_location_allow_delete_label">Allow Delete</string>
+    <string name="storage_location_allow_write_on">Allow write on %1$s</string>
+    <string name="storage_location_allow_delete_on">Allow delete on %1$s</string>
+    <string name="storage_location_edit_description_of">Edit the description of %1$s</string>
+    <string name="storage_location_remove_named">Remove storage location %1$s</string>
     <string name="storage_builtin_locations_title">Built-in Locations</string>
     <string name="storage_builtin_locations_description">Always available. Use MediaStore to read and write files without additional setup.</string>
     <string name="storage_user_locations_title">User Locations</string>
@@ -278,6 +383,39 @@
     <string name="channel_not_configured_dialog_title">Endpoint URL not set</string>
     <string name="channel_not_configured_dialog_body">Configure the event channel endpoint URL in Settings → Event Channel before starting the service. The auth token is optional and can be left empty if your endpoint does not require it.</string>
     <string name="channel_not_configured_dialog_ok">OK</string>
+
+    <!-- Event Channel settings -->
+    <string name="channel_endpoint_url_label">Endpoint URL</string>
+    <string name="channel_auth_token_label">Auth Token</string>
+    <string name="channel_auto_start_label">Auto-start at boot</string>
+    <string name="channel_auto_start_description">Start event channel when device boots</string>
+    <string name="channel_event_sources_section">Event Sources</string>
+    <string name="notification_filter_title">Notification Filter</string>
+    <string name="notification_filter_search_label">Search apps</string>
+    <string name="notification_filter_mode_all">ALL</string>
+    <string name="notification_filter_mode_whitelist">WHITELIST</string>
+    <string name="notification_filter_mode_blacklist">BLACKLIST</string>
+    <plurals name="notification_filter_selected_count">
+        <item quantity="one">%1$d app selected</item>
+        <item quantity="other">%1$d apps selected</item>
+    </plurals>
+    <string name="wifi_monitor_title">WiFi Monitor</string>
+    <string name="wifi_monitor_ssid_label">SSID</string>
+    <string name="wifi_monitor_notify_discovered">Notify on discovered</string>
+    <string name="wifi_monitor_notify_lost">Notify on lost</string>
+    <string name="wifi_monitor_notify_connected">Notify on connected</string>
+    <string name="wifi_monitor_notify_disconnected">Notify on disconnected</string>
+    <string name="wifi_monitor_scan_based">Scan-based, may be delayed</string>
+    <string name="wifi_monitor_real_time">Real-time</string>
+    <string name="wifi_monitor_throttling_note">WiFi scan events (discovered/lost) may be delayed up to 30 minutes in background due to Android scan throttling. Connection events are real-time.</string>
+    <string name="channel_notification_events">Notification Events</string>
+    <string name="channel_wifi_events">WiFi Events</string>
+    <string name="channel_auth_token_show">Show auth token</string>
+    <string name="channel_auth_token_hide">Hide auth token</string>
+    <string name="channel_auth_token_copy">Copy auth token</string>
+    <string name="channel_auth_token_generate">Generate a new auth token</string>
+    <string name="wifi_monitor_remove_ssid">Remove %1$s</string>
+    <string name="wifi_monitor_add_ssid">Add SSID</string>
 
     <!-- Access settings (OAuth + bearer) -->
     <string name="access_title">Access</string>
@@ -306,7 +444,8 @@
     <string name="oauth_clients_empty">No connected clients. Clients appear here after they connect via OAuth.</string>
     <string name="oauth_clients_created">Created %1$s</string>
     <string name="oauth_clients_last_used">Last used %1$s</string>
-    <string name="oauth_clients_revoke">Revoke</string>
+    <string name="oauth_clients_revoke_named">Revoke %1$s</string>
+    <string name="oauth_clients_unknown_client">Unknown</string>
     <string name="oauth_clients_revoke_dialog_title">Revoke client?</string>
     <string name="oauth_clients_revoke_dialog_body">Revoking immediately invalidates this client\'s tokens. It must re-authorize to reconnect.</string>
     <string name="oauth_clients_revoke_confirm">Revoke</string>
@@ -318,6 +457,8 @@
     <string name="approval_match_code_label">Confirm this code matches your browser:</string>
     <string name="approval_approve">Approve</string>
     <string name="approval_deny">Deny</string>
+    <string name="approval_deny_named">Deny %1$s</string>
+    <string name="approval_approve_named">Approve %1$s</string>
     <string name="approval_expires_in">Expires in %1$s</string>
     <string name="approval_expired">Request expired</string>
     <string name="notification_channel_oauth_approval_name">Connection approvals</string>
@@ -332,14 +473,18 @@
     <string name="notification_arc_tunnel_enroll_title">Setting up the free E2E tunnel</string>
     <string name="notification_arc_tunnel_enroll_body">Getting a name and a certificate for this device…</string>
     <string name="update_banner_text">Update available: v%1$s — tap to view</string>
-    <string name="update_banner_open_description">Open the release page</string>
+    <!-- What a screen reader speaks for update_banner_text, which adds its own "double tap to open in browser" -->
+    <string name="update_banner_text_spoken">Update available: v%1$s</string>
     <string name="about_updates_section">Updates</string>
     <string name="about_auto_update_label">Automatically check for updates</string>
     <string name="about_check_updates_button">Check for updates</string>
+    <string name="about_update_checking">Checking for updates</string>
     <string name="about_update_up_to_date">You\'re on the latest version</string>
     <string name="about_update_check_failed">Couldn\'t check for updates. Try again later.</string>
     <string name="about_update_dev_build">Update checks are disabled for development builds</string>
     <string name="about_update_found">Version %1$s is available — tap to view the release</string>
+    <!-- What a screen reader speaks for about_update_found, which adds its own "double tap to open in browser" -->
+    <string name="about_update_found_spoken">Version %1$s is available</string>
     <string name="event_channel_subtitle">Notifications and WiFi event forwarding</string>
     <string name="settings_privacy_title">Privacy Mode</string>
     <string name="settings_privacy_subtitle">Hide personal data from AI providers</string>

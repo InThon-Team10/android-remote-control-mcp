@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -34,6 +34,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +61,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ServerStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelProviderType
 import com.danielealbano.androidremotecontrolmcp.data.model.TunnelStatus
 import com.danielealbano.androidremotecontrolmcp.mcp.ListenerSettingsCheck
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelRenewalViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ArcTunnelViewModel
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
@@ -95,12 +98,8 @@ fun TunnelSettingsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.settings_tunnel_title)) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                }
-            },
+            title = { TopBarTitle(stringResource(R.string.settings_tunnel_title)) },
+            navigationIcon = { TopBarBackButton(onClick = onBack) },
             windowInsets = WindowInsets(0),
         )
         Column(
@@ -121,7 +120,16 @@ fun TunnelSettingsScreen(
 
             // Tunnel Enable/Disable Toggle
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier.fillMaxWidth().toggleable(
+                        value = serverConfig.tunnelEnabled,
+                        enabled = isEnabled,
+                        role = Role.Switch,
+                        onValueChange = { on ->
+                            viewModel.updateTunnelEnabled(on)
+                            if (on && arcSelected) arcViewModel.requestEnrollment()
+                        },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -131,11 +139,9 @@ fun TunnelSettingsScreen(
                 )
                 Switch(
                     checked = serverConfig.tunnelEnabled,
-                    onCheckedChange = { on ->
-                        viewModel.updateTunnelEnabled(on)
-                        if (on && arcSelected) arcViewModel.requestEnrollment()
-                    },
+                    onCheckedChange = null,
                     enabled = isEnabled,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 )
             }
 
@@ -364,9 +370,9 @@ private fun NgrokConfigFields(
                             },
                         contentDescription =
                             if (showAuthtoken) {
-                                "Hide authtoken"
+                                stringResource(R.string.remote_access_ngrok_authtoken_hide)
                             } else {
-                                "Show authtoken"
+                                stringResource(R.string.remote_access_ngrok_authtoken_show)
                             },
                     )
                 }

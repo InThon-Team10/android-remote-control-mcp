@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +42,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerLogEntry
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogIndexEntry
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.LogsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -74,13 +75,9 @@ fun LogsScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.server_logs_title)) },
+            title = { TopBarTitle(stringResource(R.string.server_logs_title)) },
             windowInsets = WindowInsets(0),
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                }
-            },
+            navigationIcon = { TopBarBackButton(onClick = onBack) },
             actions = {
                 IconButton(onClick = { showClearDialog = true }) {
                     Icon(
@@ -181,7 +178,7 @@ private fun LogEntryRow(
             )
             if (ref.type == ServerLogEntry.Type.TOOL_CALL) {
                 Text(
-                    text = "${ref.durationMs ?: 0}ms",
+                    text = stringResource(R.string.server_logs_duration_ms, ref.durationMs ?: 0),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

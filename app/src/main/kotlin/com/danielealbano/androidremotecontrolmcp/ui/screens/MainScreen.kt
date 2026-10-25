@@ -77,7 +77,8 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = selectedTabRoute == route.route,
                         onClick = { selectedTabRoute = route.route },
-                        icon = { Icon(icon, contentDescription = label) },
+                        // Decorative: the label below says it
+                        icon = { Icon(icon, contentDescription = null) },
                         label = { Text(label) },
                     )
                 }

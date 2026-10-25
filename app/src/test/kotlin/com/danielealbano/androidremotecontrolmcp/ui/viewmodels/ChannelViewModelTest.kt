@@ -10,7 +10,9 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -65,6 +67,23 @@ class ChannelViewModelTest {
     @Nested
     @DisplayName("channel enabled")
     inner class ChannelEnabled {
+        @Test
+        fun `channelEnabled is null until the saved configuration is read, then the saved value`() =
+            runTest {
+                val saved = MutableSharedFlow<EventChannelConfig>()
+                every { settingsRepository.eventChannelConfig } returns saved
+                val pending = ChannelViewModel(settingsRepository, appIconCache, appContext, testDispatcher)
+                backgroundScope.launch { pending.channelEnabled.collect {} }
+                advanceUntilIdle()
+
+                assertNull(pending.channelEnabled.value)
+
+                saved.emit(EventChannelConfig(enabled = true))
+                advanceUntilIdle()
+
+                assertEquals(true, pending.channelEnabled.value)
+            }
+
         @Test
         fun `updateChannelEnabled delegates to repository`() =
             runTest {

@@ -18,12 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -36,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -45,6 +44,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.danielealbano.androidremotecontrolmcp.R
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
+import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.MainViewModel
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 
@@ -91,12 +92,8 @@ fun PermissionsSettingsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(stringResource(R.string.settings_permissions_title)) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                }
-            },
+            title = { TopBarTitle(stringResource(R.string.settings_permissions_title)) },
+            navigationIcon = { TopBarBackButton(onClick = onBack) },
             windowInsets = WindowInsets(0),
         )
         Column(
@@ -230,6 +227,7 @@ internal fun PermissionRow(
     buttonText: String,
     onAction: () -> Unit,
     actionEnabled: Boolean,
+    spokenButtonText: String = buttonText,
 ) {
     Row(
         modifier =
@@ -238,9 +236,10 @@ internal fun PermissionRow(
                 .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Decorative: the button says the state ("Granted", "Grant", ...), or a [spokenButtonText] does
         Icon(
             imageVector = if (isEnabled) Icons.Default.CheckCircle else Icons.Default.Error,
-            contentDescription = if (isEnabled) "$label enabled" else "$label disabled",
+            contentDescription = null,
             tint = if (isEnabled) enabledColor() else disabledColor(),
             modifier = Modifier.size(24.dp),
         )
@@ -254,8 +253,10 @@ internal fun PermissionRow(
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
+        val actionDescription = stringResource(R.string.permission_action_description, label, spokenButtonText)
         OutlinedButton(onClick = onAction, enabled = actionEnabled) {
-            Text(text = buttonText)
+            // On the text: the button reads its content, and the description replaces the bare "Grant"
+            Text(text = buttonText, modifier = Modifier.semantics { contentDescription = actionDescription })
         }
     }
 }
