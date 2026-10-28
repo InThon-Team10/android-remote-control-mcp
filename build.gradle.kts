@@ -5,13 +5,15 @@ import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 // apkzlib -> bcprov 1.79). These run only inside Gradle at build time and never ship, but Dependabot
 // still flags them, and the `allprojects` project-configuration forces below cannot reach the
 // buildscript classpath. Force them to their patched releases here. (netty 4.1.x is not on this
-// classpath — it is a project-configuration transitive only.)
+// classpath — it is a project-configuration transitive only.) AGP also pulls guava 33.4.0-jre.
 buildscript {
     configurations.configureEach {
         resolutionStrategy.eachDependency {
             val group = requested.group
             val name = requested.name
             when {
+                group == "com.google.guava" && name == "guava" ->
+                    useVersion("33.7.2-jre")
                 group == "org.bouncycastle" &&
                     name in setOf("bcprov-jdk18on", "bcutil-jdk18on", "bcpkix-jdk18on") ->
                     useVersion("1.85")
@@ -44,21 +46,31 @@ tasks.withType<DependencyUpdatesTask> {
     }
 }
 
-// Every Dependabot-flagged CVE in this repo originates from BUILD/TEST-TOOLING transitives that never
+// Most Dependabot-flagged CVEs in this repo originate from BUILD/TEST-TOOLING transitives that never
 // ship in the APK and never run at app runtime: Android Lint's `androidLintTool` configuration and
 // AGP's Unified Test Platform (UTP) configurations pull vulnerable bouncycastle/httpclient/commons-lang3,
 // and UTP's grpc-netty drags a vulnerable netty 4.1.x. Scoped `constraints {}` cannot reach these
 // AGP-internal tooling configurations, and the forces must apply to :app, :compose-test-app and
 // :e2e-tests alike — so force every affected transitive up to its first patched release across ALL
-// projects and ALL configurations. The shipping runtime is unaffected: Ktor's server engine keeps its
-// netty 4.2.x line (pinned to 4.2.19.Final by :app constraints, which this 4.1.x rule never matches),
-// and the app's direct bouncycastle is 1.86, the version forced here.
+// projects and ALL configurations. The netty and bouncycastle forces leave the shipping runtime
+// unaffected: Ktor's server engine keeps its netty 4.2.x line (pinned to 4.2.19.Final by :app
+// constraints, which this 4.1.x rule never matches), and the app's direct bouncycastle is 1.86, the
+// version forced here. guava is the exception that ships: CameraX camera-video -> media3-common puts
+// guava 33.3.1-android in the APK, and no CameraX or media3 release requests a patched guava yet, so
+// the same rule also covers the app runtime. The -android/-jre flavor of each request is kept.
 allprojects {
     configurations.configureEach {
         resolutionStrategy.eachDependency {
             val group = requested.group
             val name = requested.name
             when {
+                group == "com.google.guava" && name == "guava" -> {
+                    useVersion(if (requested.version?.endsWith("-android") == true) "33.7.2-android" else "33.7.2-jre")
+                    because(
+                        "CVE-2026-102554; CameraX camera-video -> media3-common ships guava 33.3.1-android in the APK, " +
+                            "androidLintTool/UTP and the Hilt/Dagger annotation processors pull older -jre releases",
+                    )
+                }
                 group == "io.netty" && requested.version?.startsWith("4.1.") == true -> {
                     useVersion("4.1.137.Final")
                     because(
