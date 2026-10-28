@@ -105,54 +105,56 @@ class ArcTunnelStack(
         waitForDns(chal.host, dnsHostPort)
 
         // Pebble with host validation: tls-alpn-01 / http-01 go to the server's real edge ports.
-        val pebble =
-            start(
-                GenericContainer(DockerImageName.parse(PEBBLE_IMAGE))
-                    .withNetwork(network)
-                    .withNetworkAliases("pebble")
-                    .withCopyToContainer(Transferable.of(pebbleConfig()), PEBBLE_CONFIG_PATH)
-                    .withCommand("-config", PEBBLE_CONFIG_PATH, "-dnsserver", "challtestsrv:$CHAL_DNS_PORT")
-                    .withEnv("PEBBLE_VA_NOSLEEP", "1")
-                    .withEnv("PEBBLE_WFE_NONCEREJECT", "0")
-                    .withExposedPorts(PEBBLE_ACME_PORT, PEBBLE_MGMT_PORT)
-                    .waitingFor(
-                        Wait
-                            .forHttp("/roots/0")
-                            .forPort(PEBBLE_MGMT_PORT)
-                            .usingTls()
-                            .allowInsecure()
-                            .forStatusCode(200),
-                    ),
-            )
+        val pebble = start(pebbleContainer())
         val minica = File.createTempFile("pebble-minica", ".pem").apply { deleteOnExit() }
         pebble.copyFileFromContainer("/test/certs/pebble.minica.pem", minica.absolutePath)
         issuingRootPem = httpsGet("https://${pebble.host}:${pebble.getMappedPort(PEBBLE_MGMT_PORT)}/roots/0")
 
-        val ca = ArcTunnelTestCa.generate()
-        val server =
-            start(
-                GenericContainer(DockerImageName.parse(SERVER_IMAGE))
-                    .withImagePullPolicy(PullPolicy.alwaysPull())
-                    .withNetwork(network)
-                    .withNetworkAliases(SERVER_ALIAS)
-                    .withCreateContainerCmdModifier { cmd ->
-                        cmd.withIpv4Address(serverIp)
-                        // distroless `nonroot` cannot write the copied-in dirs: root inside this throw-away container.
-                        cmd.withUser("0:0")
-                    }.withCopyToContainer(Transferable.of(ca.certPem), "/ca/ca.pem")
-                    .withCopyToContainer(Transferable.of(ca.keyPem), "/ca/ca-key.pem")
-                    .withCopyToContainer(Transferable.of(minica.readText()), "/ca/pebble-minica.pem")
-                    .withCopyToContainer(Transferable.of(""), "/attest/signers.txt")
-                    .withCopyToContainer(Transferable.of(""), "/acme/.keep")
-                    .withCopyToContainer(Transferable.of(""), "/conn-logs/.keep")
-                    .withEnv(serverEnv())
-                    .withExposedPorts(EDGE_PORT, INTERNAL_PORT)
-                    .waitingFor(Wait.forHttp("/healthz").forPort(INTERNAL_PORT).forStatusCode(200)),
-            )
+        val server = start(serverContainer(ArcTunnelTestCa.generate(), minica.readText()))
         relay = ArcTunnelHostRelay(EDGE_HOST_PORT, server.getMappedPort(EDGE_PORT)).also { it.start() }
         waitForReservedCert(ENROLL_HOST)
         waitForReservedCert(CONTROL_HOST)
     }
+
+    private fun pebbleContainer(): GenericContainer<*> =
+        GenericContainer(DockerImageName.parse(PEBBLE_IMAGE))
+            .withNetwork(network)
+            .withNetworkAliases("pebble")
+            .withCopyToContainer(Transferable.of(pebbleConfig()), PEBBLE_CONFIG_PATH)
+            .withCommand("-config", PEBBLE_CONFIG_PATH, "-dnsserver", "challtestsrv:$CHAL_DNS_PORT")
+            .withEnv("PEBBLE_VA_NOSLEEP", "1")
+            .withEnv("PEBBLE_WFE_NONCEREJECT", "0")
+            .withExposedPorts(PEBBLE_ACME_PORT, PEBBLE_MGMT_PORT)
+            .waitingFor(
+                Wait
+                    .forHttp("/roots/0")
+                    .forPort(PEBBLE_MGMT_PORT)
+                    .usingTls()
+                    .allowInsecure()
+                    .forStatusCode(200),
+            )
+
+    private fun serverContainer(
+        ca: ArcTunnelTestCa.Material,
+        minicaPem: String,
+    ): GenericContainer<*> =
+        GenericContainer(DockerImageName.parse(SERVER_IMAGE))
+            .withImagePullPolicy(PullPolicy.alwaysPull())
+            .withNetwork(network)
+            .withNetworkAliases(SERVER_ALIAS)
+            .withCreateContainerCmdModifier { cmd ->
+                cmd.withIpv4Address(serverIp)
+                // distroless `nonroot` cannot write the copied-in dirs: root inside this throw-away container.
+                cmd.withUser("0:0")
+            }.withCopyToContainer(Transferable.of(ca.certPem), "/ca/ca.pem")
+            .withCopyToContainer(Transferable.of(ca.keyPem), "/ca/ca-key.pem")
+            .withCopyToContainer(Transferable.of(minicaPem), "/ca/pebble-minica.pem")
+            .withCopyToContainer(Transferable.of(""), "/attest/signers.txt")
+            .withCopyToContainer(Transferable.of(""), "/acme/.keep")
+            .withCopyToContainer(Transferable.of(""), "/conn-logs/.keep")
+            .withEnv(serverEnv())
+            .withExposedPorts(EDGE_PORT, INTERNAL_PORT)
+            .waitingFor(Wait.forHttp("/healthz").forPort(INTERNAL_PORT).forStatusCode(200))
 
     /** Phone-side edge override (`host:port`), from the host gateway address redroid routes through. */
     fun edgeOverride(gatewayIp: String): String = "$gatewayIp:$EDGE_HOST_PORT"
@@ -240,7 +242,11 @@ class ArcTunnelStack(
     private fun httpsGet(url: String): String {
         val trustAll = arrayOf<TrustManager>(TrustAllX509TrustManager())
         val ctx = SSLContext.getInstance("TLS").apply { init(null, trustAll, null) }
-        val conn = java.net.URI(url).toURL().openConnection() as HttpsURLConnection
+        val conn =
+            java.net
+                .URI(url)
+                .toURL()
+                .openConnection() as HttpsURLConnection
         conn.sslSocketFactory = ctx.socketFactory
         conn.hostnameVerifier = HostnameVerifier { _, _ -> true }
         try {

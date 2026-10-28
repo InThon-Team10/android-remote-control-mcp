@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit
  * - Start the MCP server and wait for it to be ready
  */
 object AndroidContainerSetup {
-
     private const val DOCKER_IMAGE = "redroid/redroid:14.0.0-latest"
     private const val ADB_PORT = 5555
     private const val MCP_DEFAULT_PORT = 8080
@@ -37,8 +36,6 @@ object AndroidContainerSetup {
     // their source package (com.danielealbano.androidremotecontrolmcp.debug) — NOT the applicationId. They
     // must be sent verbatim, independent of the flavor's applicationId suffix (…gms.debug).
     private const val E2E_ACTION_BASE = "com.danielealbano.androidremotecontrolmcp.debug"
-    private const val CALCULATOR_PACKAGE = "com.simplemobiletools.calculator"
-    private const val COMPOSE_TEST_PACKAGE = "com.danielealbano.composetestapp"
     private const val CALCULATOR_APK_RESOURCE = "/simple-calculator.apk"
     private const val E2E_CONFIG_RECEIVER_CLASS =
         "com.danielealbano.androidremotecontrolmcp.debug.E2EConfigReceiver"
@@ -105,10 +102,10 @@ object AndroidContainerSetup {
     fun createContainer(): GenericContainer<*> {
         println("[E2E Setup] Creating redroid container ($DOCKER_IMAGE)")
 
-        ensureKernelModules()
+        RedroidHostPrerequisites.ensureKernelModules()
 
-        val binderDevMajor = detectBinderDevMajor()
-        val fuseDevMajorMinor = detectFuseDevMajorMinor()
+        val binderDevMajor = RedroidHostPrerequisites.detectBinderDevMajor()
+        val fuseDevMajorMinor = RedroidHostPrerequisites.detectFuseDevMajorMinor()
 
         return GenericContainer(DockerImageName.parse(DOCKER_IMAGE))
             .withExposedPorts(ADB_PORT, MCP_DEFAULT_PORT)
@@ -123,8 +120,7 @@ object AndroidContainerSetup {
                 "ro.product.manufacturer=Google",
                 "ro.debuggable=1",
                 "ro.secure=0",
-            )
-            .waitingFor(
+            ).waitingFor(
                 object : AbstractWaitStrategy() {
                     override fun waitUntilReady() {
                         // Redroid writes to Android logcat, not stdout/stderr — container
@@ -156,10 +152,16 @@ object AndroidContainerSetup {
                         // Phase 2: poll sys.boot_completed
                         while (System.currentTimeMillis() - startTime < timeoutMs) {
                             try {
-                                val output = runProcess(
-                                    "adb", "-s", serial, "shell", "getprop", "sys.boot_completed",
-                                    timeoutSeconds = 10L,
-                                )
+                                val output =
+                                    runProcess(
+                                        "adb",
+                                        "-s",
+                                        serial,
+                                        "shell",
+                                        "getprop",
+                                        "sys.boot_completed",
+                                        timeoutSeconds = 10L,
+                                    )
                                 if (output == "1") {
                                     val elapsed = System.currentTimeMillis() - startTime
                                     println("[E2E Setup] Redroid boot completed (${elapsed}ms)")
@@ -183,8 +185,7 @@ object AndroidContainerSetup {
                         )
                     }
                 },
-            )
-            .withStartupTimeout(Duration.ofSeconds(DEFAULT_EMULATOR_BOOT_TIMEOUT_MS / 1000))
+            ).withStartupTimeout(Duration.ofSeconds(DEFAULT_EMULATOR_BOOT_TIMEOUT_MS / 1000))
             .withCreateContainerCmdModifier { cmd ->
                 cmd.withVolumes(Volume("/sys/fs/cgroup"))
                 cmd.hostConfig
@@ -200,26 +201,27 @@ object AndroidContainerSetup {
                         listOf(
                             "seccomp=unconfined",
                             "apparmor=unconfined",
-                        )
-                    )
-                    ?.withDevices(
+                        ),
+                    )?.withDevices(
                         listOfNotNull(
                             Device("rwm", "/dev/fuse", "/dev/fuse"),
-                            if (java.io.File("/dev/dma_heap/system").exists())
+                            if (java.io.File("/dev/dma_heap/system").exists()) {
                                 Device("rwm", "/dev/dma_heap/system", "/dev/dma_heap/system")
-                            else null,
-                            if (java.io.File("/dev/hwrng").exists())
+                            } else {
+                                null
+                            },
+                            if (java.io.File("/dev/hwrng").exists()) {
                                 Device("rwm", "/dev/hw_random", "/dev/hwrng")
-                            else null,
-                        )
-                    )
-                    ?.withDeviceCgroupRules(
+                            } else {
+                                null
+                            },
+                        ),
+                    )?.withDeviceCgroupRules(
                         listOf(
                             "c $binderDevMajor:* rwm",
                             "c $fuseDevMajorMinor rwm",
-                        )
-                    )
-                    ?.withLogConfig(LogConfig(LogConfig.LoggingType.JSON_FILE))
+                        ),
+                    )?.withLogConfig(LogConfig(LogConfig.LoggingType.JSON_FILE))
             }
     }
 
@@ -248,8 +250,9 @@ object AndroidContainerSetup {
      */
     fun installCalculatorApk() {
         println("[E2E Setup] Installing calculator APK for testing...")
-        val resourceStream = AndroidContainerSetup::class.java.getResourceAsStream(CALCULATOR_APK_RESOURCE)
-            ?: throw IllegalStateException("Calculator APK not found in test resources: $CALCULATOR_APK_RESOURCE")
+        val resourceStream =
+            AndroidContainerSetup::class.java.getResourceAsStream(CALCULATOR_APK_RESOURCE)
+                ?: throw IllegalStateException("Calculator APK not found in test resources: $CALCULATOR_APK_RESOURCE")
         val tempFile = File.createTempFile("calculator", ".apk")
         tempFile.deleteOnExit()
         resourceStream.use { input -> tempFile.outputStream().use { output -> input.copyTo(output) } }
@@ -309,12 +312,13 @@ object AndroidContainerSetup {
                     println("[E2E Setup] Accessibility service connected (${System.currentTimeMillis() - startTime}ms)")
                     return
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
             Thread.sleep(POLL_INTERVAL_MS)
         }
 
         throw IllegalStateException(
-            "Accessibility service did not connect within ${timeoutMs}ms. Component: $serviceComponent"
+            "Accessibility service did not connect within ${timeoutMs}ms. Component: $serviceComponent",
         )
     }
 
@@ -365,13 +369,23 @@ object AndroidContainerSetup {
 
         val configAction = "$E2E_ACTION_BASE.E2E_CONFIGURE"
         execAdb(
-            "shell", "am", "broadcast",
+            "shell",
+            "am",
+            "broadcast",
             "--include-stopped-packages",
-            "-a", configAction,
-            "-n", "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS",
-            "--es", "bearer_token", E2E_BEARER_TOKEN,
-            "--es", "binding_address", "0.0.0.0",
-            "--ei", "port", MCP_DEFAULT_PORT.toString(),
+            "-a",
+            configAction,
+            "-n",
+            "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS",
+            "--es",
+            "bearer_token",
+            E2E_BEARER_TOKEN,
+            "--es",
+            "binding_address",
+            "0.0.0.0",
+            "--ei",
+            "port",
+            MCP_DEFAULT_PORT.toString(),
         )
         Thread.sleep(3_000)
 
@@ -382,9 +396,13 @@ object AndroidContainerSetup {
     fun approvePendingOAuth() {
         val action = "$E2E_ACTION_BASE.OAUTH_APPROVE"
         execAdb(
-            "shell", "am", "broadcast",
-            "-a", action,
-            "-n", "$APP_PACKAGE/$OAUTH_APPROVAL_RECEIVER_CLASS",
+            "shell",
+            "am",
+            "broadcast",
+            "-a",
+            action,
+            "-n",
+            "$APP_PACKAGE/$OAUTH_APPROVAL_RECEIVER_CLASS",
         )
         Thread.sleep(1_000)
     }
@@ -405,192 +423,18 @@ object AndroidContainerSetup {
 
         val startServerAction = "$E2E_ACTION_BASE.E2E_START_SERVER"
         execAdb(
-            "shell", "am", "broadcast",
-            "-a", startServerAction,
-            "-n", "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS",
+            "shell",
+            "am",
+            "broadcast",
+            "-a",
+            startServerAction,
+            "-n",
+            "$APP_PACKAGE/$E2E_CONFIG_RECEIVER_CLASS",
         )
         Thread.sleep(5_000)
 
         println("[E2E Setup] MCP server start commands sent")
     }
-
-    /**
-     * Launch the calculator app using am start.
-     *
-     * Uses `am start` with explicit component name instead of `monkey` because
-     * the `monkey` command is unavailable in redroid containers (exit 251).
-     */
-    fun launchCalculator() {
-        val result = execAdb(
-            "shell", "am", "start", "-W",
-            "-n", "$CALCULATOR_PACKAGE/.activities.MainActivity",
-        )
-        println("[E2E Setup] launchCalculator result: $result")
-        Thread.sleep(2_000)
-    }
-
-    /**
-     * Launch the compose test app using am start.
-     */
-    fun launchComposeTestApp() {
-        val result = execAdb(
-            "shell", "am", "start", "-W",
-            "-n", "$COMPOSE_TEST_PACKAGE/.MainActivity",
-        )
-        println("[E2E Setup] launchComposeTestApp result: $result")
-        Thread.sleep(2_000)
-    }
-
-    /**
-     * Send a broadcast to the compose test app to update the displayed number.
-     *
-     * @param number the number to display
-     */
-    fun sendComposeTestNumber(number: Int) {
-        val result = execAdb(
-            "shell", "am", "start",
-            "--activity-single-top",
-            "-n", "$COMPOSE_TEST_PACKAGE/.MainActivity",
-            "--ei", "number", number.toString(),
-        )
-        println("[E2E Setup] sendComposeTestNumber($number) result: $result")
-    }
-
-    /**
-     * Force-stops the compose test app so the next launch starts a fresh process. Used to shed the
-     * heavy WebView page that E2EWebViewNodeReductionTest leaves loaded in the shared activity,
-     * which otherwise blocks the activity's main thread on launch and leaves the WebView's virtual
-     * a11y nodes stuck for later simple-page tests.
-     */
-    fun forceStopComposeTestApp() {
-        execAdb("shell", "am", "force-stop", COMPOSE_TEST_PACKAGE)
-    }
-
-    /**
-     * Launch the long scrollable list test activity (60 rows in a ScrollView) from its top.
-     */
-    fun launchLongListTestApp() {
-        val result = execAdb(
-            "shell", "am", "start", "-W", "-S",
-            "-n", "$COMPOSE_TEST_PACKAGE/.LongListActivity",
-        )
-        println("[E2E Setup] launchLongListTestApp result: $result")
-        Thread.sleep(2_000)
-    }
-
-    /**
-     * Launch the WebView test activity using am start.
-     */
-    fun launchWebViewTestApp() {
-        val result = execAdb(
-            "shell", "am", "start", "-W",
-            "-n", "$COMPOSE_TEST_PACKAGE/.WebViewActivity",
-        )
-        println("[E2E Setup] launchWebViewTestApp result: $result")
-        Thread.sleep(3_000)
-    }
-
-    /**
-     * Launch the WebView test activity with the large, content-heavy page
-     * (hundreds of articles) used to exercise WebView node collapsing.
-     */
-    fun launchHeavyWebViewTestApp() {
-        val result = execAdb(
-            "shell", "am", "start", "-W",
-            "--es", "content", "heavy",
-            "-n", "$COMPOSE_TEST_PACKAGE/.WebViewActivity",
-        )
-        println("[E2E Setup] launchHeavyWebViewTestApp result: $result")
-        Thread.sleep(3_000)
-    }
-
-    /**
-     * Counts the accessibility nodes currently on screen via `uiautomator dump`. This is the raw,
-     * un-collapsed node count (every node the platform exposes), used as the baseline against the
-     * collapsed `get_screen_state` output.
-     *
-     * @return the number of `<node` elements in the dump, or 0 if the dump could not be produced.
-     */
-    fun uiAutomatorNodeCount(): Int {
-        execAdb("shell", "uiautomator", "dump", "/sdcard/uidump.xml")
-        val xml = execAdb("shell", "cat", "/sdcard/uidump.xml")
-        return Regex("<node ").findAll(xml).count()
-    }
-
-    /**
-     * Counts on-screen nodes that would survive `get_screen_state`'s keep-filter BEFORE the WebView
-     * merge: a node is kept if it has non-empty text / content-desc / resource-id, or is clickable /
-     * long-clickable / scrollable. Comparing the collapsed `get_screen_state` count against THIS
-     * baseline (rather than the raw total) isolates the merge's contribution from the structural-only
-     * filtering that `get_screen_state` always applies.
-     */
-    fun uiAutomatorKeptNodeCount(): Int {
-        execAdb("shell", "uiautomator", "dump", "/sdcard/uidump.xml")
-        val xml = execAdb("shell", "cat", "/sdcard/uidump.xml")
-        return NODE_TAG_REGEX.findAll(xml).count { match ->
-            val tag = match.value
-            attrNonEmpty(tag, "text") ||
-                attrNonEmpty(tag, "content-desc") ||
-                attrNonEmpty(tag, "resource-id") ||
-                attrTrue(tag, "clickable") ||
-                attrTrue(tag, "long-clickable") ||
-                attrTrue(tag, "scrollable")
-        }
-    }
-
-    private val NODE_TAG_REGEX = Regex("<node\\b[^>]*>")
-
-    private fun attrNonEmpty(
-        tag: String,
-        name: String,
-    ): Boolean {
-        val match = Regex("\\s$name=\"([^\"]*)\"").find(tag) ?: return false
-        return match.groupValues[1].isNotEmpty()
-    }
-
-    private fun attrTrue(
-        tag: String,
-        name: String,
-    ): Boolean = Regex("\\s$name=\"true\"").containsMatchIn(tag)
-
-    /**
-     * Send an intent to the WebView test activity to update the displayed number.
-     *
-     * @param number the number to display
-     */
-    fun sendWebViewTestNumber(number: Int) {
-        val result = execAdb(
-            "shell", "am", "start",
-            "--activity-single-top",
-            "-n", "$COMPOSE_TEST_PACKAGE/.WebViewActivity",
-            "--ei", "number", number.toString(),
-        )
-        println("[E2E Setup] sendWebViewTestNumber($number) result: $result")
-    }
-
-    /**
-     * Dump logcat lines from the compose test app for diagnostics.
-     *
-     * @return recent logcat lines matching the ComposeTestApp tag
-     */
-    fun dumpComposeTestAppLogs(): String =
-        try {
-            execAdb("shell", "logcat", "-d", "-s", "ComposeTestApp:I")
-        } catch (e: Exception) {
-            "Failed to dump logcat: ${e.message}"
-        }
-
-    /**
-     * Dump logcat lines from the WebView test activity for diagnostics.
-     *
-     * @return recent logcat lines matching the WebViewTestApp tag
-     */
-    fun dumpWebViewTestAppLogs(): String =
-        try {
-            execAdb("shell", "logcat", "-d", "-s", "WebViewTestApp:I")
-        } catch (e: Exception) {
-            "Failed to dump logcat: ${e.message}"
-        }
 
     /**
      * Poll the MCP endpoint until the server is ready to accept requests.
@@ -614,8 +458,11 @@ object AndroidContainerSetup {
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             var conn: java.net.HttpURLConnection? = null
             try {
-                conn = java.net.URI("$baseUrl/mcp").toURL()
-                    .openConnection() as java.net.HttpURLConnection
+                conn =
+                    java.net
+                        .URI("$baseUrl/mcp")
+                        .toURL()
+                        .openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.connectTimeout = 2_000
                 conn.readTimeout = 2_000
@@ -629,7 +476,7 @@ object AndroidContainerSetup {
                 if (responseCode > 0) {
                     println(
                         "[E2E Setup] MCP server is ready " +
-                            "(HTTP $responseCode, ${System.currentTimeMillis() - startTime}ms)"
+                            "(HTTP $responseCode, ${System.currentTimeMillis() - startTime}ms)",
                     )
                     return
                 }
@@ -648,7 +495,7 @@ object AndroidContainerSetup {
         dumpDiagnostics()
 
         throw IllegalStateException(
-            "MCP server did not become ready within ${timeoutMs}ms at $baseUrl"
+            "MCP server did not become ready within ${timeoutMs}ms at $baseUrl",
         )
     }
 
@@ -680,120 +527,6 @@ object AndroidContainerSetup {
     }
 
     /**
-     * Ensures binder and fuse are available to redroid.
-     *
-     * On CI, modules are pre-loaded and binderfs mounted by the workflow. When [kernelPrerequisitesSatisfied] reports
-     * them usable (binderfs mounted, fuse loaded or built in) nothing is done; otherwise attempts `sudo modprobe`
-     * plus the binderfs mount and provides a clear error on failure.
-     *
-     * NOTE: Uses `sudo` — accepted exception to CLAUDE.md no-sudo rule.
-     * Kernel module loading is a host-OS operation required by redroid.
-     */
-    private fun ensureKernelModules() {
-        val satisfied =
-            kernelPrerequisitesSatisfied(
-                procModules = readProcModules(),
-                devFuseExists = File("/dev/fuse").exists(),
-                binderfsMounted = isBinderfsMounted(),
-            )
-        if (satisfied) {
-            println("[E2E Setup] Kernel prerequisites already available (binder, fuse)")
-            return
-        }
-
-        println("[E2E Setup] Loading kernel modules via sudo modprobe...")
-        try {
-            runProcess("sudo", "modprobe", "binder_linux", "devices=binder,hwbinder,vndbinder",
-                timeoutSeconds = 60L)
-            runProcess("sudo", "modprobe", "fuse", timeoutSeconds = 60L)
-            ensureBinderfs()
-            println("[E2E Setup] Kernel modules loaded successfully")
-        } catch (e: Exception) {
-            throw IllegalStateException(
-                "Failed to load kernel modules required by redroid. " +
-                    "On Linux, ensure 'binder_linux' and 'fuse' modules are available. " +
-                    "Install with: sudo apt-get install linux-modules-extra-\$(uname -r) && " +
-                    "sudo modprobe binder_linux devices=\"binder,hwbinder,vndbinder\" && " +
-                    "sudo modprobe fuse. Error: ${e.message}",
-                e,
-            )
-        }
-    }
-
-    /**
-     * Mounts binderfs at /dev/binderfs/ if not already mounted.
-     * NOTE: Uses `sudo` — same accepted exception as ensureKernelModules.
-     */
-    private fun ensureBinderfs() {
-        if (isBinderfsMounted()) return
-
-        println("[E2E Setup] Mounting binderfs at /dev/binderfs/...")
-        runProcess("sudo", "mkdir", "-p", "/dev/binderfs")
-        runProcess("sudo", "mount", "-t", "binder", "binder", "/dev/binderfs")
-    }
-
-    /**
-     * True when binder and fuse are already usable, so the sudo `modprobe` path can be skipped. Binder counts only
-     * when `/dev/binderfs` is mounted, module or built in: [detectBinderDevMajor] reads the device major from that
-     * mount, so a loaded `binder_linux` without it still needs [ensureBinderfs]. Built-in (non-module) fuse never
-     * appears in [procModules], so an existing `/dev/fuse` also counts.
-     */
-    internal fun kernelPrerequisitesSatisfied(
-        procModules: String,
-        devFuseExists: Boolean,
-        binderfsMounted: Boolean,
-    ): Boolean = binderfsMounted && (devFuseExists || procModules.contains("fuse"))
-
-    private fun readProcModules(): String =
-        try {
-            File("/proc/modules").readText()
-        } catch (_: IOException) {
-            ""
-        }
-
-    private fun isBinderfsMounted(): Boolean =
-        try {
-            runProcess("mountpoint", "-q", "/dev/binderfs")
-            true
-        } catch (_: IllegalStateException) {
-            // Non-zero exit (not a mount point) or timeout.
-            false
-        } catch (_: IOException) {
-            // `mountpoint` could not be started.
-            false
-        }
-
-    private fun detectBinderDevMajor(): String =
-        try {
-            val output = runProcess("stat", "-c", "%Hr", "/dev/binderfs/binder-control")
-            if (output.isNotEmpty()) {
-                println("[E2E Setup] Binder device major: $output")
-                output
-            } else {
-                println("[E2E Setup] Could not detect binder device major, using default 10")
-                "10"
-            }
-        } catch (e: Exception) {
-            println("[E2E Setup] Binder device major detection failed: ${e.message}, using default 10")
-            "10"
-        }
-
-    private fun detectFuseDevMajorMinor(): String =
-        try {
-            val content = File("/sys/class/misc/fuse/dev").readText().trim()
-            if (content.isNotEmpty()) {
-                println("[E2E Setup] Fuse device major:minor: $content")
-                content
-            } else {
-                println("[E2E Setup] Could not detect fuse device, using default 10:229")
-                "10:229"
-            }
-        } catch (e: Exception) {
-            println("[E2E Setup] Fuse device detection failed: ${e.message}, using default 10:229")
-            "10:229"
-        }
-
-    /**
      * The address of the HOST as seen from inside the container: its default-gateway IP (podman's bridge).
      * `host.testcontainers.internal` is not resolvable by Android's resolver; Android uses policy routing, so
      * `ip route get <external ip>` is used instead of the main table (prints "<ip> via <gateway> dev …").
@@ -821,7 +554,11 @@ object AndroidContainerSetup {
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             var conn: java.net.HttpURLConnection? = null
             try {
-                conn = java.net.URI("$baseUrl/health").toURL().openConnection() as java.net.HttpURLConnection
+                conn =
+                    java.net
+                        .URI("$baseUrl/health")
+                        .toURL()
+                        .openConnection() as java.net.HttpURLConnection
                 conn.connectTimeout = 2_000
                 conn.readTimeout = 2_000
                 conn.responseCode
@@ -864,14 +601,33 @@ object AndroidContainerSetup {
                 Base64.getEncoder().encodeToString(settings.trustedCaPem.toByteArray())
             }
         execAdbOn(
-            serial, "shell", "am", "broadcast", "--include-stopped-packages",
-            "-a", E2E_CONFIGURE_ACTION, "-n", E2E_RECEIVER_COMPONENT,
-            "--ez", "tunnel_enabled", settings.tunnelEnabled.toString(),
-            "--es", "tunnel_provider", settings.provider,
-            "--es", "arc_tunnel_base_address", settings.baseAddress,
-            "--ez", "arc_tunnel_ct_check_enabled", settings.ctCheckEnabled.toString(),
-            "--es", "arc_tunnel_edge_override", settings.edgeOverride.ifEmpty { "-" },
-            "--es", "arc_tunnel_trusted_ca_pem_b64", pemB64,
+            serial,
+            "shell",
+            "am",
+            "broadcast",
+            "--include-stopped-packages",
+            "-a",
+            E2E_CONFIGURE_ACTION,
+            "-n",
+            E2E_RECEIVER_COMPONENT,
+            "--ez",
+            "tunnel_enabled",
+            settings.tunnelEnabled.toString(),
+            "--es",
+            "tunnel_provider",
+            settings.provider,
+            "--es",
+            "arc_tunnel_base_address",
+            settings.baseAddress,
+            "--ez",
+            "arc_tunnel_ct_check_enabled",
+            settings.ctCheckEnabled.toString(),
+            "--es",
+            "arc_tunnel_edge_override",
+            settings.edgeOverride.ifEmpty { "-" },
+            "--es",
+            "arc_tunnel_trusted_ca_pem_b64",
+            pemB64,
         )
         awaitArcTunnel(serial = serial, timeoutMs = 30_000L) { status ->
             status.tunnelEnabled == settings.tunnelEnabled &&
@@ -939,17 +695,28 @@ object AndroidContainerSetup {
      *
      * @throws IllegalStateException if any service is not registered within [timeoutMs]
      */
-    private fun waitForSystemServices(serial: String, services: List<String>, timeoutMs: Long) {
+    private fun waitForSystemServices(
+        serial: String,
+        services: List<String>,
+        timeoutMs: Long,
+    ) {
         for (service in services) {
             println("[E2E Setup] Waiting for system service '$service'...")
             val startTime = System.currentTimeMillis()
             var ready = false
             while (System.currentTimeMillis() - startTime < timeoutMs) {
                 try {
-                    val output = runProcess(
-                        "adb", "-s", serial, "shell", "service", "check", service,
-                        timeoutSeconds = 10L,
-                    )
+                    val output =
+                        runProcess(
+                            "adb",
+                            "-s",
+                            serial,
+                            "shell",
+                            "service",
+                            "check",
+                            service,
+                            timeoutSeconds = 10L,
+                        )
                     // `service check` prints "Service <name>: found" once registered.
                     if (output.contains("found", ignoreCase = true) &&
                         !output.contains("not found", ignoreCase = true)
@@ -987,14 +754,15 @@ object AndroidContainerSetup {
 
         try {
             val logcat = execAdb("shell", "logcat", "-d", "-t", "50")
-            val filtered = logcat.lines()
-                .filter {
-                    it.contains("MCP", ignoreCase = true) ||
-                        it.contains("E2E", ignoreCase = true) ||
-                        it.contains("FATAL", ignoreCase = true)
-                }
-                .takeLast(20)
-                .joinToString("\n")
+            val filtered =
+                logcat
+                    .lines()
+                    .filter {
+                        it.contains("MCP", ignoreCase = true) ||
+                            it.contains("E2E", ignoreCase = true) ||
+                            it.contains("FATAL", ignoreCase = true)
+                    }.takeLast(20)
+                    .joinToString("\n")
             System.err.println("[E2E Diagnostics] logcat (MCP/E2E): $filtered")
         } catch (e: Exception) {
             System.err.println("[E2E Diagnostics] logcat failed: ${e.message}")
@@ -1018,17 +786,22 @@ object AndroidContainerSetup {
     ): String {
         val process = ProcessBuilder(*command).redirectErrorStream(true).start()
         val outputBuilder = StringBuilder()
-        val readerThread = Thread {
-            try {
-                outputBuilder.append(process.inputStream.bufferedReader().readText())
-            } catch (_: Exception) { }
-        }.apply { isDaemon = true; start() }
+        val readerThread =
+            Thread {
+                try {
+                    outputBuilder.append(process.inputStream.bufferedReader().readText())
+                } catch (_: Exception) {
+                }
+            }.apply {
+                isDaemon = true
+                start()
+            }
 
         if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
             process.destroyForcibly()
             readerThread.join(1_000)
             throw IllegalStateException(
-                "Process timed out after ${timeoutSeconds}s: ${command.joinToString(" ")}"
+                "Process timed out after ${timeoutSeconds}s: ${command.joinToString(" ")}",
             )
         }
         readerThread.join(5_000)
@@ -1036,7 +809,7 @@ object AndroidContainerSetup {
 
         if (process.exitValue() != 0) {
             throw IllegalStateException(
-                "Process '${command.joinToString(" ")}' failed (exit ${process.exitValue()}): $output"
+                "Process '${command.joinToString(" ")}' failed (exit ${process.exitValue()}): $output",
             )
         }
         return output

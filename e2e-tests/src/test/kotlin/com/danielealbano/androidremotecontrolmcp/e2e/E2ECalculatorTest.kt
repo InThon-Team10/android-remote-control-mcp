@@ -39,7 +39,6 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2ECalculatorTest {
-
     private val mcpClient = SharedAndroidContainer.mcpClient
 
     companion object {
@@ -85,138 +84,145 @@ class E2ECalculatorTest {
 
     @Test
     @Order(1)
-    fun `MCP server lists all available tools`() = runBlocking {
-        val result = mcpClient.listTools()
-        assertTrue(result.tools.size >= 27, "Expected at least 27 tools, got: ${result.tools.size}")
-        assertTrue(
-            result.tools.all { it.name.startsWith(TOOL_PREFIX) },
-            "All tools should have '$TOOL_PREFIX' prefix, found: ${
-                result.tools.filter { !it.name.startsWith(TOOL_PREFIX) }.map { it.name }
-            }",
-        )
-    }
-
-    @Test
-    @Order(2)
-    fun `calculate 7 plus 3 equals 10`() = runBlocking {
-        // Step 1: Press home to ensure clean state
-        mcpClient.callTool("${TOOL_PREFIX}press_home")
-        Thread.sleep(1_000)
-
-        // Step 2: Launch Simple Calculator app via monkey command and poll for visibility
-        AndroidContainerSetup.launchCalculator()
-        val treeStrOrNull = waitForAppVisible(CALCULATOR_PACKAGE, "Calculator", APP_LAUNCH_TIMEOUT_MS)
-        assertNotNull(
-            treeStrOrNull,
-            "Calculator should be visible in screen state within ${APP_LAUNCH_TIMEOUT_MS}ms",
-        )
-        val treeStr = treeStrOrNull!!
-        println("[E2E Calculator] Screen state excerpt: ${treeStr.take(1000)}")
-        // Verify new note lines
-        assertTrue(
-            treeStr.contains("note:flags: on=onscreen off=offscreen"),
-            "Screen state should contain flags legend note line",
-        )
-        assertTrue(
-            treeStr.contains("note:offscreen items require scroll_to_node before interaction"),
-            "Screen state should contain offscreen hint note line",
-        )
-        // Verify new comma-separated flag format (at least one element should be on-screen + clickable + enabled)
-        assertTrue(
-            treeStr.contains("on,clk") || treeStr.contains("on,ena"),
-            "Screen state flags should use comma-separated abbreviations",
-        )
-        // Negative assertions: old single-char format must not appear
-        assertFalse(
-            treeStr.contains("\tvcn") || treeStr.contains("\tvclfsen") || treeStr.contains("\tvn"),
-            "Screen state should NOT contain old single-char flag format",
-        )
-
-        // Step 4: Find and click "7" button
-        val button7 = findNodeWithRetry("text", "7")
-        assertNotNull(button7, "Could not find '7' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button7!!))
-        Thread.sleep(500)
-
-        // Step 5: Find and click "+" button
-        val buttonPlus = findNodeWithRetry("text", "+")
-        assertNotNull(buttonPlus, "Could not find '+' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonPlus!!))
-        Thread.sleep(500)
-
-        // Step 6: Find and click "3" button
-        val button3 = findNodeWithRetry("text", "3")
-        assertNotNull(button3, "Could not find '3' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button3!!))
-        Thread.sleep(500)
-
-        // Step 7: Find and click "=" button
-        val buttonEquals = findNodeWithRetry("text", "=")
-        assertNotNull(buttonEquals, "Could not find '=' button in Calculator")
-        mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonEquals!!))
-        Thread.sleep(1_000)
-
-        // Step 8: Wait for UI to settle
-        mcpClient.callTool("${TOOL_PREFIX}wait_for_idle", mapOf("timeout" to 3000))
-
-        // Step 9: Verify result "10" in screen state
-        val resultTree = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
-        val resultTreeStr = (resultTree.content[0] as TextContent).text
-        assertTrue(
-            resultTreeStr.contains("10"),
-            "Result '10' should appear in screen state after 7+3=. Excerpt: ${resultTreeStr.take(500)}",
-        )
-    }
-
-    @Test
-    @Order(3)
-    fun `get_screen_state with screenshot returns valid image data`() = runBlocking {
-        // Retry screenshot capture — can be transiently unavailable on slow CI emulators.
-        var result = mcpClient.callTool(
-            "${TOOL_PREFIX}get_screen_state",
-            mapOf("include_screenshot" to true),
-        )
-
-        for (attempt in 1..MAX_RETRY_ATTEMPTS) {
-            if (result.isError != true && result.content.size >= 2) break
-            val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
-            println("[E2E Calculator] Screenshot attempt $attempt failed (isError=${result.isError}, " +
-                "content.size=${result.content.size}): $errorText — retrying after ${RETRY_DELAY_MS}ms")
-            Thread.sleep(RETRY_DELAY_MS)
-            result = mcpClient.callTool(
-                "${TOOL_PREFIX}get_screen_state",
-                mapOf("include_screenshot" to true),
+    fun `MCP server lists all available tools`() =
+        runBlocking {
+            val result = mcpClient.listTools()
+            assertTrue(result.tools.size >= 27, "Expected at least 27 tools, got: ${result.tools.size}")
+            assertTrue(
+                result.tools.all { it.name.startsWith(TOOL_PREFIX) },
+                "All tools should have '$TOOL_PREFIX' prefix, found: ${
+                    result.tools.filter { !it.name.startsWith(TOOL_PREFIX) }.map { it.name }
+                }",
             )
         }
 
-        assertNotEquals(
-            true,
-            result.isError,
-            "get_screen_state should not return error: " +
-                (result.content.firstOrNull() as? TextContent)?.text,
-        )
+    @Test
+    @Order(2)
+    fun `calculate 7 plus 3 equals 10`() =
+        runBlocking {
+            // Step 1: Press home to ensure clean state
+            mcpClient.callTool("${TOOL_PREFIX}press_home")
+            Thread.sleep(1_000)
 
-        val content = result.content
-        assertTrue(
-            content.size >= 2,
-            "Result should have at least 2 content items (text + image), got: ${content.size}. " +
-                "Content[0]: ${(content.firstOrNull() as? TextContent)?.text?.take(200)}",
-        )
+            // Step 2: Launch Simple Calculator app via monkey command and poll for visibility
+            E2ETestApps.launchCalculator()
+            val treeStrOrNull = waitForAppVisible(CALCULATOR_PACKAGE, "Calculator", APP_LAUNCH_TIMEOUT_MS)
+            assertNotNull(
+                treeStrOrNull,
+                "Calculator should be visible in screen state within ${APP_LAUNCH_TIMEOUT_MS}ms",
+            )
+            val treeStr = treeStrOrNull!!
+            println("[E2E Calculator] Screen state excerpt: ${treeStr.take(1000)}")
+            // Verify new note lines
+            assertTrue(
+                treeStr.contains("note:flags: on=onscreen off=offscreen"),
+                "Screen state should contain flags legend note line",
+            )
+            assertTrue(
+                treeStr.contains("note:offscreen items require scroll_to_node before interaction"),
+                "Screen state should contain offscreen hint note line",
+            )
+            // Verify new comma-separated flag format (at least one element should be on-screen + clickable + enabled)
+            assertTrue(
+                treeStr.contains("on,clk") || treeStr.contains("on,ena"),
+                "Screen state flags should use comma-separated abbreviations",
+            )
+            // Negative assertions: old single-char format must not appear
+            assertFalse(
+                treeStr.contains("\tvcn") || treeStr.contains("\tvclfsen") || treeStr.contains("\tvn"),
+                "Screen state should NOT contain old single-char flag format",
+            )
 
-        // First item is TextContent with compact TSV
-        assertTrue(content[0] is TextContent, "First content item should be TextContent")
+            // Step 4: Find and click "7" button
+            val button7 = findNodeWithRetry("text", "7")
+            assertNotNull(button7, "Could not find '7' button in Calculator")
+            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button7!!))
+            Thread.sleep(500)
 
-        // Second item is ImageContent with JPEG data
-        val imageContent = content[1] as ImageContent
+            // Step 5: Find and click "+" button
+            val buttonPlus = findNodeWithRetry("text", "+")
+            assertNotNull(buttonPlus, "Could not find '+' button in Calculator")
+            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonPlus!!))
+            Thread.sleep(500)
 
-        val mimeType = imageContent.mimeType
-        assertTrue(mimeType == "image/jpeg", "Screenshot mimeType should be 'image/jpeg', got: $mimeType")
+            // Step 6: Find and click "3" button
+            val button3 = findNodeWithRetry("text", "3")
+            assertNotNull(button3, "Could not find '3' button in Calculator")
+            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button3!!))
+            Thread.sleep(500)
 
-        val data = imageContent.data
-        assertNotNull(data, "Screenshot data should not be null")
-        assertFalse(data.isEmpty(), "Screenshot data should not be empty")
-        assertTrue(data.length > 100, "Screenshot data should be substantial (got ${data.length} chars)")
-    }
+            // Step 7: Find and click "=" button
+            val buttonEquals = findNodeWithRetry("text", "=")
+            assertNotNull(buttonEquals, "Could not find '=' button in Calculator")
+            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonEquals!!))
+            Thread.sleep(1_000)
+
+            // Step 8: Wait for UI to settle
+            mcpClient.callTool("${TOOL_PREFIX}wait_for_idle", mapOf("timeout" to 3000))
+
+            // Step 9: Verify result "10" in screen state
+            val resultTree = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
+            val resultTreeStr = (resultTree.content[0] as TextContent).text
+            assertTrue(
+                resultTreeStr.contains("10"),
+                "Result '10' should appear in screen state after 7+3=. Excerpt: ${resultTreeStr.take(500)}",
+            )
+        }
+
+    @Test
+    @Order(3)
+    fun `get_screen_state with screenshot returns valid image data`() =
+        runBlocking {
+            // Retry screenshot capture — can be transiently unavailable on slow CI emulators.
+            var result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}get_screen_state",
+                    mapOf("include_screenshot" to true),
+                )
+
+            for (attempt in 1..MAX_RETRY_ATTEMPTS) {
+                if (result.isError != true && result.content.size >= 2) break
+                val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
+                println(
+                    "[E2E Calculator] Screenshot attempt $attempt failed (isError=${result.isError}, " +
+                        "content.size=${result.content.size}): $errorText — retrying after ${RETRY_DELAY_MS}ms",
+                )
+                Thread.sleep(RETRY_DELAY_MS)
+                result =
+                    mcpClient.callTool(
+                        "${TOOL_PREFIX}get_screen_state",
+                        mapOf("include_screenshot" to true),
+                    )
+            }
+
+            assertNotEquals(
+                true,
+                result.isError,
+                "get_screen_state should not return error: " +
+                    (result.content.firstOrNull() as? TextContent)?.text,
+            )
+
+            val content = result.content
+            assertTrue(
+                content.size >= 2,
+                "Result should have at least 2 content items (text + image), got: ${content.size}. " +
+                    "Content[0]: ${(content.firstOrNull() as? TextContent)?.text?.take(200)}",
+            )
+
+            // First item is TextContent with compact TSV
+            assertTrue(content[0] is TextContent, "First content item should be TextContent")
+
+            // Second item is ImageContent with JPEG data
+            val imageContent = content[1] as ImageContent
+
+            val mimeType = imageContent.mimeType
+            assertTrue(mimeType == "image/jpeg", "Screenshot mimeType should be 'image/jpeg', got: $mimeType")
+
+            val data = imageContent.data
+            assertNotNull(data, "Screenshot data should not be null")
+            assertFalse(data.isEmpty(), "Screenshot data should not be empty")
+            assertTrue(data.length > 100, "Screenshot data should be substantial (got ${data.length} chars)")
+        }
 
     /**
      * Polls get_screen_state until the app identified by [packageName] or [appLabel]
@@ -259,15 +265,19 @@ class E2ECalculatorTest {
      * {"nodes":[...]}
      * ```
      */
-    private suspend fun findNodeWithRetry(by: String, value: String): String? {
+    private suspend fun findNodeWithRetry(
+        by: String,
+        value: String,
+    ): String? {
         val startTime = System.currentTimeMillis()
 
         while (System.currentTimeMillis() - startTime < NODE_WAIT_TIMEOUT_MS) {
             try {
-                val result = mcpClient.callTool(
-                    "${TOOL_PREFIX}find_nodes",
-                    mapOf("by" to by, "value" to value, "exact_match" to true),
-                )
+                val result =
+                    mcpClient.callTool(
+                        "${TOOL_PREFIX}find_nodes",
+                        mapOf("by" to by, "value" to value, "exact_match" to true),
+                    )
 
                 val textContent = (result.content[0] as? TextContent)?.text
                 if (textContent != null) {

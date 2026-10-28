@@ -40,7 +40,6 @@ import kotlin.concurrent.thread
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2EStorageToolsTest {
-
     companion object {
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
         private const val DOWNLOADS = "builtin:downloads"
@@ -127,25 +126,29 @@ class E2EStorageToolsTest {
         path: String = "",
         offset: Int = 0,
         limit: Int = 200,
-    ): JsonObject = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}list_files",
-            mapOf("location_id" to locationId, "path" to path, "offset" to offset, "limit" to limit),
-        )
-        assertNotEquals(true, result.isError, "list_files failed: ${toolText(result)}")
-        Json.parseToJsonElement(stripUntrustedWarning(toolText(result))).jsonObject
-    }
+    ): JsonObject =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}list_files",
+                    mapOf("location_id" to locationId, "path" to path, "offset" to offset, "limit" to limit),
+                )
+            assertNotEquals(true, result.isError, "list_files failed: ${toolText(result)}")
+            Json.parseToJsonElement(stripUntrustedWarning(toolText(result))).jsonObject
+        }
 
     private fun fileNames(listing: JsonObject): List<String> =
         listing["files"]!!.jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
 
     private fun dirNames(listing: JsonObject): List<String> =
-        listing["files"]!!.jsonArray
+        listing["files"]!!
+            .jsonArray
             .filter { it.jsonObject["is_directory"]!!.jsonPrimitive.boolean }
             .map { it.jsonObject["name"]!!.jsonPrimitive.content }
 
     private fun plainFileNames(listing: JsonObject): List<String> =
-        listing["files"]!!.jsonArray
+        listing["files"]!!
+            .jsonArray
             .filter { !it.jsonObject["is_directory"]!!.jsonPrimitive.boolean }
             .map { it.jsonObject["name"]!!.jsonPrimitive.content }
 
@@ -157,23 +160,33 @@ class E2EStorageToolsTest {
      * Reads a file via read_file and strips the "N| " line-number prefixes the tool
      * adds (output format: "1| line content\n2| ..." + optional "--- More lines ---" trailer).
      */
-    private fun readFileContent(locationId: String, path: String): String = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}read_file",
-            mapOf("location_id" to locationId, "path" to path),
-        )
-        assertNotEquals(true, result.isError, "read_file failed: ${toolText(result)}")
-        stripUntrustedWarning(toolText(result))
-            .lines()
-            .filterNot { it.startsWith("--- More lines available") }
-            .joinToString("\n") { it.replace(Regex("^\\d+\\| "), "") }
-    }
+    private fun readFileContent(
+        locationId: String,
+        path: String,
+    ): String =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}read_file",
+                    mapOf("location_id" to locationId, "path" to path),
+                )
+            assertNotEquals(true, result.isError, "read_file failed: ${toolText(result)}")
+            stripUntrustedWarning(toolText(result))
+                .lines()
+                .filterNot { it.startsWith("--- More lines available") }
+                .joinToString("\n") { it.replace(Regex("^\\d+\\| "), "") }
+        }
 
-    private fun writeFile(locationId: String, path: String, content: String) = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}write_file",
-            mapOf("location_id" to locationId, "path" to path, "content" to content),
-        )
+    private fun writeFile(
+        locationId: String,
+        path: String,
+        content: String,
+    ) = runBlocking {
+        val result =
+            mcpClient.callTool(
+                "${TOOL_PREFIX}write_file",
+                mapOf("location_id" to locationId, "path" to path, "content" to content),
+            )
         assertNotEquals(true, result.isError, "write_file failed: ${toolText(result)}")
     }
 
@@ -181,25 +194,26 @@ class E2EStorageToolsTest {
 
     @Test
     @Order(1)
-    fun `list_storage_locations returns six builtins with access levels`() = runBlocking {
-        val result = mcpClient.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
-        assertNotEquals(true, result.isError)
-        val raw = toolText(result)
-        assertNotEquals(raw, stripUntrustedWarning(raw), "response must begin with the untrusted warning")
-        val locations = Json.parseToJsonElement(stripUntrustedWarning(raw)).jsonArray.map { it.jsonObject }
-        val ids = locations.map { it["id"]!!.jsonPrimitive.content }
-        assertEquals(
-            listOf(DOWNLOADS, PICTURES, MOVIES, MUSIC, DCIM, RECORDINGS),
-            ids.filter { it.startsWith("builtin:") },
-        )
-        val byId = locations.associateBy { it["id"]!!.jsonPrimitive.content }
-        for (id in listOf(PICTURES, MOVIES, MUSIC, DCIM, RECORDINGS)) {
-            assertEquals("full", byId[id]!!["access_level"]!!.jsonPrimitive.content, id)
-            assertTrue(byId[id]!!["name"]!!.jsonPrimitive.content.endsWith("- All files"), id)
+    fun `list_storage_locations returns six builtins with access levels`() =
+        runBlocking {
+            val result = mcpClient.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
+            assertNotEquals(true, result.isError)
+            val raw = toolText(result)
+            assertNotEquals(raw, stripUntrustedWarning(raw), "response must begin with the untrusted warning")
+            val locations = Json.parseToJsonElement(stripUntrustedWarning(raw)).jsonArray.map { it.jsonObject }
+            val ids = locations.map { it["id"]!!.jsonPrimitive.content }
+            assertEquals(
+                listOf(DOWNLOADS, PICTURES, MOVIES, MUSIC, DCIM, RECORDINGS),
+                ids.filter { it.startsWith("builtin:") },
+            )
+            val byId = locations.associateBy { it["id"]!!.jsonPrimitive.content }
+            for (id in listOf(PICTURES, MOVIES, MUSIC, DCIM, RECORDINGS)) {
+                assertEquals("full", byId[id]!!["access_level"]!!.jsonPrimitive.content, id)
+                assertTrue(byId[id]!!["name"]!!.jsonPrimitive.content.endsWith("- All files"), id)
+            }
+            assertEquals("owned_only", byId[DOWNLOADS]!!["access_level"]!!.jsonPrimitive.content)
+            assertTrue(byId[DOWNLOADS]!!["name"]!!.jsonPrimitive.content.endsWith("- Only owned files"))
         }
-        assertEquals("owned_only", byId[DOWNLOADS]!!["access_level"]!!.jsonPrimitive.content)
-        assertTrue(byId[DOWNLOADS]!!["name"]!!.jsonPrimitive.content.endsWith("- Only owned files"))
-    }
 
     @Test
     @Order(2)
@@ -296,186 +310,213 @@ class E2EStorageToolsTest {
 
     @Test
     @Order(15)
-    fun `write_file rejects wrong mime with accepted types`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}write_file",
-            mapOf("location_id" to PICTURES, "path" to "x.txt", "content" to "text"),
-        )
-        assertEquals(true, result.isError)
-        assertTrue(toolText(result).contains("images, videos"), toolText(result))
-    }
+    fun `write_file rejects wrong mime with accepted types`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}write_file",
+                    mapOf("location_id" to PICTURES, "path" to "x.txt", "content" to "text"),
+                )
+            assertEquals(true, result.isError)
+            assertTrue(toolText(result).contains("images, videos"), toolText(result))
+        }
 
     @Test
     @Order(16)
-    fun `append_file appends to owned file`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}append_file",
-            mapOf("location_id" to DOWNLOADS, "path" to "e2e-rt.txt", "content" to "\nappended-line"),
-        )
-        assertNotEquals(true, result.isError, toolText(result))
-        assertTrue(readFileContent(DOWNLOADS, "e2e-rt.txt").contains("appended-line"))
-    }
+    fun `append_file appends to owned file`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}append_file",
+                    mapOf("location_id" to DOWNLOADS, "path" to "e2e-rt.txt", "content" to "\nappended-line"),
+                )
+            assertNotEquals(true, result.isError, toolText(result))
+            assertTrue(readFileContent(DOWNLOADS, "e2e-rt.txt").contains("appended-line"))
+        }
 
     @Test
     @Order(17)
-    fun `file_replace replaces text in owned file`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}file_replace",
-            mapOf(
-                "location_id" to DOWNLOADS,
-                "path" to "e2e-rt.txt",
-                "old_string" to "round-trip-content",
-                "new_string" to "replaced-content",
-            ),
-        )
-        assertNotEquals(true, result.isError, toolText(result))
-        assertTrue(readFileContent(DOWNLOADS, "e2e-rt.txt").contains("replaced-content"))
-    }
+    fun `file_replace replaces text in owned file`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}file_replace",
+                    mapOf(
+                        "location_id" to DOWNLOADS,
+                        "path" to "e2e-rt.txt",
+                        "old_string" to "round-trip-content",
+                        "new_string" to "replaced-content",
+                    ),
+                )
+            assertNotEquals(true, result.isError, toolText(result))
+            assertTrue(readFileContent(DOWNLOADS, "e2e-rt.txt").contains("replaced-content"))
+        }
 
     @Test
     @Order(18)
-    fun `delete_file removes owned file and repeat errors not found`() = runBlocking {
-        val first = mcpClient.callTool(
-            "${TOOL_PREFIX}delete_file",
-            mapOf("location_id" to DOWNLOADS, "path" to "e2e-rt.txt"),
-        )
-        assertNotEquals(true, first.isError, toolText(first))
-        assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-rt.txt"))
-        val second = mcpClient.callTool(
-            "${TOOL_PREFIX}delete_file",
-            mapOf("location_id" to DOWNLOADS, "path" to "e2e-rt.txt"),
-        )
-        assertEquals(true, second.isError)
-        assertTrue(toolText(second).contains("not found", ignoreCase = true), toolText(second))
-    }
+    fun `delete_file removes owned file and repeat errors not found`() =
+        runBlocking {
+            val first =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}delete_file",
+                    mapOf("location_id" to DOWNLOADS, "path" to "e2e-rt.txt"),
+                )
+            assertNotEquals(true, first.isError, toolText(first))
+            assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-rt.txt"))
+            val second =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}delete_file",
+                    mapOf("location_id" to DOWNLOADS, "path" to "e2e-rt.txt"),
+                )
+            assertEquals(true, second.isError)
+            assertTrue(toolText(second).contains("not found", ignoreCase = true), toolText(second))
+        }
 
     @Test
     @Order(19)
-    fun `write denied when allow write disabled`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}write_file",
-            mapOf("location_id" to MOVIES, "path" to "denied.mp4", "content" to "x"),
-        )
-        assertEquals(true, result.isError)
-        assertTrue(toolText(result).contains("not allowed", ignoreCase = true), toolText(result))
-    }
+    fun `write denied when allow write disabled`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}write_file",
+                    mapOf("location_id" to MOVIES, "path" to "denied.mp4", "content" to "x"),
+                )
+            assertEquals(true, result.isError)
+            assertTrue(toolText(result).contains("not allowed", ignoreCase = true), toolText(result))
+        }
 
     @Test
     @Order(20)
-    fun `delete denied when allow delete disabled`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}delete_file",
-            mapOf("location_id" to MOVIES, "path" to "whatever.mp4"),
-        )
-        assertEquals(true, result.isError)
-        assertTrue(toolText(result).contains("not allowed", ignoreCase = true), toolText(result))
-    }
+    fun `delete denied when allow delete disabled`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}delete_file",
+                    mapOf("location_id" to MOVIES, "path" to "whatever.mp4"),
+                )
+            assertEquals(true, result.isError)
+            assertTrue(toolText(result).contains("not allowed", ignoreCase = true), toolText(result))
+        }
 
     @Test
     @Order(21)
-    fun `delete of non-owned file reports not found`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}delete_file",
-            mapOf("location_id" to PICTURES, "path" to "clip.mp4"),
-        )
-        assertEquals(true, result.isError)
-        assertTrue(toolText(result).contains("not found", ignoreCase = true), toolText(result))
-        // Deletes resolve OWNED files only: the tool can never touch non-owned files.
-        assertTrue(plainFileNames(callListFiles(PICTURES)).contains("clip.mp4"))
-    }
+    fun `delete of non-owned file reports not found`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}delete_file",
+                    mapOf("location_id" to PICTURES, "path" to "clip.mp4"),
+                )
+            assertEquals(true, result.isError)
+            assertTrue(toolText(result).contains("not found", ignoreCase = true), toolText(result))
+            // Deletes resolve OWNED files only: the tool can never touch non-owned files.
+            assertTrue(plainFileNames(callListFiles(PICTURES)).contains("clip.mp4"))
+        }
 
     @Test
     @Order(22)
-    fun `write_file to existing non-owned name`() = runBlocking<Unit> {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}write_file",
-            mapOf("location_id" to PICTURES, "path" to "readable.jpg", "content" to "overwrite-attempt"),
-        )
-        // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
-        // the write succeeds and MediaStore auto-renames the new row to "readable (1).jpg";
-        // the non-owned original row and its content are untouched.
-        assertNotEquals(true, result.isError, toolText(result))
-        val names = plainFileNames(callListFiles(PICTURES))
-        assertTrue(names.contains("readable.jpg"), "names=$names")
-        assertTrue(names.contains("readable (1).jpg"), "names=$names")
-        assertEquals("line one\nline two", readFileContent(PICTURES, "readable.jpg"))
-    }
+    fun `write_file to existing non-owned name`() =
+        runBlocking<Unit> {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}write_file",
+                    mapOf("location_id" to PICTURES, "path" to "readable.jpg", "content" to "overwrite-attempt"),
+                )
+            // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
+            // the write succeeds and MediaStore auto-renames the new row to "readable (1).jpg";
+            // the non-owned original row and its content are untouched.
+            assertNotEquals(true, result.isError, toolText(result))
+            val names = plainFileNames(callListFiles(PICTURES))
+            assertTrue(names.contains("readable.jpg"), "names=$names")
+            assertTrue(names.contains("readable (1).jpg"), "names=$names")
+            assertEquals("line one\nline two", readFileContent(PICTURES, "readable.jpg"))
+        }
 
     @Test
     @Order(23)
-    fun `download_from_url downloads fixture file`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}download_from_url",
-            mapOf("location_id" to DOWNLOADS, "path" to "e2e-dl.txt", "url" to "$fixtureBaseUrl/fixture.txt"),
-        )
-        assertNotEquals(true, result.isError, toolText(result))
-        assertEquals(FixtureHttpServer.FIXTURE_CONTENT, readFileContent(DOWNLOADS, "e2e-dl.txt"))
-    }
+    fun `download_from_url downloads fixture file`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}download_from_url",
+                    mapOf("location_id" to DOWNLOADS, "path" to "e2e-dl.txt", "url" to "$fixtureBaseUrl/fixture.txt"),
+                )
+            assertNotEquals(true, result.isError, toolText(result))
+            assertEquals(FixtureHttpServer.FIXTURE_CONTENT, readFileContent(DOWNLOADS, "e2e-dl.txt"))
+        }
 
     @Test
     @Order(24)
-    fun `download_from_url 404 returns error and leaves no file`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}download_from_url",
-            mapOf("location_id" to DOWNLOADS, "path" to "e2e-404.txt", "url" to "$fixtureBaseUrl/missing.txt"),
-        )
-        assertEquals(true, result.isError)
-        assertFalse(
-            toolText(result).contains("not allowed", ignoreCase = true),
-            "must fail on the HTTP error, not the http-disabled gate: ${toolText(result)}",
-        )
-        assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-404.txt"))
-    }
+    fun `download_from_url 404 returns error and leaves no file`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}download_from_url",
+                    mapOf("location_id" to DOWNLOADS, "path" to "e2e-404.txt", "url" to "$fixtureBaseUrl/missing.txt"),
+                )
+            assertEquals(true, result.isError)
+            assertFalse(
+                toolText(result).contains("not allowed", ignoreCase = true),
+                "must fail on the HTTP error, not the http-disabled gate: ${toolText(result)}",
+            )
+            assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-404.txt"))
+        }
 
     @Test
     @Order(25)
-    fun `download_from_url connection refused returns error`() = runBlocking {
-        val refusedUrl = fixtureBaseUrl.replace(":${FixtureHttpServer.FIXTURE_HTTP_PORT}", ":18999")
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}download_from_url",
-            mapOf("location_id" to DOWNLOADS, "path" to "e2e-refused.txt", "url" to "$refusedUrl/x.txt"),
-        )
-        assertEquals(true, result.isError)
-        assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-refused.txt"))
-    }
+    fun `download_from_url connection refused returns error`() =
+        runBlocking {
+            val refusedUrl = fixtureBaseUrl.replace(":${FixtureHttpServer.FIXTURE_HTTP_PORT}", ":18999")
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}download_from_url",
+                    mapOf("location_id" to DOWNLOADS, "path" to "e2e-refused.txt", "url" to "$refusedUrl/x.txt"),
+                )
+            assertEquals(true, result.isError)
+            assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-refused.txt"))
+        }
 
     @Test
     @Order(26)
-    fun `download_from_url times out on slow server`() = runBlocking {
-        val start = System.currentTimeMillis()
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}download_from_url",
-            mapOf("location_id" to DOWNLOADS, "path" to "e2e-slow.txt", "url" to "$fixtureBaseUrl/slow.txt"),
-        )
-        val elapsed = System.currentTimeMillis() - start
-        assertEquals(true, result.isError, toolText(result))
-        assertTrue(
-            elapsed < FixtureHttpServer.SLOW_DELAY_MS + 5_000,
-            "timeout must trigger before the slow endpoint responds (elapsed=${elapsed}ms)",
-        )
-        assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-slow.txt"))
-    }
+    fun `download_from_url times out on slow server`() =
+        runBlocking {
+            val start = System.currentTimeMillis()
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}download_from_url",
+                    mapOf("location_id" to DOWNLOADS, "path" to "e2e-slow.txt", "url" to "$fixtureBaseUrl/slow.txt"),
+                )
+            val elapsed = System.currentTimeMillis() - start
+            assertEquals(true, result.isError, toolText(result))
+            assertTrue(
+                elapsed < FixtureHttpServer.SLOW_DELAY_MS + 5_000,
+                "timeout must trigger before the slow endpoint responds (elapsed=${elapsed}ms)",
+            )
+            assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-slow.txt"))
+        }
 
     @Test
     @Order(27)
-    fun `download_from_url handles truncated response`() = runBlocking<Unit> {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}download_from_url",
-            mapOf(
-                "location_id" to DOWNLOADS,
-                "path" to "e2e-truncated.txt",
-                "url" to "$fixtureBaseUrl/truncated.txt",
-            ),
-        )
-        // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
-        // the mid-stream cut fails cleanly ("unexpected end of stream") and the pending
-        // MediaStore row is deleted — no partial file remains in the listing.
-        assertEquals(true, result.isError)
-        assertTrue(toolText(result).contains("unexpected end of stream"), toolText(result))
-        assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-truncated.txt"))
-        // Server healthy afterwards
-        assertTrue(totalCount(callListFiles(DOWNLOADS)) >= 0)
-    }
+    fun `download_from_url handles truncated response`() =
+        runBlocking<Unit> {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}download_from_url",
+                    mapOf(
+                        "location_id" to DOWNLOADS,
+                        "path" to "e2e-truncated.txt",
+                        "url" to "$fixtureBaseUrl/truncated.txt",
+                    ),
+                )
+            // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
+            // the mid-stream cut fails cleanly ("unexpected end of stream") and the pending
+            // MediaStore row is deleted — no partial file remains in the listing.
+            assertEquals(true, result.isError)
+            assertTrue(toolText(result).contains("unexpected end of stream"), toolText(result))
+            assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-truncated.txt"))
+            // Server healthy afterwards
+            assertTrue(totalCount(callListFiles(DOWNLOADS)) >= 0)
+        }
 
     @Test
     @Order(28)
@@ -524,21 +565,27 @@ class E2EStorageToolsTest {
 
     @Test
     @Order(32)
-    fun `download_from_url refuses a local network address when the block is on`() = runBlocking {
-        // The fixture is reached through the container gateway, a private address: blocked with the switch on.
-        StorageE2E.configureBlockLocalNetworkDownloads(true)
-        try {
-            val result = mcpClient.callTool(
-                "${TOOL_PREFIX}download_from_url",
-                mapOf("location_id" to DOWNLOADS, "path" to "e2e-blocked.txt", "url" to "$fixtureBaseUrl/fixture.txt"),
-            )
-            assertEquals(true, result.isError, toolText(result))
-            assertTrue(toolText(result).contains("Block Local Network Downloads"), toolText(result))
-            assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-blocked.txt"))
-        } finally {
-            StorageE2E.configureBlockLocalNetworkDownloads(false)
+    fun `download_from_url refuses a local network address when the block is on`() =
+        runBlocking {
+            // The fixture is reached through the container gateway, a private address: blocked with the switch on.
+            StorageE2E.configureBlockLocalNetworkDownloads(true)
+            try {
+                val result =
+                    mcpClient.callTool(
+                        "${TOOL_PREFIX}download_from_url",
+                        mapOf(
+                            "location_id" to DOWNLOADS,
+                            "path" to "e2e-blocked.txt",
+                            "url" to "$fixtureBaseUrl/fixture.txt",
+                        ),
+                    )
+                assertEquals(true, result.isError, toolText(result))
+                assertTrue(toolText(result).contains("Block Local Network Downloads"), toolText(result))
+                assertFalse(fileNames(callListFiles(DOWNLOADS)).contains("e2e-blocked.txt"))
+            } finally {
+                StorageE2E.configureBlockLocalNetworkDownloads(false)
+            }
         }
-    }
 
     /** A raw MCP POST (no SDK client), so a test can abort it or send a notification of its own. */
     private fun mcpPost(body: String): Request =

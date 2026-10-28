@@ -1,6 +1,22 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
+}
+
+ktlint {
+    version.set("1.8.0")
+}
+
+// Same rationale as :app — ktlint-cli 1.8.0 bundles a CVE-flagged logback used only at build time.
+configurations.matching { it.name.startsWith("ktlint") }.configureEach {
+    resolutionStrategy {
+        force(
+            "ch.qos.logback:logback-core:1.5.34",
+            "ch.qos.logback:logback-classic:1.5.34",
+        )
+    }
 }
 
 android {

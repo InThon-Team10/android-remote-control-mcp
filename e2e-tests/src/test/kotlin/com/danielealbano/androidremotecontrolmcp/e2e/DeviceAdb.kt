@@ -24,7 +24,12 @@ object DeviceAdb {
     ) {
         val result =
             AndroidContainerSetup.runProcess(
-                "adb", "-s", serial, "install", "-r", apkPath,
+                "adb",
+                "-s",
+                serial,
+                "install",
+                "-r",
+                apkPath,
                 timeoutSeconds = INSTALL_TIMEOUT_S,
             )
         check(result.contains("Success")) { "APK installation failed on $serial: $result" }

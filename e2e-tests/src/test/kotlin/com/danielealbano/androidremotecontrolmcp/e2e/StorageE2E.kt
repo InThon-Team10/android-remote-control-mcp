@@ -57,7 +57,10 @@ object StorageE2E {
     }
 
     /** Seeds a file with the given text content at an /sdcard-relative path (parents created). */
-    fun seedFile(relativePath: String, content: String) {
+    fun seedFile(
+        relativePath: String,
+        content: String,
+    ) {
         val path = "$SDCARD/$relativePath"
         val dir = path.substringBeforeLast('/')
         val b64 = Base64.getEncoder().encodeToString(content.toByteArray())
@@ -65,12 +68,16 @@ object StorageE2E {
     }
 
     /** Seeds [count] one-byte files named <prefix>NNN.jpg under an /sdcard-relative directory. */
-    fun seedBulk(dirRelativePath: String, count: Int, prefix: String = "bulk") {
+    fun seedBulk(
+        dirRelativePath: String,
+        count: Int,
+        prefix: String = "bulk",
+    ) {
         val dir = "$SDCARD/$dirRelativePath"
         val d = "\$"
         shell(
             "mkdir -p \"$dir\" && i=0; while [ ${d}i -lt $count ]; do " +
-                "printf x > \"$dir/$prefix${d}(printf %03d ${d}i).jpg\"; i=${d}((i+1)); done",
+                "printf x > \"$dir/$prefix$d(printf %03d ${d}i).jpg\"; i=$d((i+1)); done",
         )
     }
 
@@ -92,39 +99,80 @@ object StorageE2E {
      */
     fun scanVolume() {
         AndroidContainerSetup.execAdb(
-            "shell", "content", "call", "--uri", "content://media/none",
-            "--method", "scan_volume", "--arg", "external_primary",
+            "shell",
+            "content",
+            "call",
+            "--uri",
+            "content://media/none",
+            "--method",
+            "scan_volume",
+            "--arg",
+            "external_primary",
         )
     }
 
     fun scanPath(relativePath: String) {
         AndroidContainerSetup.execAdb(
-            "shell", "content", "call", "--uri", "content://media/none",
-            "--method", "scan_file", "--arg", "$SDCARD/$relativePath",
+            "shell",
+            "content",
+            "call",
+            "--uri",
+            "content://media/none",
+            "--method",
+            "scan_file",
+            "--arg",
+            "$SDCARD/$relativePath",
         )
     }
 
     /** Sets builtin location allow-write/allow-delete via the E2E config broadcast. */
-    fun configureStorageLocation(locationId: String, allowWrite: Boolean, allowDelete: Boolean) {
+    fun configureStorageLocation(
+        locationId: String,
+        allowWrite: Boolean,
+        allowDelete: Boolean,
+    ) {
         AndroidContainerSetup.execAdb(
-            "shell", "am", "broadcast", "--include-stopped-packages",
-            "-a", "$E2E_ACTION_BASE.E2E_CONFIGURE",
-            "-n", E2E_CONFIG_RECEIVER,
-            "--es", "storage_location_id", locationId,
-            "--ez", "storage_allow_write", allowWrite.toString(),
-            "--ez", "storage_allow_delete", allowDelete.toString(),
+            "shell",
+            "am",
+            "broadcast",
+            "--include-stopped-packages",
+            "-a",
+            "$E2E_ACTION_BASE.E2E_CONFIGURE",
+            "-n",
+            E2E_CONFIG_RECEIVER,
+            "--es",
+            "storage_location_id",
+            locationId,
+            "--ez",
+            "storage_allow_write",
+            allowWrite.toString(),
+            "--ez",
+            "storage_allow_delete",
+            allowDelete.toString(),
         )
         Thread.sleep(1_000)
     }
 
     /** Sets download timeout + HTTP-download allowance via the E2E config broadcast. */
-    fun configureDownloadSettings(timeoutSeconds: Int, allowHttp: Boolean) {
+    fun configureDownloadSettings(
+        timeoutSeconds: Int,
+        allowHttp: Boolean,
+    ) {
         AndroidContainerSetup.execAdb(
-            "shell", "am", "broadcast", "--include-stopped-packages",
-            "-a", "$E2E_ACTION_BASE.E2E_CONFIGURE",
-            "-n", E2E_CONFIG_RECEIVER,
-            "--ei", "download_timeout_seconds", timeoutSeconds.toString(),
-            "--ez", "allow_http_downloads", allowHttp.toString(),
+            "shell",
+            "am",
+            "broadcast",
+            "--include-stopped-packages",
+            "-a",
+            "$E2E_ACTION_BASE.E2E_CONFIGURE",
+            "-n",
+            E2E_CONFIG_RECEIVER,
+            "--ei",
+            "download_timeout_seconds",
+            timeoutSeconds.toString(),
+            "--ez",
+            "allow_http_downloads",
+            allowHttp.toString(),
         )
         Thread.sleep(1_000)
     }
@@ -132,30 +180,56 @@ object StorageE2E {
     /** Sets "Block Local Network Downloads" via the E2E config broadcast. */
     fun configureBlockLocalNetworkDownloads(block: Boolean) {
         AndroidContainerSetup.execAdb(
-            "shell", "am", "broadcast", "--include-stopped-packages",
-            "-a", "$E2E_ACTION_BASE.E2E_CONFIGURE",
-            "-n", E2E_CONFIG_RECEIVER,
-            "--ez", "block_local_network_downloads", block.toString(),
+            "shell",
+            "am",
+            "broadcast",
+            "--include-stopped-packages",
+            "-a",
+            "$E2E_ACTION_BASE.E2E_CONFIGURE",
+            "-n",
+            E2E_CONFIG_RECEIVER,
+            "--ez",
+            "block_local_network_downloads",
+            block.toString(),
         )
         Thread.sleep(1_000)
     }
 
     /** Inserts a MediaStore row with IS_PENDING=1 (no backing content written). */
-    fun insertPendingRow(displayName: String, relativePathWithSlash: String) {
+    fun insertPendingRow(
+        displayName: String,
+        relativePathWithSlash: String,
+    ) {
         AndroidContainerSetup.execAdb(
-            "shell", "content", "insert", "--uri", "content://media/external_primary/file",
-            "--bind", "_display_name:s:$displayName",
-            "--bind", "relative_path:s:$relativePathWithSlash",
-            "--bind", "is_pending:i:1",
+            "shell",
+            "content",
+            "insert",
+            "--uri",
+            "content://media/external_primary/file",
+            "--bind",
+            "_display_name:s:$displayName",
+            "--bind",
+            "relative_path:s:$relativePathWithSlash",
+            "--bind",
+            "is_pending:i:1",
         )
     }
 
     /** Inserts a second MediaStore row with the same display name + relative path. */
-    fun insertDuplicateRow(displayName: String, relativePathWithSlash: String) {
+    fun insertDuplicateRow(
+        displayName: String,
+        relativePathWithSlash: String,
+    ) {
         AndroidContainerSetup.execAdb(
-            "shell", "content", "insert", "--uri", "content://media/external_primary/file",
-            "--bind", "_display_name:s:$displayName",
-            "--bind", "relative_path:s:$relativePathWithSlash",
+            "shell",
+            "content",
+            "insert",
+            "--uri",
+            "content://media/external_primary/file",
+            "--bind",
+            "_display_name:s:$displayName",
+            "--bind",
+            "relative_path:s:$relativePathWithSlash",
         )
     }
 
@@ -163,11 +237,12 @@ object StorageE2E {
     fun waitForAppProcessDeath(timeoutMs: Long = 15_000L) {
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeoutMs) {
-            val pid = try {
-                shell("pidof $APP_PACKAGE || true")
-            } catch (_: Exception) {
-                ""
-            }
+            val pid =
+                try {
+                    shell("pidof $APP_PACKAGE || true")
+                } catch (_: Exception) {
+                    ""
+                }
             if (pid.isBlank()) return
             Thread.sleep(500)
         }

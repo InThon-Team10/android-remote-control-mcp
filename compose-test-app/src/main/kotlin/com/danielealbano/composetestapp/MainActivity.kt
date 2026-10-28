@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.sp
  * and the text "Number: <value>" so it can be found via MCP accessibility tools.
  */
 class MainActivity : ComponentActivity() {
-
     private val currentNumber = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,11 +49,12 @@ class MainActivity : ComponentActivity() {
                         Text(
                             text = "Number: ${currentNumber.intValue}",
                             fontSize = 48.sp,
-                            modifier = Modifier
-                                .testTag("number_display")
-                                .semantics {
-                                    contentDescription = "compose_number_display"
-                                },
+                            modifier =
+                                Modifier
+                                    .testTag("number_display")
+                                    .semantics {
+                                        contentDescription = "compose_number_display"
+                                    },
                         )
                     }
                 }

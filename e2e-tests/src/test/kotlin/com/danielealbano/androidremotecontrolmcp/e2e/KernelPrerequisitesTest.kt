@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * Covers [AndroidContainerSetup.kernelPrerequisitesSatisfied], the decision that lets the redroid setup skip the
+ * Covers [RedroidHostPrerequisites.kernelPrerequisitesSatisfied], the decision that lets the redroid setup skip the
  * sudo `modprobe` path. Pure logic: no container is started.
  */
 class KernelPrerequisitesTest {
@@ -17,7 +17,7 @@ class KernelPrerequisitesTest {
     @Test
     fun `fuse module and mounted binderfs are satisfied`() {
         assertTrue(
-            AndroidContainerSetup.kernelPrerequisitesSatisfied(
+            RedroidHostPrerequisites.kernelPrerequisitesSatisfied(
                 procModules = onlyFuseModuleLoaded,
                 devFuseExists = false,
                 binderfsMounted = true,
@@ -28,7 +28,7 @@ class KernelPrerequisitesTest {
     @Test
     fun `built-in fuse and mounted binderfs with no modules listed are satisfied`() {
         assertTrue(
-            AndroidContainerSetup.kernelPrerequisitesSatisfied(
+            RedroidHostPrerequisites.kernelPrerequisitesSatisfied(
                 procModules = "",
                 devFuseExists = true,
                 binderfsMounted = true,
@@ -39,7 +39,7 @@ class KernelPrerequisitesTest {
     @Test
     fun `loaded binder module without a mounted binderfs is not satisfied`() {
         assertFalse(
-            AndroidContainerSetup.kernelPrerequisitesSatisfied(
+            RedroidHostPrerequisites.kernelPrerequisitesSatisfied(
                 procModules = bothModulesLoaded,
                 devFuseExists = true,
                 binderfsMounted = false,
@@ -50,7 +50,7 @@ class KernelPrerequisitesTest {
     @Test
     fun `missing fuse is not satisfied`() {
         assertFalse(
-            AndroidContainerSetup.kernelPrerequisitesSatisfied(
+            RedroidHostPrerequisites.kernelPrerequisitesSatisfied(
                 procModules = onlyBinderModuleLoaded,
                 devFuseExists = false,
                 binderfsMounted = true,
@@ -61,7 +61,7 @@ class KernelPrerequisitesTest {
     @Test
     fun `nothing available is not satisfied`() {
         assertFalse(
-            AndroidContainerSetup.kernelPrerequisitesSatisfied(
+            RedroidHostPrerequisites.kernelPrerequisitesSatisfied(
                 procModules = "",
                 devFuseExists = false,
                 binderfsMounted = false,

@@ -69,16 +69,18 @@ class McpClient(
      * Connect to the MCP server and complete the initialize handshake.
      */
     suspend fun connect() {
-        val transport = StreamableHttpClientTransport(
-            client = httpClient,
-            url = "$baseUrl/mcp",
-            requestBuilder = {
-                headers.append("Authorization", "Bearer $bearerToken")
-            },
-        )
-        val c = Client(
-            clientInfo = Implementation(name = "e2e-test-client", version = "1.0.0"),
-        )
+        val transport =
+            StreamableHttpClientTransport(
+                client = httpClient,
+                url = "$baseUrl/mcp",
+                requestBuilder = {
+                    headers.append("Authorization", "Bearer $bearerToken")
+                },
+            )
+        val c =
+            Client(
+                clientInfo = Implementation(name = "e2e-test-client", version = "1.0.0"),
+            )
         c.connect(transport)
         client = c
     }
@@ -110,7 +112,15 @@ class McpClient(
  * MUST NOT be used in production.
  */
 class TrustAllX509TrustManager : X509TrustManager {
-    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+    override fun checkClientTrusted(
+        chain: Array<out X509Certificate>?,
+        authType: String?,
+    ) = Unit
+
+    override fun checkServerTrusted(
+        chain: Array<out X509Certificate>?,
+        authType: String?,
+    ) = Unit
+
     override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
 }

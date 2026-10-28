@@ -26,7 +26,6 @@ import java.net.URI
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class E2EErrorHandlingTest {
-
     companion object {
         /**
          * Tool name prefix for E2E tests. Centralized from [AndroidContainerSetup.TOOL_NAME_PREFIX]
@@ -58,8 +57,10 @@ class E2EErrorHandlingTest {
     fun `missing bearer token returns 401 Unauthorized`() {
         // Use raw HTTP to assert the exact 401 status code, avoiding false positives
         // from unrelated exceptions (network errors, TLS failures, etc.)
-        val conn = URI("$baseUrl/mcp").toURL()
-            .openConnection() as HttpURLConnection
+        val conn =
+            URI("$baseUrl/mcp")
+                .toURL()
+                .openConnection() as HttpURLConnection
         try {
             conn.requestMethod = "POST"
             conn.connectTimeout = 5_000
@@ -80,8 +81,10 @@ class E2EErrorHandlingTest {
     fun `invalid bearer token returns 401 Unauthorized`() {
         // Use raw HTTP to assert the exact 401 status code, avoiding false positives
         // from unrelated exceptions (network errors, TLS failures, etc.)
-        val conn = URI("$baseUrl/mcp").toURL()
-            .openConnection() as HttpURLConnection
+        val conn =
+            URI("$baseUrl/mcp")
+                .toURL()
+                .openConnection() as HttpURLConnection
         try {
             conn.requestMethod = "POST"
             conn.connectTimeout = 5_000
@@ -99,69 +102,81 @@ class E2EErrorHandlingTest {
     }
 
     @Test
-    fun `correct bearer token returns successful response`() = runBlocking {
-        // Retry — accessibility service may be transiently unavailable after
-        // camera timeout operations on slow CI emulators.
-        var result = mcpClient.callTool("${TOOL_PREFIX}press_home")
-        for (attempt in 1..MAX_RETRY_ATTEMPTS) {
-            if (result.isError != true) break
-            val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
-            println("[E2E ErrorHandling] press_home attempt $attempt failed: $errorText — retrying after ${RETRY_DELAY_MS}ms")
-            Thread.sleep(RETRY_DELAY_MS)
-            result = mcpClient.callTool("${TOOL_PREFIX}press_home")
-        }
-        assertNotEquals(
-            true,
-            result.isError,
-            "press_home should succeed: ${(result.content.firstOrNull() as? TextContent)?.text}",
-        )
-    }
-
-    @Test
-    fun `unknown tool name returns error result`() = runBlocking {
-        val result = mcpClient.callTool("nonexistent_tool_name")
-        assertEquals(true, result.isError)
-        val text = (result.content[0] as TextContent).text
-        assertTrue(text.contains("not found", ignoreCase = true))
-    }
-
-    @Test
-    fun `invalid params returns error result`() = runBlocking {
-        // Call tap without required x,y coordinates
-        val result = mcpClient.callTool("${TOOL_PREFIX}tap", emptyMap())
-        assertEquals(true, result.isError)
-        val text = (result.content[0] as TextContent).text
-        assertTrue(
-            text.contains("Missing required parameter", ignoreCase = true) ||
-                text.contains("'x'") || text.contains("\"x\""),
-            "Error should mention missing parameter, got: $text",
-        )
-    }
-
-    @Test
-    fun `click on non-existent node returns error result`() = runBlocking {
-        // If accessibility service is transiently unavailable, the error message
-        // won't contain the node ID. Retry to allow recovery.
-        var result = mcpClient.callTool(
-            "${TOOL_PREFIX}click_node",
-            mapOf("node_id" to "nonexistent_element_id_12345"),
-        )
-        assertEquals(true, result.isError)
-        var text = (result.content[0] as TextContent).text
-        for (attempt in 1..MAX_RETRY_ATTEMPTS) {
-            if (text.contains("nonexistent_element_id_12345")) break
-            println("[E2E ErrorHandling] click_node attempt $attempt error didn't mention node ID: $text — retrying after ${RETRY_DELAY_MS}ms")
-            Thread.sleep(RETRY_DELAY_MS)
-            result = mcpClient.callTool(
-                "${TOOL_PREFIX}click_node",
-                mapOf("node_id" to "nonexistent_element_id_12345"),
+    fun `correct bearer token returns successful response`() =
+        runBlocking {
+            // Retry — accessibility service may be transiently unavailable after
+            // camera timeout operations on slow CI emulators.
+            var result = mcpClient.callTool("${TOOL_PREFIX}press_home")
+            for (attempt in 1..MAX_RETRY_ATTEMPTS) {
+                if (result.isError != true) break
+                val errorText = (result.content.firstOrNull() as? TextContent)?.text ?: "unknown"
+                println(
+                    "[E2E ErrorHandling] press_home attempt $attempt failed: $errorText — " +
+                        "retrying after ${RETRY_DELAY_MS}ms",
+                )
+                Thread.sleep(RETRY_DELAY_MS)
+                result = mcpClient.callTool("${TOOL_PREFIX}press_home")
+            }
+            assertNotEquals(
+                true,
+                result.isError,
+                "press_home should succeed: ${(result.content.firstOrNull() as? TextContent)?.text}",
             )
-            assertEquals(true, result.isError)
-            text = (result.content[0] as TextContent).text
         }
-        assertTrue(
-            text.contains("nonexistent_element_id_12345"),
-            "Error should mention the node ID, got: $text",
-        )
-    }
+
+    @Test
+    fun `unknown tool name returns error result`() =
+        runBlocking {
+            val result = mcpClient.callTool("nonexistent_tool_name")
+            assertEquals(true, result.isError)
+            val text = (result.content[0] as TextContent).text
+            assertTrue(text.contains("not found", ignoreCase = true))
+        }
+
+    @Test
+    fun `invalid params returns error result`() =
+        runBlocking {
+            // Call tap without required x,y coordinates
+            val result = mcpClient.callTool("${TOOL_PREFIX}tap", emptyMap())
+            assertEquals(true, result.isError)
+            val text = (result.content[0] as TextContent).text
+            assertTrue(
+                text.contains("Missing required parameter", ignoreCase = true) ||
+                    text.contains("'x'") || text.contains("\"x\""),
+                "Error should mention missing parameter, got: $text",
+            )
+        }
+
+    @Test
+    fun `click on non-existent node returns error result`() =
+        runBlocking {
+            // If accessibility service is transiently unavailable, the error message
+            // won't contain the node ID. Retry to allow recovery.
+            var result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}click_node",
+                    mapOf("node_id" to "nonexistent_element_id_12345"),
+                )
+            assertEquals(true, result.isError)
+            var text = (result.content[0] as TextContent).text
+            for (attempt in 1..MAX_RETRY_ATTEMPTS) {
+                if (text.contains("nonexistent_element_id_12345")) break
+                println(
+                    "[E2E ErrorHandling] click_node attempt $attempt error didn't mention node ID: $text — " +
+                        "retrying after ${RETRY_DELAY_MS}ms",
+                )
+                Thread.sleep(RETRY_DELAY_MS)
+                result =
+                    mcpClient.callTool(
+                        "${TOOL_PREFIX}click_node",
+                        mapOf("node_id" to "nonexistent_element_id_12345"),
+                    )
+                assertEquals(true, result.isError)
+                text = (result.content[0] as TextContent).text
+            }
+            assertTrue(
+                text.contains("nonexistent_element_id_12345"),
+                "Error should mention the node ID, got: $text",
+            )
+        }
 }

@@ -25,7 +25,6 @@ import org.junit.jupiter.api.TestInstance
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class E2EWebViewNodeReductionTest {
-
     private val mcpClient = SharedAndroidContainer.mcpClient
 
     companion object {
@@ -48,59 +47,65 @@ class E2EWebViewNodeReductionTest {
     }
 
     @Test
-    fun `heavy webview page node count is collapsed`() = runBlocking {
-        mcpClient.callTool("${TOOL_PREFIX}press_home")
-        Thread.sleep(1_000)
+    fun `heavy webview page node count is collapsed`() =
+        runBlocking {
+            mcpClient.callTool("${TOOL_PREFIX}press_home")
+            Thread.sleep(1_000)
 
-        AndroidContainerSetup.launchHeavyWebViewTestApp()
+            E2ETestApps.launchHeavyWebViewTestApp()
 
-        // The web accessibility tree populates asynchronously; wait until it is large enough.
-        var rawNodes = 0
-        repeat(SETTLE_ATTEMPTS) { attempt ->
-            rawNodes = AndroidContainerSetup.uiAutomatorNodeCount()
-            println("[E2E NodeReduction] attempt ${attempt + 1}: raw uiautomator nodes=$rawNodes")
-            if (rawNodes > MIN_RAW_NODES) return@repeat
-            Thread.sleep(SETTLE_WAIT_MS)
+            // The web accessibility tree populates asynchronously; wait until it is large enough.
+            var rawNodes = 0
+            repeat(SETTLE_ATTEMPTS) { attempt ->
+                rawNodes = E2ETestApps.uiAutomatorNodeCount()
+                println("[E2E NodeReduction] attempt ${attempt + 1}: raw uiautomator nodes=$rawNodes")
+                if (rawNodes > MIN_RAW_NODES) return@repeat
+                Thread.sleep(SETTLE_WAIT_MS)
+            }
+            assertTrue(
+                rawNodes > MIN_RAW_NODES,
+                "expected > $MIN_RAW_NODES raw nodes after ${SETTLE_ATTEMPTS} attempts, got $rawNodes",
+            )
+
+            // Keep-filtered baseline (nodes surviving filtering BEFORE the merge) isolates the merge.
+            val keptRawNodes = E2ETestApps.uiAutomatorKeptNodeCount()
+            val result = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
+            val text = (result.content[0] as TextContent).text
+            val mergedNodes = collapsedNodeCount(text)
+            val reduction = (keptRawNodes - mergedNodes).toDouble() / keptRawNodes
+            println(
+                "[E2E NodeReduction] raw=$rawNodes keptRaw=$keptRawNodes merged=$mergedNodes " +
+                    "merge-reduction=${"%.1f".format(reduction * 100)}%",
+            )
+
+            assertTrue(mergedNodes > 0, "collapsed node count should be positive (output:\n${text.take(500)})")
+            assertTrue(keptRawNodes > 0, "keep-filtered baseline should be positive")
+            assertTrue(
+                reduction >= MIN_REDUCTION,
+                "expected >= ${(MIN_REDUCTION * 100).toInt()}% merge reduction vs filtered baseline, got " +
+                    "${"%.1f".format(reduction * 100)}% (keptRaw=$keptRawNodes merged=$mergedNodes)",
+            )
+            // The "![" image-markdown wrapper is produced ONLY by the WebView collapse, so its presence
+            // proves the merge actually ran (isolating it from the structural-only filtering that
+            // get_screen_state always applies).
+            assertTrue(
+                text.contains("!["),
+                "merged output must contain image markdown (proving the WebView collapse ran); " +
+                    "output excerpt:\n${text.take(800)}",
+            )
         }
-        assertTrue(
-            rawNodes > MIN_RAW_NODES,
-            "expected > $MIN_RAW_NODES raw nodes after ${SETTLE_ATTEMPTS} attempts, got $rawNodes",
-        )
-
-        // Keep-filtered baseline (nodes surviving filtering BEFORE the merge) isolates the merge.
-        val keptRawNodes = AndroidContainerSetup.uiAutomatorKeptNodeCount()
-        val result = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
-        val text = (result.content[0] as TextContent).text
-        val mergedNodes = collapsedNodeCount(text)
-        val reduction = (keptRawNodes - mergedNodes).toDouble() / keptRawNodes
-        println(
-            "[E2E NodeReduction] raw=$rawNodes keptRaw=$keptRawNodes merged=$mergedNodes " +
-                "merge-reduction=${"%.1f".format(reduction * 100)}%",
-        )
-
-        assertTrue(mergedNodes > 0, "collapsed node count should be positive (output:\n${text.take(500)})")
-        assertTrue(keptRawNodes > 0, "keep-filtered baseline should be positive")
-        assertTrue(
-            reduction >= MIN_REDUCTION,
-            "expected >= ${(MIN_REDUCTION * 100).toInt()}% merge reduction vs filtered baseline, got " +
-                "${"%.1f".format(reduction * 100)}% (keptRaw=$keptRawNodes merged=$mergedNodes)",
-        )
-        // The "![" image-markdown wrapper is produced ONLY by the WebView collapse, so its presence
-        // proves the merge actually ran (isolating it from the structural-only filtering that
-        // get_screen_state always applies).
-        assertTrue(
-            text.contains("!["),
-            "merged output must contain image markdown (proving the WebView collapse ran); " +
-                "output excerpt:\n${text.take(800)}",
-        )
-    }
 
     /**
      * Returns the collapsed node count from a `get_screen_state` response: the pagination total when
      * the output is paged, otherwise the number of TSV data rows on the single page.
      */
     private fun collapsedNodeCount(screenState: String): Int {
-        val paged = NODES_TOTAL_REGEX.find(screenState)?.groupValues?.get(1)?.toIntOrNull()
+        val paged =
+            NODES_TOTAL_REGEX
+                .find(screenState)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull()
         if (paged != null) return paged
         return TSV_ROW_REGEX.findAll(screenState).count()
     }
