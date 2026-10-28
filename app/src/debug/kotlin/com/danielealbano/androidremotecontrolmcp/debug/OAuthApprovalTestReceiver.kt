@@ -34,14 +34,18 @@ import javax.inject.Inject
  * # Approve a specific pending request
  * adb shell am broadcast \
  *   -a com.danielealbano.androidremotecontrolmcp.debug.OAUTH_APPROVE \
- *   -n com.danielealbano.androidremotecontrolmcp.debug/.OAuthApprovalTestReceiver \
+ *   -n <app-id>/com.danielealbano.androidremotecontrolmcp.debug.OAuthApprovalTestReceiver \
  *   --es approval_id "<id>"
  *
  * # Or approve all currently-pending requests (omit approval_id)
  * adb shell am broadcast \
  *   -a com.danielealbano.androidremotecontrolmcp.debug.OAUTH_APPROVE \
- *   -n com.danielealbano.androidremotecontrolmcp.debug/.OAuthApprovalTestReceiver
+ *   -n <app-id>/com.danielealbano.androidremotecontrolmcp.debug.OAuthApprovalTestReceiver
  * ```
+ *
+ * Where `<app-id>` is `com.danielealbano.androidremotecontrolmcp.gms.debug` (gms flavor) or
+ * `com.danielealbano.androidremotecontrolmcp.foss.debug` (foss flavor): this receiver exists only in debug builds.
+ * The actions keep the receiver's source package (`com.danielealbano.androidremotecontrolmcp.debug`).
  */
 @AndroidEntryPoint
 class OAuthApprovalTestReceiver : BroadcastReceiver() {

@@ -616,7 +616,7 @@ Local development requires Android SDK, emulator/device, and standard Android de
 
 ### APK building
 - **Debug APK**: Build with `make build` or `./gradlew assembleDebug`.
-  - Application ID: `com.danielealbano.androidremotecontrolmcp.debug`.
+  - Application ID: `com.danielealbano.androidremotecontrolmcp.gms.debug` (gms flavor) or `com.danielealbano.androidremotecontrolmcp.foss.debug` (foss flavor).
   - Debuggable: true.
   - Minify: false.
   - Signed with debug keystore.

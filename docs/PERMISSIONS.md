@@ -8,10 +8,11 @@ The commands below require a device or emulator reachable over `adb` where the a
 
 Replace `<app-id>` with the application ID for your build:
 
-- **Debug**: `com.danielealbano.androidremotecontrolmcp.debug`
-- **Release**: `com.danielealbano.androidremotecontrolmcp`
+- **Debug (gms flavor)**: `com.danielealbano.androidremotecontrolmcp.gms.debug`
+- **Debug (foss flavor)**: `com.danielealbano.androidremotecontrolmcp.foss.debug`
+- **Release (both flavors)**: `com.danielealbano.androidremotecontrolmcp`
 
-> **Note**: the debug build adds the `.debug` suffix to the **application ID**, but the **class names do not change**. The Accessibility and Notification Listener component names below always use the unsuffixed class package (`com.danielealbano.androidremotecontrolmcp.services.*`), regardless of build type.
+> **Note**: debug builds add the `.gms.debug` or `.foss.debug` suffix to the **application ID**, but the **class names do not change**. The Accessibility and Notification Listener component names below always use the unsuffixed class package (`com.danielealbano.androidremotecontrolmcp.services.*`), regardless of build type.
 
 ## Permission categories
 
@@ -81,8 +82,9 @@ The following script grants every runtime permission and enables both special-ac
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Set to com.danielealbano.androidremotecontrolmcp for a release build
-APP_ID="com.danielealbano.androidremotecontrolmcp.debug"
+# gms debug build; set to com.danielealbano.androidremotecontrolmcp.foss.debug for the foss debug build,
+# or to com.danielealbano.androidremotecontrolmcp for a release build
+APP_ID="com.danielealbano.androidremotecontrolmcp.gms.debug"
 
 ACCESSIBILITY_SERVICE="$APP_ID/com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService"
 NOTIFICATION_LISTENER="$APP_ID/com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService"

@@ -44,8 +44,9 @@ import com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel.ArcTu
  * ```
  *
  * Where `<app-id>` is:
- * - Debug: `com.danielealbano.androidremotecontrolmcp.debug`
- * - Release: `com.danielealbano.androidremotecontrolmcp`
+ * - Debug, gms flavor: `com.danielealbano.androidremotecontrolmcp.gms.debug`
+ * - Debug, foss flavor: `com.danielealbano.androidremotecontrolmcp.foss.debug`
+ * - Release (both flavors): `com.danielealbano.androidremotecontrolmcp`
  */
 class AdbServiceTrampolineActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
