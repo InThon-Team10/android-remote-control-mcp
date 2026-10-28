@@ -13,6 +13,12 @@ concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
+env:
+  # Go toolchain that compiles the bundled cloudflared. Its crypto/x509 decides which certificate
+  # chains cloudflared trusts (go1.27.3 distrusts the weak-key eMudhra intermediates, GO-2026-6809),
+  # so it is part of the cloudflared cache key: changing it rebuilds the binary.
+  CLOUDFLARED_GO_VERSION: '1.27.3'
+
 jobs:
   release:
     name: Create Draft Release
@@ -111,7 +117,7 @@ jobs:
           path: |
             app/src/main/jniLibs/arm64-v8a/libcloudflared.so
             app/src/main/jniLibs/x86_64/libcloudflared.so
-          key: cloudflared-android-${{ runner.os }}-${{ hashFiles('.gitmodules', 'vendor/cloudflared/**/*.go', 'vendor/cloudflared/go.sum') }}
+          key: cloudflared-android-${{ runner.os }}-go${{ env.CLOUDFLARED_GO_VERSION }}-${{ hashFiles('.gitmodules', 'Makefile', 'vendor/cloudflared/**/*.go', 'vendor/cloudflared/go.mod', 'vendor/cloudflared/go.sum') }}
 
       - name: Cache ngrok-java Android native
         id: cache-ngrok-android
@@ -128,7 +134,7 @@ jobs:
         if: steps.cache-cloudflared.outputs.cache-hit != 'true'
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.6'
+          go-version: ${{ env.CLOUDFLARED_GO_VERSION }}
 
       - name: Set up Rust
         if: steps.cache-ngrok-android.outputs.cache-hit != 'true'
