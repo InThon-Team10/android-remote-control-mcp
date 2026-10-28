@@ -13,6 +13,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Go toolchain that compiles the bundled cloudflared. Its crypto/x509 decides which certificate
+  # chains cloudflared trusts (go1.27.3 distrusts the weak-key eMudhra intermediates, GO-2026-6809),
+  # so it is part of the cloudflared cache key: changing it rebuilds the binary.
+  CLOUDFLARED_GO_VERSION: '1.27.3'
+
 # The four jobs below are independent — none consumes another's artifacts; each checks out
 # fresh, rebuilds its native deps from cache, and runs its own Gradle tasks. They therefore run
 # in PARALLEL on separate runners instead of in a needs: chain, cutting wall-clock from the sum
@@ -174,6 +180,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Resolve cloudflared build inputs
+        id: cloudflared-inputs
+        # The binary also depends on the submodule commit (version stamp, VCS info) and on the NDK
+        # clang that compiles and links it, the newest NDK as the Makefile picks it.
+        run: |
+          echo "commit=$(git rev-parse HEAD:vendor/cloudflared)" >> "$GITHUB_OUTPUT"
+          echo "ndk=$(ls "$ANDROID_HOME/ndk" | sort -V | tail -1)" >> "$GITHUB_OUTPUT"
+
       - name: Cache cloudflared Android native
         id: cache-cloudflared
         uses: actions/cache@v6
@@ -181,7 +195,7 @@ jobs:
           path: |
             app/src/main/jniLibs/arm64-v8a/libcloudflared.so
             app/src/main/jniLibs/x86_64/libcloudflared.so
-          key: cloudflared-android-${{ runner.os }}-${{ hashFiles('.gitmodules', 'vendor/cloudflared/**/*.go', 'vendor/cloudflared/go.sum') }}
+          key: cloudflared-android-${{ runner.os }}-go${{ env.CLOUDFLARED_GO_VERSION }}-ndk${{ steps.cloudflared-inputs.outputs.ndk }}-${{ steps.cloudflared-inputs.outputs.commit }}-${{ hashFiles('.gitmodules', 'Makefile', 'vendor/cloudflared/**/*.go', 'vendor/cloudflared/go.mod', 'vendor/cloudflared/go.sum') }}
 
       - name: Cache ngrok-java Android native
         id: cache-ngrok-android
@@ -198,7 +212,7 @@ jobs:
         if: steps.cache-cloudflared.outputs.cache-hit != 'true'
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.6'
+          go-version: ${{ env.CLOUDFLARED_GO_VERSION }}
 
       - name: Set up Rust
         if: steps.cache-ngrok-android.outputs.cache-hit != 'true'
@@ -330,6 +344,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Resolve cloudflared build inputs
+        id: cloudflared-inputs
+        # The binary also depends on the submodule commit (version stamp, VCS info) and on the NDK
+        # clang that compiles and links it, the newest NDK as the Makefile picks it.
+        run: |
+          echo "commit=$(git rev-parse HEAD:vendor/cloudflared)" >> "$GITHUB_OUTPUT"
+          echo "ndk=$(ls "$ANDROID_HOME/ndk" | sort -V | tail -1)" >> "$GITHUB_OUTPUT"
+
       - name: Cache cloudflared Android native
         id: cache-cloudflared
         uses: actions/cache@v6
@@ -337,7 +359,7 @@ jobs:
           path: |
             app/src/main/jniLibs/arm64-v8a/libcloudflared.so
             app/src/main/jniLibs/x86_64/libcloudflared.so
-          key: cloudflared-android-${{ runner.os }}-${{ hashFiles('.gitmodules', 'vendor/cloudflared/**/*.go', 'vendor/cloudflared/go.sum') }}
+          key: cloudflared-android-${{ runner.os }}-go${{ env.CLOUDFLARED_GO_VERSION }}-ndk${{ steps.cloudflared-inputs.outputs.ndk }}-${{ steps.cloudflared-inputs.outputs.commit }}-${{ hashFiles('.gitmodules', 'Makefile', 'vendor/cloudflared/**/*.go', 'vendor/cloudflared/go.mod', 'vendor/cloudflared/go.sum') }}
 
       - name: Cache ngrok-java Android native
         id: cache-ngrok-android
@@ -354,7 +376,7 @@ jobs:
         if: steps.cache-cloudflared.outputs.cache-hit != 'true'
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.6'
+          go-version: ${{ env.CLOUDFLARED_GO_VERSION }}
 
       - name: Set up Rust
         if: steps.cache-ngrok-android.outputs.cache-hit != 'true'

@@ -64,12 +64,13 @@ Go modules compiled into it:
 | github.com/BurntSushi/toml | MIT | https://pkg.go.dev/github.com/BurntSushi/toml |
 | github.com/beorn7/perks | MIT | https://pkg.go.dev/github.com/beorn7/perks |
 | github.com/cespare/xxhash/v2 | MIT | https://pkg.go.dev/github.com/cespare/xxhash/v2 |
+| github.com/cloudflare/backoff | BSD-2-Clause | https://pkg.go.dev/github.com/cloudflare/backoff |
 | github.com/coreos/go-oidc/v3 | Apache-2.0 | https://pkg.go.dev/github.com/coreos/go-oidc/v3 |
 | github.com/coreos/go-systemd/v22 | Apache-2.0 | https://pkg.go.dev/github.com/coreos/go-systemd/v22 |
 | github.com/cpuguy83/go-md2man/v2 | MIT | https://pkg.go.dev/github.com/cpuguy83/go-md2man/v2 |
 | github.com/facebookgo/grace | MIT | https://pkg.go.dev/github.com/facebookgo/grace |
 | github.com/fsnotify/fsnotify | BSD-3-Clause | https://pkg.go.dev/github.com/fsnotify/fsnotify |
-| github.com/getsentry/sentry-go | BSD-2-Clause | https://pkg.go.dev/github.com/getsentry/sentry-go |
+| github.com/getsentry/sentry-go | MIT | https://pkg.go.dev/github.com/getsentry/sentry-go |
 | github.com/go-chi/chi/v5 | MIT | https://pkg.go.dev/github.com/go-chi/chi/v5 |
 | github.com/go-chi/cors | MIT | https://pkg.go.dev/github.com/go-chi/cors |
 | github.com/go-jose/go-jose/v4 | Apache-2.0 AND BSD-3-Clause | https://pkg.go.dev/github.com/go-jose/go-jose/v4 |
@@ -98,14 +99,17 @@ Go modules compiled into it:
 | github.com/quic-go/quic-go | MIT | https://pkg.go.dev/github.com/quic-go/quic-go (built from the fork github.com/chungthuang/quic-go) |
 | github.com/rs/zerolog | MIT | https://pkg.go.dev/github.com/rs/zerolog |
 | github.com/russross/blackfriday/v2 | BSD-2-Clause | https://pkg.go.dev/github.com/russross/blackfriday/v2 |
+| github.com/shirou/gopsutil/v4 | BSD-3-Clause | https://pkg.go.dev/github.com/shirou/gopsutil/v4 |
+| github.com/tklauser/go-sysconf | BSD-3-Clause | https://pkg.go.dev/github.com/tklauser/go-sysconf |
+| github.com/tklauser/numcpus | Apache-2.0 | https://pkg.go.dev/github.com/tklauser/numcpus |
 | github.com/urfave/cli/v2 | MIT | https://pkg.go.dev/github.com/urfave/cli/v2 (built from the fork github.com/ipostelnik/cli/v2) |
 | go.opentelemetry.io/auto/sdk | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/auto/sdk |
 | go.opentelemetry.io/contrib/propagators | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/contrib/propagators |
-| go.opentelemetry.io/otel | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/otel |
-| go.opentelemetry.io/otel/exporters/otlp/otlptrace | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/otel/exporters/otlp/otlptrace |
-| go.opentelemetry.io/otel/metric | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/otel/metric |
-| go.opentelemetry.io/otel/sdk | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/otel/sdk |
-| go.opentelemetry.io/otel/trace | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/otel/trace |
+| go.opentelemetry.io/otel | Apache-2.0 AND BSD-3-Clause | https://pkg.go.dev/go.opentelemetry.io/otel |
+| go.opentelemetry.io/otel/exporters/otlp/otlptrace | Apache-2.0 AND BSD-3-Clause | https://pkg.go.dev/go.opentelemetry.io/otel/exporters/otlp/otlptrace |
+| go.opentelemetry.io/otel/metric | Apache-2.0 AND BSD-3-Clause | https://pkg.go.dev/go.opentelemetry.io/otel/metric |
+| go.opentelemetry.io/otel/sdk | Apache-2.0 AND BSD-3-Clause | https://pkg.go.dev/go.opentelemetry.io/otel/sdk |
+| go.opentelemetry.io/otel/trace | Apache-2.0 AND BSD-3-Clause | https://pkg.go.dev/go.opentelemetry.io/otel/trace |
 | go.opentelemetry.io/proto/otlp | Apache-2.0 | https://pkg.go.dev/go.opentelemetry.io/proto/otlp |
 | go.uber.org/automaxprocs | MIT | https://pkg.go.dev/go.uber.org/automaxprocs |
 | golang.org/x/crypto | BSD-3-Clause | https://pkg.go.dev/golang.org/x/crypto |
