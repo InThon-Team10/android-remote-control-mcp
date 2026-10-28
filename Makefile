@@ -343,6 +343,11 @@ NDK_BIN := $(NDK_ROOT)/toolchains/llvm/prebuilt/$(shell uname -s | tr A-Z a-z)-$
 
 CLOUDFLARED_SRC_DIR := vendor/cloudflared
 CLOUDFLARED_JNILIBS_DIR := app/src/main/jniLibs
+# Version stamp, as upstream builds it (without it the binary reports "DEV"). The build time is the date of
+# the release's RELEASE_NOTES commit, not the clock, so the same submodule commit always gets the same version stamp.
+CLOUDFLARED_VERSION = $(shell git -C $(CLOUDFLARED_SRC_DIR) describe --tags --always --match "[0-9][0-9][0-9][0-9].*.*")
+CLOUDFLARED_BUILD_TIME = $(shell TZ=UTC git -C $(CLOUDFLARED_SRC_DIR) log -1 --format=%ad --date=format-local:'%Y-%m-%d-%H:%M UTC' -- RELEASE_NOTES)
+CLOUDFLARED_LDFLAGS = -s -w -X 'main.Version=$(CLOUDFLARED_VERSION)' -X 'main.BuildTime=$(CLOUDFLARED_BUILD_TIME)' -extldflags=-Wl,-z,max-page-size=16384
 
 compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + Android NDK)
 	@if [ ! -f "$(CLOUDFLARED_SRC_DIR)/cmd/cloudflared/main.go" ]; then \
@@ -364,7 +369,7 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=arm64 \
 		CC=$(NDK_BIN)/aarch64-linux-android21-clang \
-		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
+		go build -a -installsuffix cgo -ldflags="$(CLOUDFLARED_LDFLAGS)" \
 		-o $(CURDIR)/$(CLOUDFLARED_JNILIBS_DIR)/arm64-v8a/libcloudflared.so \
 		./cmd/cloudflared
 	@echo ""
@@ -373,7 +378,7 @@ compile-cloudflared: ## Cross-compile cloudflared for Android (requires Go + And
 	cd $(CLOUDFLARED_SRC_DIR) && \
 		CGO_ENABLED=1 GOOS=android GOARCH=amd64 \
 		CC=$(NDK_BIN)/x86_64-linux-android21-clang \
-		go build -a -installsuffix cgo -ldflags="-s -w -extldflags=-Wl,-z,max-page-size=16384" \
+		go build -a -installsuffix cgo -ldflags="$(CLOUDFLARED_LDFLAGS)" \
 		-o $(CURDIR)/$(CLOUDFLARED_JNILIBS_DIR)/x86_64/libcloudflared.so \
 		./cmd/cloudflared
 	@echo ""
