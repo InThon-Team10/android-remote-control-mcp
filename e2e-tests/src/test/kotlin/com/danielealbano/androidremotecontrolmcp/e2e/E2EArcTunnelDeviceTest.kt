@@ -86,10 +86,21 @@ class E2EArcTunnelDeviceTest {
     ) {
         try {
             AndroidContainerSetup.execAdbOn(
-                device, "shell", "am", "broadcast", "--include-stopped-packages",
-                "-a", AndroidContainerSetup.E2E_CONFIGURE_ACTION, "-n", AndroidContainerSetup.E2E_RECEIVER_COMPONENT,
-                "--es", "bearer_token", value,
-                "--ez", "bearer_token_enabled", enabled.toString(),
+                device,
+                "shell",
+                "am",
+                "broadcast",
+                "--include-stopped-packages",
+                "-a",
+                AndroidContainerSetup.E2E_CONFIGURE_ACTION,
+                "-n",
+                AndroidContainerSetup.E2E_RECEIVER_COMPONENT,
+                "--es",
+                "bearer_token",
+                value,
+                "--ez",
+                "bearer_token_enabled",
+                enabled.toString(),
             )
         } catch (_: IllegalStateException) {
             throw IllegalStateException("bearer token broadcast failed on $device")

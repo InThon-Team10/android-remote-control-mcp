@@ -36,7 +36,6 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2EStorageEdgeCasesTest {
-
     companion object {
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
         private const val DOWNLOADS = "builtin:downloads"
@@ -89,44 +88,51 @@ class E2EStorageEdgeCasesTest {
 
     // ─── shared helpers ─────────────────────────────────────────────────────
 
-    private fun toolText(result: CallToolResult): String =
-        (result.content.first() as TextContent).text
+    private fun toolText(result: CallToolResult): String = (result.content.first() as TextContent).text
 
     private fun callListFiles(
         locationId: String,
         path: String = "",
         offset: Int = 0,
         limit: Int = 200,
-    ): JsonObject = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}list_files",
-            mapOf("location_id" to locationId, "path" to path, "offset" to offset, "limit" to limit),
-        )
-        assertNotEquals(true, result.isError, "list_files failed: ${toolText(result)}")
-        Json.parseToJsonElement(stripUntrustedWarning(toolText(result))).jsonObject
-    }
+    ): JsonObject =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}list_files",
+                    mapOf("location_id" to locationId, "path" to path, "offset" to offset, "limit" to limit),
+                )
+            assertNotEquals(true, result.isError, "list_files failed: ${toolText(result)}")
+            Json.parseToJsonElement(stripUntrustedWarning(toolText(result))).jsonObject
+        }
 
     private fun fileNames(listing: JsonObject): List<String> =
         listing["files"]!!.jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
 
     private fun dirNames(listing: JsonObject): List<String> =
-        listing["files"]!!.jsonArray
+        listing["files"]!!
+            .jsonArray
             .filter { it.jsonObject["is_directory"]!!.jsonPrimitive.boolean }
             .map { it.jsonObject["name"]!!.jsonPrimitive.content }
 
     private fun totalCount(listing: JsonObject): Int = listing["total_count"]!!.jsonPrimitive.int
 
-    private fun readFileContent(locationId: String, path: String): String = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}read_file",
-            mapOf("location_id" to locationId, "path" to path),
-        )
-        assertNotEquals(true, result.isError, "read_file failed: ${toolText(result)}")
-        stripUntrustedWarning(toolText(result))
-            .lines()
-            .filterNot { it.startsWith("--- More lines available") }
-            .joinToString("\n") { it.replace(Regex("^\\d+\\| "), "") }
-    }
+    private fun readFileContent(
+        locationId: String,
+        path: String,
+    ): String =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}read_file",
+                    mapOf("location_id" to locationId, "path" to path),
+                )
+            assertNotEquals(true, result.isError, "read_file failed: ${toolText(result)}")
+            stripUntrustedWarning(toolText(result))
+                .lines()
+                .filterNot { it.startsWith("--- More lines available") }
+                .joinToString("\n") { it.replace(Regex("^\\d+\\| "), "") }
+        }
 
     private fun newSecondClient(): McpClient {
         val client = McpClient(SharedAndroidContainer.mcpServerUrl, AndroidContainerSetup.E2E_BEARER_TOKEN)
@@ -189,23 +195,27 @@ class E2EStorageEdgeCasesTest {
 
     @Test
     @Order(7)
-    fun `multi dot name round trips`() = runBlocking {
-        assertEquals("multi-dot", readFileContent(PICTURES, "edge/report.v2.final.jpg"))
-        val write = mcpClient.callTool(
-            "${TOOL_PREFIX}write_file",
-            mapOf("location_id" to DOWNLOADS, "path" to "out.v1.draft.txt", "content" to "draft-1"),
-        )
-        assertNotEquals(true, write.isError, toolText(write))
-        assertEquals("draft-1", readFileContent(DOWNLOADS, "out.v1.draft.txt"))
-    }
+    fun `multi dot name round trips`() =
+        runBlocking {
+            assertEquals("multi-dot", readFileContent(PICTURES, "edge/report.v2.final.jpg"))
+            val write =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}write_file",
+                    mapOf("location_id" to DOWNLOADS, "path" to "out.v1.draft.txt", "content" to "draft-1"),
+                )
+            assertNotEquals(true, write.isError, toolText(write))
+            assertEquals("draft-1", readFileContent(DOWNLOADS, "out.v1.draft.txt"))
+        }
 
     @Test
     @Order(8)
     fun `zero byte file lists and reads empty`() {
         val listing = callListFiles(PICTURES, "edge")
-        val entry = listing["files"]!!.jsonArray
-            .map { it.jsonObject }
-            .find { it["name"]!!.jsonPrimitive.content == "empty.jpg" }
+        val entry =
+            listing["files"]!!
+                .jsonArray
+                .map { it.jsonObject }
+                .find { it["name"]!!.jsonPrimitive.content == "empty.jpg" }
         // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
         // zero-byte files ARE indexed (size=0, mime derived from the extension) and read back empty.
         assertTrue(entry != null, "empty.jpg must be listed")
@@ -235,17 +245,19 @@ class E2EStorageEdgeCasesTest {
 
     @Test
     @Order(11)
-    fun `stale row read fails cleanly`() = runBlocking {
-        StorageE2E.removeFromDisk("Pictures/edge/report.v2.final.jpg")
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}read_file",
-            mapOf("location_id" to PICTURES, "path" to "edge/report.v2.final.jpg"),
-        )
-        assertEquals(true, result.isError, "reading a stale row must fail cleanly")
-        assertTrue(toolText(result).isNotBlank())
-        StorageE2E.scanPath("Pictures/edge/report.v2.final.jpg")
-        assertFalse(fileNames(callListFiles(PICTURES, "edge")).contains("report.v2.final.jpg"))
-    }
+    fun `stale row read fails cleanly`() =
+        runBlocking {
+            StorageE2E.removeFromDisk("Pictures/edge/report.v2.final.jpg")
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}read_file",
+                    mapOf("location_id" to PICTURES, "path" to "edge/report.v2.final.jpg"),
+                )
+            assertEquals(true, result.isError, "reading a stale row must fail cleanly")
+            assertTrue(toolText(result).isNotBlank())
+            StorageE2E.scanPath("Pictures/edge/report.v2.final.jpg")
+            assertFalse(fileNames(callListFiles(PICTURES, "edge")).contains("report.v2.final.jpg"))
+        }
 
     @Test
     @Order(12)
@@ -258,188 +270,212 @@ class E2EStorageEdgeCasesTest {
 
     @Test
     @Order(13)
-    fun `path traversal rejected end to end`() = runBlocking {
-        for (badPath in listOf("../Music", "/etc", "bad\npath")) {
-            val result = mcpClient.callTool(
-                "${TOOL_PREFIX}list_files",
-                mapOf("location_id" to PICTURES, "path" to badPath),
-            )
-            assertEquals(true, result.isError, "path '$badPath' must be rejected")
+    fun `path traversal rejected end to end`() =
+        runBlocking {
+            for (badPath in listOf("../Music", "/etc", "bad\npath")) {
+                val result =
+                    mcpClient.callTool(
+                        "${TOOL_PREFIX}list_files",
+                        mapOf("location_id" to PICTURES, "path" to badPath),
+                    )
+                assertEquals(true, result.isError, "path '$badPath' must be rejected")
+            }
         }
-    }
 
     @Test
     @Order(14)
-    fun `missing or wrongly typed params rejected`() = runBlocking {
-        val missing = mcpClient.callTool("${TOOL_PREFIX}list_files", mapOf("path" to ""))
-        assertEquals(true, missing.isError)
-        val wrongType = mcpClient.callTool(
-            "${TOOL_PREFIX}list_files",
-            mapOf("location_id" to PICTURES, "path" to 42),
-        )
-        assertEquals(true, wrongType.isError)
-    }
+    fun `missing or wrongly typed params rejected`() =
+        runBlocking {
+            val missing = mcpClient.callTool("${TOOL_PREFIX}list_files", mapOf("path" to ""))
+            assertEquals(true, missing.isError)
+            val wrongType =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}list_files",
+                    mapOf("location_id" to PICTURES, "path" to 42),
+                )
+            assertEquals(true, wrongType.isError)
+        }
 
     @Test
     @Order(15)
-    fun `unknown location id rejected`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}list_files",
-            mapOf("location_id" to "builtin:nope", "path" to ""),
-        )
-        assertEquals(true, result.isError)
-        assertTrue(toolText(result).contains("not found", ignoreCase = true), toolText(result))
-    }
+    fun `unknown location id rejected`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}list_files",
+                    mapOf("location_id" to "builtin:nope", "path" to ""),
+                )
+            assertEquals(true, result.isError)
+            assertTrue(toolText(result).contains("not found", ignoreCase = true), toolText(result))
+        }
 
     @Test
     @Order(16)
-    fun `negative offset and zero limit`() = runBlocking<Unit> {
-        val negOffset = mcpClient.callTool(
-            "${TOOL_PREFIX}list_files",
-            mapOf("location_id" to PICTURES, "path" to "edge", "offset" to -1),
-        )
-        val zeroLimit = mcpClient.callTool(
-            "${TOOL_PREFIX}list_files",
-            mapOf("location_id" to PICTURES, "path" to "edge", "limit" to 0),
-        )
-        // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
-        // a negative offset fails cleanly ("Requested element count -1 is less than zero");
-        // limit=0 succeeds and returns an empty page with has_more=true.
-        assertEquals(true, negOffset.isError)
-        assertTrue(toolText(negOffset).contains("less than zero"), toolText(negOffset))
-        assertNotEquals(true, zeroLimit.isError)
-        val listing = Json.parseToJsonElement(stripUntrustedWarning(toolText(zeroLimit))).jsonObject
-        assertEquals(0, fileNames(listing).size)
-        assertTrue(listing["has_more"]!!.jsonPrimitive.boolean)
-    }
+    fun `negative offset and zero limit`() =
+        runBlocking<Unit> {
+            val negOffset =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}list_files",
+                    mapOf("location_id" to PICTURES, "path" to "edge", "offset" to -1),
+                )
+            val zeroLimit =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}list_files",
+                    mapOf("location_id" to PICTURES, "path" to "edge", "limit" to 0),
+                )
+            // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
+            // a negative offset fails cleanly ("Requested element count -1 is less than zero");
+            // limit=0 succeeds and returns an empty page with has_more=true.
+            assertEquals(true, negOffset.isError)
+            assertTrue(toolText(negOffset).contains("less than zero"), toolText(negOffset))
+            assertNotEquals(true, zeroLimit.isError)
+            val listing = Json.parseToJsonElement(stripUntrustedWarning(toolText(zeroLimit))).jsonObject
+            assertEquals(0, fileNames(listing).size)
+            assertTrue(listing["has_more"]!!.jsonPrimitive.boolean)
+        }
 
     @Test
     @Order(17)
-    fun `parallel writes to same filename`() = runBlocking<Unit> {
-        val second = newSecondClient()
-        try {
-            val a = async(Dispatchers.IO) {
-                mcpClient.callTool(
-                    "${TOOL_PREFIX}write_file",
-                    mapOf("location_id" to DOWNLOADS, "path" to "race.txt", "content" to "writer-a"),
-                )
+    fun `parallel writes to same filename`() =
+        runBlocking<Unit> {
+            val second = newSecondClient()
+            try {
+                val a =
+                    async(Dispatchers.IO) {
+                        mcpClient.callTool(
+                            "${TOOL_PREFIX}write_file",
+                            mapOf("location_id" to DOWNLOADS, "path" to "race.txt", "content" to "writer-a"),
+                        )
+                    }
+                val b =
+                    async(Dispatchers.IO) {
+                        second.callTool(
+                            "${TOOL_PREFIX}write_file",
+                            mapOf("location_id" to DOWNLOADS, "path" to "race.txt", "content" to "writer-b"),
+                        )
+                    }
+                val resultA = a.await()
+                val resultB = b.await()
+                // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on
+                // image upgrade: both writers succeed without transport errors; depending on interleaving the second
+                // writer either overwrites the first's owned row (1 file) or MediaStore auto-renames
+                // its insert (2 files) — never a crash or corrupted listing.
+                assertNotEquals(true, resultA.isError, toolText(resultA))
+                assertNotEquals(true, resultB.isError, toolText(resultB))
+                val raceCount = fileNames(callListFiles(DOWNLOADS)).count { it.startsWith("race") }
+                assertTrue(raceCount in 1..2, "raceCount=$raceCount")
+            } finally {
+                second.close()
             }
-            val b = async(Dispatchers.IO) {
-                second.callTool(
-                    "${TOOL_PREFIX}write_file",
-                    mapOf("location_id" to DOWNLOADS, "path" to "race.txt", "content" to "writer-b"),
-                )
-            }
-            val resultA = a.await()
-            val resultB = b.await()
-            // Observed redroid 13 (API 33) and 14 (API 34) behavior — documents the platform, revisit on image upgrade:
-            // both writers succeed without transport errors; depending on interleaving the second
-            // writer either overwrites the first's owned row (1 file) or MediaStore auto-renames
-            // its insert (2 files) — never a crash or corrupted listing.
-            assertNotEquals(true, resultA.isError, toolText(resultA))
-            assertNotEquals(true, resultB.isError, toolText(resultB))
-            val raceCount = fileNames(callListFiles(DOWNLOADS)).count { it.startsWith("race") }
-            assertTrue(raceCount in 1..2, "raceCount=$raceCount")
-        } finally {
-            second.close()
         }
-    }
 
     @Test
     @Order(18)
-    fun `delete during read does not break server`() = runBlocking {
-        val write = mcpClient.callTool(
-            "${TOOL_PREFIX}write_file",
-            mapOf("location_id" to DOWNLOADS, "path" to "victim.txt", "content" to "short-lived"),
-        )
-        assertNotEquals(true, write.isError, toolText(write))
-        val second = newSecondClient()
-        try {
-            val reads = async(Dispatchers.IO) {
-                (1..5).map {
-                    mcpClient.callTool(
-                        "${TOOL_PREFIX}read_file",
-                        mapOf("location_id" to DOWNLOADS, "path" to "victim.txt"),
-                    )
-                }
-            }
-            val delete = async(Dispatchers.IO) {
-                second.callTool(
-                    "${TOOL_PREFIX}delete_file",
-                    mapOf("location_id" to DOWNLOADS, "path" to "victim.txt"),
+    fun `delete during read does not break server`() =
+        runBlocking {
+            val write =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}write_file",
+                    mapOf("location_id" to DOWNLOADS, "path" to "victim.txt", "content" to "short-lived"),
                 )
-            }
-            val readResults = reads.await()
-            val deleteResult = delete.await()
-            // Every call must complete with success or a clean tool error (never a transport failure).
-            for (read in readResults) {
-                if (read.isError == true) {
-                    assertTrue(toolText(read).isNotBlank())
+            assertNotEquals(true, write.isError, toolText(write))
+            val second = newSecondClient()
+            try {
+                val reads =
+                    async(Dispatchers.IO) {
+                        (1..5).map {
+                            mcpClient.callTool(
+                                "${TOOL_PREFIX}read_file",
+                                mapOf("location_id" to DOWNLOADS, "path" to "victim.txt"),
+                            )
+                        }
+                    }
+                val delete =
+                    async(Dispatchers.IO) {
+                        second.callTool(
+                            "${TOOL_PREFIX}delete_file",
+                            mapOf("location_id" to DOWNLOADS, "path" to "victim.txt"),
+                        )
+                    }
+                val readResults = reads.await()
+                val deleteResult = delete.await()
+                // Every call must complete with success or a clean tool error (never a transport failure).
+                for (read in readResults) {
+                    if (read.isError == true) {
+                        assertTrue(toolText(read).isNotBlank())
+                    }
                 }
+                assertNotEquals(true, deleteResult.isError, toolText(deleteResult))
+                // Server healthy afterwards
+                assertTrue(totalCount(callListFiles(DOWNLOADS)) >= 0)
+            } finally {
+                second.close()
             }
-            assertNotEquals(true, deleteResult.isError, toolText(deleteResult))
-            // Server healthy afterwards
-            assertTrue(totalCount(callListFiles(DOWNLOADS)) >= 0)
-        } finally {
-            second.close()
         }
-    }
 
     @Test
     @Order(19)
-    fun `list during writes stays consistent`() = runBlocking {
-        val second = newSecondClient()
-        try {
-            val writer = async(Dispatchers.IO) {
-                for (i in 0 until 10) {
-                    val result = second.callTool(
-                        "${TOOL_PREFIX}write_file",
-                        mapOf("location_id" to DOWNLOADS, "path" to "consist$i.txt", "content" to "c$i"),
+    fun `list during writes stays consistent`() =
+        runBlocking {
+            val second = newSecondClient()
+            try {
+                val writer =
+                    async(Dispatchers.IO) {
+                        for (i in 0 until 10) {
+                            val result =
+                                second.callTool(
+                                    "${TOOL_PREFIX}write_file",
+                                    mapOf("location_id" to DOWNLOADS, "path" to "consist$i.txt", "content" to "c$i"),
+                                )
+                            assertNotEquals(true, result.isError, toolText(result))
+                        }
+                    }
+                var previousCount = -1
+                while (writer.isActive) {
+                    val listing = callListFiles(DOWNLOADS)
+                    val count = totalCount(listing)
+                    assertTrue(
+                        count >= previousCount,
+                        "total_count must be monotonically non-decreasing ($previousCount -> $count)",
                     )
-                    assertNotEquals(true, result.isError, toolText(result))
+                    previousCount = count
                 }
+                writer.await()
+            } finally {
+                second.close()
             }
-            var previousCount = -1
-            while (writer.isActive) {
-                val listing = callListFiles(DOWNLOADS)
-                val count = totalCount(listing)
-                assertTrue(
-                    count >= previousCount,
-                    "total_count must be monotonically non-decreasing ($previousCount -> $count)",
-                )
-                previousCount = count
-            }
-            writer.await()
-        } finally {
-            second.close()
         }
-    }
 
     @Test
     @Order(20)
-    fun `revoke mid session kills process and server recovers`() = runBlocking {
-        StorageE2E.revokeMediaPermission(StorageE2E.PERM_IMAGES)
-        StorageE2E.waitForAppProcessDeath()
-        val refreshed = StorageE2E.restartServerAndRefreshClient()
+    fun `revoke mid session kills process and server recovers`() =
+        runBlocking {
+            StorageE2E.revokeMediaPermission(StorageE2E.PERM_IMAGES)
+            StorageE2E.waitForAppProcessDeath()
+            val refreshed = StorageE2E.restartServerAndRefreshClient()
 
-        val partial = refreshed.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
-        assertNotEquals(true, partial.isError)
-        val partialPictures = Json
-            .parseToJsonElement(stripUntrustedWarning((partial.content.first() as TextContent).text))
-            .jsonArray.map { it.jsonObject }
-            .first { it["id"]!!.jsonPrimitive.content == PICTURES }
-        assertEquals("Pictures - All videos, owned images", partialPictures["name"]!!.jsonPrimitive.content)
-        assertEquals("partial", partialPictures["access_level"]!!.jsonPrimitive.content)
+            val partial = refreshed.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
+            assertNotEquals(true, partial.isError)
+            val partialPictures =
+                Json
+                    .parseToJsonElement(stripUntrustedWarning((partial.content.first() as TextContent).text))
+                    .jsonArray
+                    .map { it.jsonObject }
+                    .first { it["id"]!!.jsonPrimitive.content == PICTURES }
+            assertEquals("Pictures - All videos, owned images", partialPictures["name"]!!.jsonPrimitive.content)
+            assertEquals("partial", partialPictures["access_level"]!!.jsonPrimitive.content)
 
-        StorageE2E.grantMediaPermission(StorageE2E.PERM_IMAGES)
-        val restored = StorageE2E.restartServerAndRefreshClient()
-        val full = restored.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
-        assertNotEquals(true, full.isError)
-        val fullPictures = Json
-            .parseToJsonElement(stripUntrustedWarning((full.content.first() as TextContent).text))
-            .jsonArray.map { it.jsonObject }
-            .first { it["id"]!!.jsonPrimitive.content == PICTURES }
-        assertEquals("Pictures - All files", fullPictures["name"]!!.jsonPrimitive.content)
-        assertEquals("full", fullPictures["access_level"]!!.jsonPrimitive.content)
-    }
+            StorageE2E.grantMediaPermission(StorageE2E.PERM_IMAGES)
+            val restored = StorageE2E.restartServerAndRefreshClient()
+            val full = restored.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
+            assertNotEquals(true, full.isError)
+            val fullPictures =
+                Json
+                    .parseToJsonElement(stripUntrustedWarning((full.content.first() as TextContent).text))
+                    .jsonArray
+                    .map { it.jsonObject }
+                    .first { it["id"]!!.jsonPrimitive.content == PICTURES }
+            assertEquals("Pictures - All files", fullPictures["name"]!!.jsonPrimitive.content)
+            assertEquals("full", fullPictures["access_level"]!!.jsonPrimitive.content)
+        }
 }

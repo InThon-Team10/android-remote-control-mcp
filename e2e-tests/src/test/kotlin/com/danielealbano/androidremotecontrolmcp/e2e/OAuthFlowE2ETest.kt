@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.e2e
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -50,7 +51,11 @@ class OAuthFlowE2ETest {
                 "application/json",
             )
         assertEquals(HttpURLConnection.HTTP_CREATED, regStatus, "register failed: $regBody")
-        val clientId = Json.parseToJsonElement(regBody).jsonObject["client_id"]!!.jsonPrimitive.content
+        val clientId =
+            Json
+                .parseToJsonElement(regBody)
+                .jsonObject["client_id"]!!
+                .jsonPrimitive.content
 
         // 2. Authorize (creates a pending approval). Parse the approval id from the consent page JS.
         // The optional `resource` param is omitted so the server defaults it to its own request-derived
@@ -84,7 +89,11 @@ class OAuthFlowE2ETest {
                 ),
             )
         assertEquals(HttpURLConnection.HTTP_OK, tokenStatus, "token failed: $tokenBody")
-        val accessToken = Json.parseToJsonElement(tokenBody).jsonObject["access_token"]!!.jsonPrimitive.content
+        val accessToken =
+            Json
+                .parseToJsonElement(tokenBody)
+                .jsonObject["access_token"]!!
+                .jsonPrimitive.content
 
         // 6. Connect the MCP client with the issued access token and call a basic tool.
         val client = McpClient(mcpUrl, accessToken)
@@ -115,30 +124,33 @@ class OAuthFlowE2ETest {
 
     private fun pollForCode(approvalId: String): String? {
         val deadline = System.currentTimeMillis() + STATUS_TIMEOUT_MS
-        while (System.currentTimeMillis() < deadline) {
-            val (status, body) = httpGet("$base/authorize/status?id=${enc(approvalId)}")
-            if (status == HttpURLConnection.HTTP_OK) {
-                val obj = Json.parseToJsonElement(body).jsonObject
-                when (obj["state"]?.jsonPrimitive?.content) {
-                    "approved" -> {
-                        val redirect = obj["redirect"]!!.jsonPrimitive.content
-                        return CODE_REGEX.find(redirect)?.groupValues?.get(1)
-                    }
-                    "denied", "expired" -> return null
-                }
-            }
-            Thread.sleep(1_000)
+        var settled: JsonObject? = null
+        while (settled == null && System.currentTimeMillis() < deadline) {
+            settled = settledApprovalStatus(approvalId)
+            if (settled == null) Thread.sleep(1_000)
         }
-        return null
+        val approved = settled?.takeIf { it["state"]?.jsonPrimitive?.content == "approved" } ?: return null
+        return CODE_REGEX.find(approved["redirect"]!!.jsonPrimitive.content)?.groupValues?.get(1)
+    }
+
+    /**
+     * The approval status once it is approved, denied or expired; null while it is pending or the status endpoint
+     * answers a non-200 status. A request that throws propagates.
+     */
+    private fun settledApprovalStatus(approvalId: String): JsonObject? {
+        val (status, body) = httpGet("$base/authorize/status?id=${enc(approvalId)}")
+        if (status != HttpURLConnection.HTTP_OK) return null
+        return Json.parseToJsonElement(body).jsonObject.takeIf { it["state"]?.jsonPrimitive?.content in SETTLED_STATES }
     }
 
     private fun httpGet(urlStr: String): Pair<Int, String> {
-        val conn = (URI(urlStr).toURL().openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            instanceFollowRedirects = false
-            connectTimeout = HTTP_TIMEOUT_MS
-            readTimeout = HTTP_TIMEOUT_MS
-        }
+        val conn =
+            (URI(urlStr).toURL().openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                instanceFollowRedirects = false
+                connectTimeout = HTTP_TIMEOUT_MS
+                readTimeout = HTTP_TIMEOUT_MS
+            }
         return conn.use()
     }
 
@@ -147,14 +159,15 @@ class OAuthFlowE2ETest {
         body: String,
         contentType: String,
     ): Pair<Int, String> {
-        val conn = (URI(urlStr).toURL().openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            instanceFollowRedirects = false
-            doOutput = true
-            setRequestProperty("Content-Type", contentType)
-            connectTimeout = HTTP_TIMEOUT_MS
-            readTimeout = HTTP_TIMEOUT_MS
-        }
+        val conn =
+            (URI(urlStr).toURL().openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                instanceFollowRedirects = false
+                doOutput = true
+                setRequestProperty("Content-Type", contentType)
+                connectTimeout = HTTP_TIMEOUT_MS
+                readTimeout = HTTP_TIMEOUT_MS
+            }
         OutputStreamWriter(conn.outputStream).use { it.write(body) }
         return conn.use()
     }
@@ -167,8 +180,8 @@ class OAuthFlowE2ETest {
         return httpPost(urlStr, encoded, "application/x-www-form-urlencoded")
     }
 
-    private fun HttpURLConnection.use(): Pair<Int, String> {
-        return try {
+    private fun HttpURLConnection.use(): Pair<Int, String> =
+        try {
             val status = responseCode
             val stream = if (status in 200..299) inputStream else errorStream
             val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
@@ -176,7 +189,6 @@ class OAuthFlowE2ETest {
         } finally {
             disconnect()
         }
-    }
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
 
@@ -191,5 +203,6 @@ class OAuthFlowE2ETest {
 
         val APPROVAL_ID_REGEX = Regex("""var id = "([^"]+)"""")
         val CODE_REGEX = Regex("""[?&]code=([^&]+)""")
+        val SETTLED_STATES = setOf("approved", "denied", "expired")
     }
 }

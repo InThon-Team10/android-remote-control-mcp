@@ -14,7 +14,6 @@ import kotlinx.coroutines.runBlocking
  * reducing total E2E runtime significantly.
  */
 object SharedAndroidContainer {
-
     /**
      * Path to the debug APK, relative to the project root.
      * Must be built before running E2E tests: `./gradlew assembleGmsDebug`
@@ -33,8 +32,9 @@ object SharedAndroidContainer {
      * passed as a system property from build.gradle.kts.
      */
     private val apkPath: String by lazy {
-        val rootDir = System.getProperty("project.rootDir")
-            ?: error("System property 'project.rootDir' not set. Run via Gradle.")
+        val rootDir =
+            System.getProperty("project.rootDir")
+                ?: error("System property 'project.rootDir' not set. Run via Gradle.")
         "$rootDir/$APK_RELATIVE_PATH"
     }
 
@@ -42,14 +42,15 @@ object SharedAndroidContainer {
      * Resolved absolute path to the compose test app APK.
      */
     private val composeTestApkPath: String by lazy {
-        val rootDir = System.getProperty("project.rootDir")
-            ?: error("System property 'project.rootDir' not set. Run via Gradle.")
+        val rootDir =
+            System.getProperty("project.rootDir")
+                ?: error("System property 'project.rootDir' not set. Run via Gradle.")
         "$rootDir/$COMPOSE_TEST_APK_RELATIVE_PATH"
     }
 
     // Cached values set during successful initialization
     @Volatile
-    private var _container: org.testcontainers.containers.GenericContainer<*>? = null
+    private var cachedContainer: org.testcontainers.containers.GenericContainer<*>? = null
 
     @Volatile
     private var _mcpServerUrl: String? = null
@@ -68,13 +69,11 @@ object SharedAndroidContainer {
      * or rethrow the initialization error.
      */
     private fun ensureInitialized() {
-        if (_container != null) return
-        if (initError != null) throw initError!!
+        if (isInitialized()) return
 
         synchronized(lock) {
             // Double-check inside lock
-            if (_container != null) return
-            if (initError != null) throw initError!!
+            if (isInitialized()) return
 
             try {
                 println("[SharedAndroidContainer] Initializing shared container...")
@@ -124,7 +123,7 @@ object SharedAndroidContainer {
                 // Store all values atomically
                 _mcpServerUrl = url
                 _mcpClient = client
-                _container = c
+                cachedContainer = c
 
                 println("[SharedAndroidContainer] Container fully initialized and MCP server ready at $url")
             } catch (e: Throwable) {
@@ -132,6 +131,13 @@ object SharedAndroidContainer {
                 throw e
             }
         }
+    }
+
+    /** True once the container is ready; otherwise rethrows the cached failure when initialization already failed. */
+    private fun isInitialized(): Boolean {
+        if (cachedContainer != null) return true
+        initError?.let { throw it }
+        return false
     }
 
     /**
@@ -185,15 +191,17 @@ object SharedAndroidContainer {
 
     init {
         // Register JVM shutdown hook to stop the container when all tests complete.
-        Runtime.getRuntime().addShutdownHook(Thread {
-            _container?.let { c ->
-                println("[SharedAndroidContainer] Stopping shared container...")
-                AndroidContainerSetup.disconnectAdb()
-                if (c.isRunning) {
-                    c.stop()
+        Runtime.getRuntime().addShutdownHook(
+            Thread {
+                cachedContainer?.let { c ->
+                    println("[SharedAndroidContainer] Stopping shared container...")
+                    AndroidContainerSetup.disconnectAdb()
+                    if (c.isRunning) {
+                        c.stop()
+                    }
+                    println("[SharedAndroidContainer] Shared container stopped")
                 }
-                println("[SharedAndroidContainer] Shared container stopped")
-            }
-        })
+            },
+        )
     }
 }

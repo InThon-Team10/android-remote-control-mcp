@@ -80,8 +80,9 @@ import javax.inject.Inject
  * ```
  *
  * Where `<app-id>` is:
- * - Debug: `com.danielealbano.androidremotecontrolmcp.debug`
- * - Release: `com.danielealbano.androidremotecontrolmcp`
+ * - Debug, gms flavor: `com.danielealbano.androidremotecontrolmcp.gms.debug`
+ * - Debug, foss flavor: `com.danielealbano.androidremotecontrolmcp.foss.debug`
+ * - Release (both flavors): `com.danielealbano.androidremotecontrolmcp`
  */
 @AndroidEntryPoint
 class AdbConfigReceiver : BroadcastReceiver() {

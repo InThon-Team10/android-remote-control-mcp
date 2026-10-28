@@ -22,7 +22,13 @@ data class E2EArcTunnelStatus(
 ) {
     /** The tunnel-related settings of this status, to restore a device afterwards. */
     fun toSettings(): ArcTunnelE2ESettings =
-        ArcTunnelE2ESettings(tunnelEnabled, tunnelProvider, baseAddress, ctCheckEnabled, edgeOverride)
+        ArcTunnelE2ESettings(
+            tunnelEnabled = tunnelEnabled,
+            provider = tunnelProvider,
+            baseAddress = baseAddress,
+            ctCheckEnabled = ctCheckEnabled,
+            edgeOverride = edgeOverride,
+        )
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }

@@ -161,8 +161,9 @@ jobs:
 
   test-e2e:
     name: E2E Tests
-    # Pinned OS image (not kernel): redroid needs binder_linux from linux-modules-extra-$(uname -r), which Ubuntu
-    # 24.04 publishes for its runner kernels; ubuntu-latest moved to a kernel without that package.
+    # Pinned OS image (not kernel): redroid needs binder_linux. Ubuntu 24.04 runner kernels ship it either in
+    # linux-modules-extra-$(uname -r) or, on the 7.0 azure kernel (no modules-extra package), in the base
+    # linux-modules package; ubuntu-latest had moved to a kernel without linux-modules-extra when this was pinned.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -270,9 +271,12 @@ jobs:
 
       - name: Set up redroid kernel modules
         run: |
-          # Install kernel module package (binder_linux is in linux-modules-extra)
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq linux-modules-extra-$(uname -r)
+          # binder_linux is in linux-modules-extra-$(uname -r) on older runner kernels and in the base
+          # linux-modules package on the 7.0 azure kernel, which has no modules-extra package
+          if ! modinfo binder_linux >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq linux-modules-extra-$(uname -r)
+          fi
           # Load required kernel modules
           sudo modprobe binder_linux devices="binder,hwbinder,vndbinder"
           sudo modprobe fuse

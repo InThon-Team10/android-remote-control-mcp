@@ -14,7 +14,8 @@ ANDROID_HOME ?= $(HOME)/Android/Sdk
 GRADLE := ./gradlew
 ADB := adb
 APP_ID := com.danielealbano.androidremotecontrolmcp
-APP_ID_DEBUG := $(APP_ID).debug
+# The gms debug build that `make install` installs (the foss debug build is $(APP_ID).foss.debug).
+APP_ID_DEBUG := $(APP_ID).gms.debug
 EMULATOR_NAME := mcp_test_emulator
 EMULATOR_DEVICE := pixel_6
 EMULATOR_API := 34

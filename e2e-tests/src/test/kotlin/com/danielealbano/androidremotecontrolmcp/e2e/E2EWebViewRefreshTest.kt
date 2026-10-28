@@ -40,7 +40,6 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2EWebViewRefreshTest {
-
     private val mcpClient = SharedAndroidContainer.mcpClient
 
     companion object {
@@ -64,53 +63,55 @@ class E2EWebViewRefreshTest {
         // the shared WebViewActivity; inheriting it both blocks the activity's main thread on launch and
         // leaves the WebView's virtual a11y nodes stuck, so a later simple-page DOM change never reflects.
         // Force-stopping the app makes the next launch a fresh process on the simple counter page.
-        AndroidContainerSetup.forceStopComposeTestApp()
+        E2ETestApps.forceStopComposeTestApp()
     }
 
     @Test
     @Order(1)
-    fun `webview shows initial value zero`() = runBlocking {
-        mcpClient.callTool("${TOOL_PREFIX}press_home")
+    fun `webview shows initial value zero`() =
+        runBlocking {
+            mcpClient.callTool("${TOOL_PREFIX}press_home")
 
-        AndroidContainerSetup.launchWebViewTestApp()
+            E2ETestApps.launchWebViewTestApp()
 
-        val screenText = waitForTextInScreenState("Number: 0", APP_LAUNCH_TIMEOUT_MS)
-        assertNotNull(
-            screenText,
-            "WebView test app should show 'Number: 0' within ${APP_LAUNCH_TIMEOUT_MS}ms",
-        )
-    }
+            val screenText = waitForTextInScreenState("Number: 0", APP_LAUNCH_TIMEOUT_MS)
+            assertNotNull(
+                screenText,
+                "WebView test app should show 'Number: 0' within ${APP_LAUNCH_TIMEOUT_MS}ms",
+            )
+        }
 
     @Test
     @Order(2)
-    fun `accessibility tree reflects webview dom changes via javascript`() = runBlocking {
-        AndroidContainerSetup.launchWebViewTestApp()
-        val initialScreen = waitForTextInScreenState("Number:", APP_LAUNCH_TIMEOUT_MS)
-        assertNotNull(initialScreen, "WebView test app should be visible")
+    fun `accessibility tree reflects webview dom changes via javascript`() =
+        runBlocking {
+            E2ETestApps.launchWebViewTestApp()
+            val initialScreen = waitForTextInScreenState("Number:", APP_LAUNCH_TIMEOUT_MS)
+            assertNotNull(initialScreen, "WebView test app should be visible")
 
-        for (i in 1..UPDATE_COUNT) {
-            AndroidContainerSetup.sendWebViewTestNumber(i)
+            for (i in 1..UPDATE_COUNT) {
+                E2ETestApps.sendWebViewTestNumber(i)
 
-            val expectedText = "Number: $i"
-            val screenText = waitForTextInScreenState(expectedText, NUMBER_UPDATE_TIMEOUT_MS)
+                val expectedText = "Number: $i"
+                val screenText = waitForTextInScreenState(expectedText, NUMBER_UPDATE_TIMEOUT_MS)
 
-            if (screenText == null) {
-                val logcat = AndroidContainerSetup.dumpWebViewTestAppLogs()
-                println("[E2E WebViewRefresh] Logcat from WebViewTestApp:\n$logcat")
+                if (screenText == null) {
+                    val logcat = E2ETestApps.dumpWebViewTestAppLogs()
+                    println("[E2E WebViewRefresh] Logcat from WebViewTestApp:\n$logcat")
 
-                val diagnosticResult = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
-                val diagnosticText = (diagnosticResult.content[0] as? TextContent)?.text ?: "N/A"
-                fail<Unit>(
-                    "Accessibility tree did not reflect '$expectedText' within " +
-                        "${NUMBER_UPDATE_TIMEOUT_MS}ms (update $i of $UPDATE_COUNT). " +
-                        "Logcat:\n$logcat\n" +
-                        "Screen state excerpt: ${diagnosticText.take(1000)}",
-                )
+                    val diagnosticResult = mcpClient.callTool("${TOOL_PREFIX}get_screen_state")
+                    val diagnosticText = (diagnosticResult.content[0] as? TextContent)?.text ?: "N/A"
+                    fail<Unit>(
+                        "Accessibility tree did not reflect '$expectedText' within " +
+                            "${NUMBER_UPDATE_TIMEOUT_MS}ms (update $i of $UPDATE_COUNT). " +
+                            "Logcat:\n$logcat\n" +
+                            "Screen state excerpt: ${diagnosticText.take(1000)}",
+                    )
+                }
+
+                println("[E2E WebViewRefresh] Update $i/$UPDATE_COUNT: '$expectedText' confirmed in tree")
             }
-
-            println("[E2E WebViewRefresh] Update $i/$UPDATE_COUNT: '$expectedText' confirmed in tree")
         }
-    }
 
     @Test
     @Order(3)
@@ -119,18 +120,18 @@ class E2EWebViewRefreshTest {
             // The cache-clear lives in the shared getFreshWindows path, so a read that never goes
             // through get_screen_state must ALSO see fresh WebView content. find_nodes(by=text) reads
             // the tree directly by selector — no prior node id, no get_screen_state.
-            AndroidContainerSetup.launchWebViewTestApp()
+            E2ETestApps.launchWebViewTestApp()
             assertTrue(
                 waitForFindNodesMatch("Number: 0", APP_LAUNCH_TIMEOUT_MS),
                 "find_nodes should locate 'Number: 0' after launch",
             )
 
             for (i in 1..UPDATE_COUNT) {
-                AndroidContainerSetup.sendWebViewTestNumber(i)
+                E2ETestApps.sendWebViewTestNumber(i)
 
                 val expectedText = "Number: $i"
                 if (!waitForFindNodesMatch(expectedText, NUMBER_UPDATE_TIMEOUT_MS)) {
-                    val logcat = AndroidContainerSetup.dumpWebViewTestAppLogs()
+                    val logcat = E2ETestApps.dumpWebViewTestAppLogs()
                     fail<Unit>(
                         "find_nodes did not locate '$expectedText' within ${NUMBER_UPDATE_TIMEOUT_MS}ms " +
                             "(update $i of $UPDATE_COUNT). Logcat:\n$logcat",

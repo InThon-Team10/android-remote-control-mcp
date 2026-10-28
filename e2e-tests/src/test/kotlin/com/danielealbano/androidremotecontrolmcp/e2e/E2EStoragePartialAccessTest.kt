@@ -42,7 +42,6 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class E2EStoragePartialAccessTest {
-
     companion object {
         private const val TOOL_PREFIX = AndroidContainerSetup.TOOL_NAME_PREFIX
         private const val PICTURES = "builtin:pictures"
@@ -102,24 +101,30 @@ class E2EStoragePartialAccessTest {
 
     // ─── shared helpers ─────────────────────────────────────────────────────
 
-    private fun toolText(result: CallToolResult): String =
-        (result.content.first() as TextContent).text
+    private fun toolText(result: CallToolResult): String = (result.content.first() as TextContent).text
 
-    private fun writeOwnedFile(path: String, content: String) = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}write_file",
-            mapOf("location_id" to PICTURES, "path" to path, "content" to content),
-        )
+    private fun writeOwnedFile(
+        path: String,
+        content: String,
+    ) = runBlocking {
+        val result =
+            mcpClient.callTool(
+                "${TOOL_PREFIX}write_file",
+                mapOf("location_id" to PICTURES, "path" to path, "content" to content),
+            )
         check(result.isError != true) { "write_file failed: ${toolText(result)}" }
     }
 
-    private fun storageLocationsById(): Map<String, JsonObject> = runBlocking {
-        val result = mcpClient.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
-        assertNotEquals(true, result.isError, "list_storage_locations failed")
-        Json.parseToJsonElement(stripUntrustedWarning(toolText(result)))
-            .jsonArray.map { it.jsonObject }
-            .associateBy { it["id"]!!.jsonPrimitive.content }
-    }
+    private fun storageLocationsById(): Map<String, JsonObject> =
+        runBlocking {
+            val result = mcpClient.callTool("${TOOL_PREFIX}list_storage_locations", emptyMap())
+            assertNotEquals(true, result.isError, "list_storage_locations failed")
+            Json
+                .parseToJsonElement(stripUntrustedWarning(toolText(result)))
+                .jsonArray
+                .map { it.jsonObject }
+                .associateBy { it["id"]!!.jsonPrimitive.content }
+        }
 
     private fun assertLocationState(
         locations: Map<String, JsonObject>,
@@ -132,27 +137,34 @@ class E2EStoragePartialAccessTest {
         assertEquals(expectedName, location["name"]!!.jsonPrimitive.content, locationId)
     }
 
-    private fun listFixtureDirNames(): List<String> = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}list_files",
-            mapOf("location_id" to PICTURES, "path" to FIXTURE_DIR, "offset" to 0, "limit" to 200),
-        )
-        assertNotEquals(true, result.isError, "list_files failed: ${toolText(result)}")
-        Json.parseToJsonElement(stripUntrustedWarning(toolText(result))).jsonObject["files"]!!
-            .jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
-    }
+    private fun listFixtureDirNames(): List<String> =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}list_files",
+                    mapOf("location_id" to PICTURES, "path" to FIXTURE_DIR, "offset" to 0, "limit" to 200),
+                )
+            assertNotEquals(true, result.isError, "list_files failed: ${toolText(result)}")
+            Json
+                .parseToJsonElement(stripUntrustedWarning(toolText(result)))
+                .jsonObject["files"]!!
+                .jsonArray
+                .map { it.jsonObject["name"]!!.jsonPrimitive.content }
+        }
 
-    private fun readFileContent(path: String): String = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}read_file",
-            mapOf("location_id" to PICTURES, "path" to path),
-        )
-        assertNotEquals(true, result.isError, "read_file failed: ${toolText(result)}")
-        stripUntrustedWarning(toolText(result))
-            .lines()
-            .filterNot { it.startsWith("--- More lines available") }
-            .joinToString("\n") { it.replace(Regex("^\\d+\\| "), "") }
-    }
+    private fun readFileContent(path: String): String =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}read_file",
+                    mapOf("location_id" to PICTURES, "path" to path),
+                )
+            assertNotEquals(true, result.isError, "read_file failed: ${toolText(result)}")
+            stripUntrustedWarning(toolText(result))
+                .lines()
+                .filterNot { it.startsWith("--- More lines available") }
+                .joinToString("\n") { it.replace(Regex("^\\d+\\| "), "") }
+        }
 
     /**
      * Tolerant variant of [StorageE2E.waitForAppProcessDeath] for teardown: polls until
@@ -162,11 +174,12 @@ class E2EStoragePartialAccessTest {
     private fun waitForPossibleProcessDeath() {
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < TEARDOWN_DEATH_POLL_MS) {
-            val pid = try {
-                StorageE2E.shell("pidof ${StorageE2E.APP_PACKAGE} || true")
-            } catch (_: Exception) {
-                ""
-            }
+            val pid =
+                try {
+                    StorageE2E.shell("pidof ${StorageE2E.APP_PACKAGE} || true")
+                } catch (_: Exception) {
+                    ""
+                }
             if (pid.isBlank()) return
             Thread.sleep(500)
         }
@@ -223,14 +236,16 @@ class E2EStoragePartialAccessTest {
 
     @Test
     @Order(5)
-    fun `partial access read of non owned file fails cleanly`() = runBlocking {
-        val result = mcpClient.callTool(
-            "${TOOL_PREFIX}read_file",
-            mapOf("location_id" to PICTURES, "path" to "$FIXTURE_DIR/nonowned.jpg"),
-        )
-        assertEquals(true, result.isError, "non-owned read must fail under partial access")
-        assertTrue(toolText(result).isNotBlank())
-    }
+    fun `partial access read of non owned file fails cleanly`() =
+        runBlocking {
+            val result =
+                mcpClient.callTool(
+                    "${TOOL_PREFIX}read_file",
+                    mapOf("location_id" to PICTURES, "path" to "$FIXTURE_DIR/nonowned.jpg"),
+                )
+            assertEquals(true, result.isError, "non-owned read must fail under partial access")
+            assertTrue(toolText(result).isNotBlank())
+        }
 
     @Test
     @Order(6)

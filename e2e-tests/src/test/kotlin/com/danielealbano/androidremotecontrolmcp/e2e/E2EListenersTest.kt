@@ -13,9 +13,10 @@ import java.net.HttpURLConnection
 import java.net.URI
 
 /**
- * E2E test: the server's listeners on the device. A Specific IP is the only address the server listens on; one the
- * device does not have, or one with a zone index, fails the start with a clear error; a Cloudflare or ngrok tunnel gets a plain HTTP listener of
- * its own on 127.0.0.1:<tunnel local port>, serving the same application with the same authentication.
+ * E2E test: the server's listeners on the device. A Specific IP is the only address the server listens on; one
+ * the device does not have, or one with a zone index, fails the start with a clear error; a Cloudflare or ngrok
+ * tunnel gets a plain HTTP listener of its own on 127.0.0.1:<tunnel local port>, serving the same application with
+ * the same authentication.
  *
  * Redroid's Android shares the container's network namespace, so the container port mapping reaches its eth0.
  */
@@ -30,10 +31,18 @@ class E2EListenersTest {
         // classes that follow (the specific address stays saved, unused while bound to every address)
         AndroidContainerSetup.stopMcpServer(baseUrl)
         configure(
-            "--es", "binding_address", "0.0.0.0",
-            "--ez", "tunnel_enabled", "false",
-            "--es", "tunnel_provider", "android-remote-control-mcp-tunneld",
-            "--ei", "tunnel_local_port", MCP_PORT.toString(),
+            "--es",
+            "binding_address",
+            "0.0.0.0",
+            "--ez",
+            "tunnel_enabled",
+            "false",
+            "--es",
+            "tunnel_provider",
+            "android-remote-control-mcp-tunneld",
+            "--ei",
+            "tunnel_local_port",
+            MCP_PORT.toString(),
         )
         StorageE2E.restartServerAndRefreshClient()
     }
@@ -57,7 +66,8 @@ class E2EListenersTest {
     fun `a specific IP the device does not have fails the start with a clear error`() {
         restartWith("--es", "binding_address", ABSENT_IP)
 
-        val status = AndroidContainerSetup.awaitArcTunnel(timeoutMs = STATUS_TIMEOUT_MS) { it.server.startsWith("Error") }
+        val status =
+            AndroidContainerSetup.awaitArcTunnel(timeoutMs = STATUS_TIMEOUT_MS) { it.server.startsWith("Error") }
 
         assertEquals("Error: $ABSENT_IP is not an address of this device", status.server)
     }
@@ -68,7 +78,8 @@ class E2EListenersTest {
         // Android parses a global IPv6 literal with a numeric zone index; the URLs would carry it
         restartWith("--es", "binding_address", ZONED_IP)
 
-        val status = AndroidContainerSetup.awaitArcTunnel(timeoutMs = STATUS_TIMEOUT_MS) { it.server.startsWith("Error") }
+        val status =
+            AndroidContainerSetup.awaitArcTunnel(timeoutMs = STATUS_TIMEOUT_MS) { it.server.startsWith("Error") }
 
         assertEquals("Error: Remove the zone index (%3): this address does not need one", status.server)
     }
@@ -89,10 +100,18 @@ class E2EListenersTest {
     fun `a Cloudflare or ngrok tunnel gets a localhost listener of its own, with the same authentication`() {
         // ngrok without an authtoken fails on its own: the server, and the listener, keep running
         restartWith(
-            "--es", "binding_address", "0.0.0.0",
-            "--ez", "tunnel_enabled", "true",
-            "--es", "tunnel_provider", "NGROK",
-            "--ei", "tunnel_local_port", TUNNEL_PORT.toString(),
+            "--es",
+            "binding_address",
+            "0.0.0.0",
+            "--ez",
+            "tunnel_enabled",
+            "true",
+            "--es",
+            "tunnel_provider",
+            "NGROK",
+            "--ei",
+            "tunnel_local_port",
+            TUNNEL_PORT.toString(),
         )
         AndroidContainerSetup.waitForServerReady(baseUrl)
 
@@ -112,9 +131,13 @@ class E2EListenersTest {
 
     private fun configure(vararg extras: String) {
         AndroidContainerSetup.execAdb(
-            "shell", "am", "broadcast",
-            "-a", AndroidContainerSetup.E2E_CONFIGURE_ACTION,
-            "-n", AndroidContainerSetup.E2E_RECEIVER_COMPONENT,
+            "shell",
+            "am",
+            "broadcast",
+            "-a",
+            AndroidContainerSetup.E2E_CONFIGURE_ACTION,
+            "-n",
+            AndroidContainerSetup.E2E_RECEIVER_COMPONENT,
             *extras,
         )
         Thread.sleep(CONFIGURE_WAIT_MS)
@@ -168,6 +191,7 @@ class E2EListenersTest {
     private companion object {
         /** The port [AndroidContainerSetup] configures the server on. */
         const val MCP_PORT = 8080
+
         // Above the ephemeral ports, which a connection could be holding
         const val TUNNEL_PORT = 61200
 

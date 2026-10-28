@@ -30,17 +30,17 @@ import androidx.activity.ComponentActivity
  * after a heavy-page launch reliably shows the simple page again.
  */
 class WebViewActivity : ComponentActivity() {
-
     private var webView: WebView? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.i(TAG, "onCreate called")
-        webView = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            webViewClient = WebViewClient()
-        }
+        webView =
+            WebView(this).apply {
+                settings.javaScriptEnabled = true
+                webViewClient = WebViewClient()
+            }
         setContentView(webView)
         applyIntent(intent)
     }

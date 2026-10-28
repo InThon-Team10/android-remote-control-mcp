@@ -374,8 +374,9 @@ Enable the tunnel in the app's "Remote Access" section. The public URL is displa
 The app can be fully configured and controlled from the command line without opening the UI. This is useful for automated setups, CI pipelines, or headless devices.
 
 Replace `<app-id>` with the application ID for your build:
-- **Debug**: `com.danielealbano.androidremotecontrolmcp.debug`
-- **Release**: `com.danielealbano.androidremotecontrolmcp`
+- **Debug (gms flavor)**: `com.danielealbano.androidremotecontrolmcp.gms.debug`
+- **Debug (foss flavor)**: `com.danielealbano.androidremotecontrolmcp.foss.debug`
+- **Release (both flavors)**: `com.danielealbano.androidremotecontrolmcp`
 
 #### Grant Permissions
 

@@ -51,7 +51,7 @@ import javax.inject.Inject
  * # Configure settings
  * adb shell am broadcast \
  *   -a com.danielealbano.androidremotecontrolmcp.debug.E2E_CONFIGURE \
- *   -n com.danielealbano.androidremotecontrolmcp.debug/.E2EConfigReceiver \
+ *   -n <app-id>/com.danielealbano.androidremotecontrolmcp.debug.E2EConfigReceiver \
  *   --es bearer_token "test-token-uuid" \
  *   --es binding_address "0.0.0.0" \
  *   --ei port 8080 \
@@ -64,12 +64,12 @@ import javax.inject.Inject
  * # Start the MCP server (runs inside app process, avoids exported=false restriction)
  * adb shell am broadcast \
  *   -a com.danielealbano.androidremotecontrolmcp.debug.E2E_START_SERVER \
- *   -n com.danielealbano.androidremotecontrolmcp.debug/.E2EConfigReceiver
+ *   -n <app-id>/com.danielealbano.androidremotecontrolmcp.debug.E2EConfigReceiver
  *
  * # Stop the MCP server
  * adb shell am broadcast \
  *   -a com.danielealbano.androidremotecontrolmcp.debug.E2E_STOP_SERVER \
- *   -n com.danielealbano.androidremotecontrolmcp.debug/.E2EConfigReceiver
+ *   -n <app-id>/com.danielealbano.androidremotecontrolmcp.debug.E2EConfigReceiver
  *
  * # Free E2E tunnel: configure (override + trusted CA are debug-only; "-" clears a string extra),
  * # enroll, and query the status (Base64 JSON in the broadcast result data)
@@ -80,6 +80,10 @@ import javax.inject.Inject
  * adb shell am broadcast -a ....E2E_ARC_TUNNEL_ENROLL -n ...
  * adb shell am broadcast -a ....E2E_ARC_TUNNEL_QUERY -n ...
  * ```
+ *
+ * Where `<app-id>` is `com.danielealbano.androidremotecontrolmcp.gms.debug` (gms flavor) or
+ * `com.danielealbano.androidremotecontrolmcp.foss.debug` (foss flavor): this receiver exists only in debug builds.
+ * The actions keep the receiver's source package (`com.danielealbano.androidremotecontrolmcp.debug`).
  */
 @AndroidEntryPoint
 class E2EConfigReceiver : BroadcastReceiver() {
