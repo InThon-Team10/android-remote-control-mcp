@@ -12,15 +12,22 @@ buildscript {
             val group = requested.group
             val name = requested.name
             when {
-                group == "com.google.guava" && name == "guava" ->
+                group == "com.google.guava" && name == "guava" -> {
                     useVersion("33.7.2-jre")
+                }
+
                 group == "org.bouncycastle" &&
-                    name in setOf("bcprov-jdk18on", "bcutil-jdk18on", "bcpkix-jdk18on") ->
+                    name in setOf("bcprov-jdk18on", "bcutil-jdk18on", "bcpkix-jdk18on") -> {
                     useVersion("1.85")
-                group == "org.apache.httpcomponents" && name in setOf("httpclient", "httpmime") ->
+                }
+
+                group == "org.apache.httpcomponents" && name in setOf("httpclient", "httpmime") -> {
                     useVersion("4.5.14")
-                group == "org.apache.commons" && name == "commons-lang3" ->
+                }
+
+                group == "org.apache.commons" && name == "commons-lang3" -> {
                     useVersion("3.18.0")
+                }
             }
         }
     }
@@ -33,10 +40,26 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
-    alias(libs.plugins.ktlint) apply false
+    // Applied here (not only in the modules) so `ktlintCheck` also covers the root build.gradle.kts and
+    // settings.gradle.kts; on a project without Kotlin sources the plugin checks only its own *.kts files.
+    alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.gradle.versions)
     alias(libs.plugins.version.catalog.update)
+}
+
+ktlint {
+    version.set("1.8.0")
+}
+
+// Same rationale as :app — ktlint-cli 1.8.0 bundles a CVE-flagged logback used only at build time.
+configurations.matching { it.name.startsWith("ktlint") }.configureEach {
+    resolutionStrategy {
+        force(
+            "ch.qos.logback:logback-core:1.5.34",
+            "ch.qos.logback:logback-classic:1.5.34",
+        )
+    }
 }
 
 tasks.withType<DependencyUpdatesTask> {
@@ -71,29 +94,41 @@ allprojects {
                             "androidLintTool/UTP and the Hilt/Dagger annotation processors pull older -jre releases",
                     )
                 }
+
                 group == "io.netty" && requested.version?.startsWith("4.1.") == true -> {
                     useVersion("4.1.137.Final")
                     because(
                         "CVE-2026-59903 (and earlier); UTP/grpc-netty pulls a vulnerable 4.1.x tooling transitive",
                     )
                 }
+
                 group == "org.bouncycastle" &&
                     name in setOf("bcprov-jdk18on", "bcutil-jdk18on", "bcpkix-jdk18on") -> {
                     useVersion("1.86")
                     because("CVE-2025-14813; androidLintTool/UTP pull vulnerable bouncycastle 1.79 (tooling only)")
                 }
+
                 group == "org.apache.httpcomponents" && name in setOf("httpclient", "httpmime") -> {
                     useVersion("4.5.14")
                     because("CVE-2020-13956; androidLintTool/UTP pull vulnerable httpclient 4.5.6 (tooling only)")
                 }
+
                 group == "org.apache.httpcomponents.core5" && name in setOf("httpcore5", "httpcore5-h2") -> {
                     useVersion("5.4.3")
-                    because("CVE-2026-54399; ktor-server-test-host -> ktor-client-apache5 -> httpclient5 pulls vulnerable httpcore5 5.3.6 (test only)")
+                    because(
+                        "CVE-2026-54399; ktor-server-test-host -> ktor-client-apache5 -> httpclient5 pulls vulnerable " +
+                            "httpcore5 5.3.6 (test only)",
+                    )
                 }
+
                 group == "org.apache.httpcomponents.client5" && name == "httpclient5" -> {
                     useVersion("5.6.3")
-                    because("CVE-2026-64607; ktor-server-test-host -> ktor-client-apache5 pulls vulnerable httpclient5 < 5.6.3 (test only; 5.6.3 depends on the already-forced httpcore5 5.4.3)")
+                    because(
+                        "CVE-2026-64607; ktor-server-test-host -> ktor-client-apache5 pulls vulnerable httpclient5 < 5.6.3 " +
+                            "(test only; 5.6.3 depends on the already-forced httpcore5 5.4.3)",
+                    )
                 }
+
                 group == "org.apache.commons" && name == "commons-lang3" -> {
                     useVersion("3.18.0")
                     because("CVE-2025-48924; androidLintTool/UTP pull vulnerable commons-lang3 3.16.0 (tooling only)")
