@@ -876,6 +876,23 @@ class FileOperationProviderTest {
                     }
                 assertTrue(exception.message!!.contains("exceeds the configured limit"))
             }
+
+        @Test
+        fun `replaceInFile throws ActionFailed when replace_all growth exceeds size limit`() =
+            runTest {
+                // Arrange — 600 KB file doubled by the replacement passes the 1 MB limit
+                val outputStream = setupReplaceFile("a".repeat(REPLACE_GROWTH_FILE_CHARS))
+                coEvery { mockSettingsRepository.getServerConfig() } returns
+                    ServerConfig(fileSizeLimitMb = 1)
+
+                // Act & Assert
+                val exception =
+                    assertThrows<McpToolException.ActionFailed> {
+                        provider.replaceInFile("loc1", "file.txt", "a", "bb", true)
+                    }
+                assertTrue(exception.message!!.contains("exceed the configured file size limit"))
+                assertEquals(0, outputStream.size())
+            }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -1772,6 +1789,7 @@ class FileOperationProviderTest {
         private const val BYTES_PER_MB = 1024 * 1024
         private const val DEFAULT_FILE_SIZE_LIMIT_MB = 50
         private const val FILE_SIZE_EXCEEDING_LIMIT = 100_000_000L
+        private const val REPLACE_GROWTH_FILE_CHARS = 600_000
         private const val TEN_MB = 10L * 1024 * 1024
         private const val LIST_ENTRIES_ABOVE_MAX = 210
         private const val LINES_ABOVE_MAX = 210
