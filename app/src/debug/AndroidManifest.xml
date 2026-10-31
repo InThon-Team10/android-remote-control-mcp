@@ -20,6 +20,18 @@
             android:name=".debug.OAuthApprovalTestReceiver"
             android:exported="true"
             android:permission="android.permission.DUMP" />
+
+        <!-- Debug-only assistant test screen. Exported only because a LAUNCHER entry requires it. -->
+        <activity
+            android:name=".debug.assistant.AssistantTestActivity"
+            android:exported="true"
+            android:label="@string/assistant_debug_label"
+            android:theme="@style/Theme.AndroidRemoteControlMcp">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>
