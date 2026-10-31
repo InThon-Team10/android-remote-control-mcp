@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- Boot receiver -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -24,6 +25,8 @@
     <!-- Camera -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Live voice: speakerphone-style routing (voice-communication mode on the loudspeaker or a headset). -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Location (background-location is geofence-only → declared in the gms flavor manifest) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -58,16 +61,24 @@
         android:theme="@style/Theme.AndroidRemoteControlMcp"
         tools:targetApi="34">
 
-        <!-- Main Activity -->
+        <!-- Helper entry flow: the app's launcher ("start screen") -->
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.helper.HelperActivity"
             android:exported="true"
+            android:label="@string/app_name"
             android:theme="@style/Theme.AndroidRemoteControlMcp">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Main Activity (advanced MCP server settings). No intent-filter: it stays exported because the
+             E2E tests and `make start-server` start it by explicit component over adb. -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AndroidRemoteControlMcp" />
 
         <!-- Share Target (receives content shared INTO the app via the Android share sheet) -->
         <activity
@@ -103,6 +114,12 @@
             android:name=".services.tunnel.arctunnel.ArcTunnelEnrollService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Assistant live voice conversation (keeps the microphone alive while the AI drives other apps) -->
+        <service
+            android:name=".assistant.voice.AssistantVoiceService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- Accessibility Service -->
         <service

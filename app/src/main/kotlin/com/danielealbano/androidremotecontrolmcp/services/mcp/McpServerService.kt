@@ -37,7 +37,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenSt
 import com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
 import com.danielealbano.androidremotecontrolmcp.services.sharing.EphemeralFileLinkService
 import com.danielealbano.androidremotecontrolmcp.services.tunnel.TunnelManager
-import com.danielealbano.androidremotecontrolmcp.ui.MainActivity
+import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperActivity
 import com.danielealbano.androidremotecontrolmcp.utils.NetworkUtils
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.AndroidEntryPoint
@@ -242,6 +242,7 @@ class McpServerService : Service() {
                 effectivePerms,
                 config.fileSizeLimitMb,
                 config.toolCallIndicatorEnabled,
+                config.elderGuidanceEnabled,
                 currentBaseUrl,
             )
 
@@ -453,7 +454,7 @@ class McpServerService : Service() {
             PendingIntent.getActivity(
                 this,
                 0,
-                Intent(this, MainActivity::class.java),
+                Intent(this, HelperActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
 

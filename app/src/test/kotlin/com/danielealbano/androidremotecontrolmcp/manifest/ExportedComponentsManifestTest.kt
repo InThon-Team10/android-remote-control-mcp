@@ -127,11 +127,14 @@ class ExportedComponentsManifestTest {
 
         /**
          * Components that must stay reachable by any caller:
-         * - `MainActivity` is the LAUNCHER entry point.
+         * - `HelperActivity` is the LAUNCHER entry point.
+         * - `MainActivity` has no intent-filter but is started by explicit component over adb (E2E tests,
+         *   `make start-server`).
          * - `ShareReceiverActivity` is a share-sheet target, invoked by arbitrary sending apps.
          */
         val INTENTIONALLY_PUBLIC =
             setOf(
+                ".ui.helper.HelperActivity",
                 ".ui.MainActivity",
                 ".ui.ShareReceiverActivity",
             )

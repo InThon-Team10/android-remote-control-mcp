@@ -15,6 +15,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 2. [Tool Naming Convention](#tool-naming-convention)
 3. [Common Patterns](#common-patterns)
 4. [Error Codes](#error-codes)
+   - [Elder guidance mode](#elder-guidance-mode)
 5. [Screen Introspection Tools](#1-screen-introspection-tools)
 6. [System Action Tools](#2-system-action-tools)
 7. [Touch Action Tools](#3-touch-action-tools)
@@ -182,6 +183,39 @@ MCP clients MUST:
 Tool errors are **not** returned as JSON-RPC error codes. Instead, the SDK catches `McpToolException` subtypes and wraps them as `CallToolResult(isError = true)` with a descriptive message in `TextContent`. This follows the standard MCP SDK pattern.
 
 Protocol-level errors (parse errors, invalid requests) are handled automatically by the SDK and returned as standard JSON-RPC errors.
+
+---
+
+## Elder guidance mode
+
+The app helps elderly users, so MCP tools never operate the phone by themselves while guidance is on (the default). Tool names below are un-prefixed.
+
+| Class | Tools | Behavior |
+|-------|-------|----------|
+| Read-only | `get_screen_state`, `find_nodes`, `get_node_details`, `get_accessibility_status`, `get_clipboard`, `wait_for_node`, `wait_for_idle`, `list_apps`, `list_storage_locations`, `list_files`, `read_file`, `list_cameras`, `list_camera_photo_resolutions`, `list_camera_video_resolutions`, `notification_list`, `get_location`, `get_shared_content` | Unchanged |
+| Highlight | `tap`, `long_press`, `double_tap`, `click_node`, `long_click_node`, `tap_node`, `type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`, `scroll_node`, `scroll_to_node` | Validates its own parameters, highlights the target on screen and waits for the user to act. Never acts on the device |
+| Refused | every other tool (and any tool added later) | `isError` result telling the AI to explain the step to the user or use a highlight tool |
+
+Highlight tools take two extra optional strings: `instruction` (max 200 characters, one sentence telling the user what to do, in the user's language) and `explanation` (max 500 characters, what happens once they do it). Longer values are an invalid-params error; blank values are dropped (the overlay shows a default). Privacy placeholders in both are substituted before they are shown.
+
+Targets: node tools highlight the node they would act on (a missing node is the tool's usual not-found error); `tap`, `long_press` and `double_tap` highlight the deepest visible node at the point (topmost window, the app's own overlays excluded), or a 72dp square around it; `scroll_to_node` answers that the node is already on screen when it is fully visible, otherwise highlights its nearest scrollable ancestor.
+
+The call waits up to 45 s (MCP client requests time out at 60 s). Answers (server-generated text only, never device text or the text the AI wanted to type):
+
+| Outcome | Result |
+|---------|--------|
+| User acted | "The user did it. Call get_screen_state to see the new screen before the next step." |
+| Screen changed | "The screen changed before the user acted on the highlight. Call get_screen_state and guide again." |
+| Timed out | "The user has not acted yet (waited 45 s). The highlight stays on screen. Call the same tool with the same target to keep waiting, or ask the user whether they need help." |
+| Closed (`isError`) | "The user closed the guidance. Ask what they want to do." |
+| Replaced (`isError`) | "A newer guidance step replaced this one." |
+| Overlay unavailable (`isError`) | "The guidance overlay is not available because the helper's accessibility service is not connected. Ask the user to turn it on." |
+
+After a timeout the highlight stays on screen for up to 120 s ("lingering"): a slow user can still act, and calling the same tool with the same target waits again without showing the explanation twice. If the user already acted on it in the meantime, that call returns "user acted" at once.
+
+Guided calls do not show the tool-call indicator (the user acts, not the AI).
+
+**Test-only switch**: `ServerConfig.elderGuidanceEnabled` (default `true`) has no UI and is not part of the ADB config, so release builds cannot turn guidance off. Debug builds accept the boolean extra `elder_guidance_enabled` on the E2E config broadcast (the E2E suites set it to `false` to keep driving the device). When it is `false`, tools are registered exactly as without guidance.
 
 ---
 

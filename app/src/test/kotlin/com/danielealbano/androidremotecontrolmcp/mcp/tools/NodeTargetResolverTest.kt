@@ -85,6 +85,29 @@ class NodeTargetResolverTest {
         }
 
         @Test
+        fun `a bare lowercase hex node_id gets the node_ prefix`() {
+            for (bare in listOf("cc18f32c", "a", "0123456789abcdef")) {
+                assertEquals(NodeTarget.ById("node_$bare"), resolver.parse(buildJsonObject { put("node_id", bare) }))
+            }
+        }
+
+        @Test
+        fun `a node_id with the node_ prefix is unchanged`() {
+            assertEquals(
+                NodeTarget.ById("node_cc18f32c"),
+                resolver.parse(buildJsonObject { put("node_id", "node_cc18f32c") }),
+            )
+        }
+
+        @Test
+        fun `a node_id that is not bare lowercase hex is unchanged`() {
+            val others = listOf("CC18F32C", "cc18f32g", "0123456789abcdef0", " cc18f32c", "root_w3", "node-cc18f32c")
+            for (other in others) {
+                assertEquals(NodeTarget.ById(other), resolver.parse(buildJsonObject { put("node_id", other) }), other)
+            }
+        }
+
+        @Test
         fun `by and value are a selector, exact_match defaults to false`() {
             val target =
                 resolver.parse(
@@ -222,6 +245,14 @@ class NodeTargetResolverTest {
                     NodeResolution.Resolved("node_missing"),
                     resolver.resolve(NodeTarget.ById("node_missing"), windows),
                 )
+            }
+
+        @Test
+        fun `a bare hex node id resolves to the prefixed node id`() =
+            runTest {
+                val target = resolver.parse(buildJsonObject { put("node_id", "cc18f32c") })
+
+                assertEquals(NodeResolution.Resolved("node_cc18f32c"), resolver.resolve(target, windows))
             }
 
         @Test

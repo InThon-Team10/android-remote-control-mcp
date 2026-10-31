@@ -3,7 +3,11 @@ package com.danielealbano.androidremotecontrolmcp.services.mcp
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.CompositeToolCallIndicator
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ElderGuidanceTargets
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ElderToolGuidance
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.NodeTargetResolver
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
@@ -45,9 +49,14 @@ class McpToolRegistration
             perms: ToolPermissionsConfig,
             fileSizeLimitMb: Int,
             toolCallIndicatorEnabled: Boolean,
+            elderGuidanceEnabled: Boolean,
             currentBaseUrl: () -> String,
         ) {
-            val toolCallIndicator = ReferenceCountedToolCallIndicator(AccessibilityToolCallIndicator())
+            val toolCallIndicator =
+                CompositeToolCallIndicator(
+                    visual = ReferenceCountedToolCallIndicator(AccessibilityToolCallIndicator()),
+                    activity = accessibility.inFlightToolCallSignal,
+                )
             toolCallIndicator.setEnabled(toolCallIndicatorEnabled)
             val registrar =
                 LoggedToolRegistrar(
@@ -55,6 +64,7 @@ class McpToolRegistration
                     serverLogRepository,
                     toolCallIndicator,
                     inFlightToolCalls,
+                    if (elderGuidanceEnabled) elderToolGuidance() else null,
                 )
             registerAccessibilityToolBundle(registrar, toolNamePrefix, perms)
             val d = device
@@ -73,6 +83,24 @@ class McpToolRegistration
             registerLocationTools(registrar, d.locationProvider, privacy.privacyToolGate, toolNamePrefix, perms)
             registerSharingBundle(registrar, toolNamePrefix, perms, fileSizeLimitMb, currentBaseUrl)
         }
+
+        private fun elderToolGuidance(): ElderToolGuidance =
+            ElderToolGuidance(
+                accessibility.guidanceController,
+                ElderGuidanceTargets(
+                    accessibility.treeParser,
+                    accessibility.accessibilityServiceProvider,
+                    accessibility.nodeCache,
+                    accessibility.elementFinder,
+                    NodeTargetResolver(
+                        accessibility.elementFinder,
+                        privacy.privacyToolGate,
+                        privacy.placeholderSubstitutor,
+                    ),
+                    privacy.placeholderSubstitutor,
+                ),
+                privacy.placeholderSubstitutor,
+            )
 
         private fun registerAccessibilityToolBundle(
             registrar: LoggedToolRegistrar,

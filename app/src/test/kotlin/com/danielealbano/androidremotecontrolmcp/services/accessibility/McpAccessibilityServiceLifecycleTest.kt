@@ -1,12 +1,14 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.content.Context
+import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import dagger.hilt.android.EntryPointAccessors
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.spyk
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.isActive
@@ -23,15 +25,23 @@ import org.junit.jupiter.api.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("McpAccessibilityService lifecycle")
 class McpAccessibilityServiceLifecycleTest {
+    private val host = mockk<AccessibilityOverlayHost>(relaxed = true)
+
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
         val entryPoint = mockk<McpAccessibilityService.NodeCacheEntryPoint>()
         every { entryPoint.nodeCache() } returns mockk<AccessibilityNodeCache>(relaxed = true)
+        val guidanceEntryPoint = mockk<McpAccessibilityService.GuidanceEntryPoint>()
+        every { guidanceEntryPoint.guidanceController() } returns mockk<GuidanceController>(relaxed = true)
+        every { guidanceEntryPoint.overlayHosts() } returns setOf(host)
         mockkStatic(EntryPointAccessors::class)
         every {
             EntryPointAccessors.fromApplication(any(), McpAccessibilityService.NodeCacheEntryPoint::class.java)
         } returns entryPoint
+        every {
+            EntryPointAccessors.fromApplication(any(), McpAccessibilityService.GuidanceEntryPoint::class.java)
+        } returns guidanceEntryPoint
     }
 
     @AfterEach
@@ -77,5 +87,17 @@ class McpAccessibilityServiceLifecycleTest {
 
         assertFalse(firstScope.isActive)
         service.onDestroy()
+    }
+
+    @Test
+    @DisplayName("overlay hosts are attached on connect and detached on destroy")
+    fun `hosts are attached and detached`() {
+        val service = newService()
+
+        service.connect()
+        verify(exactly = 1) { host.attach(service) }
+        service.onDestroy()
+
+        verify(exactly = 1) { host.detach() }
     }
 }

@@ -23,8 +23,11 @@ import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthApprovalCoordina
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthRouteDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthServerDeps
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.installOAuthRoutes
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ElderGuidanceTargets
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ElderToolGuidance
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.NodeTargetResolver
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerCameraTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerFileTools
@@ -72,6 +75,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.TypeInpu
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WebViewNodeMerger
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
+import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.location.LocationProvider
 import com.danielealbano.androidremotecontrolmcp.services.notifications.NotificationProvider
@@ -252,9 +256,16 @@ object McpIntegrationTestHelper {
         deps: MockDependencies,
         deviceSlug: String = "",
         perms: ToolPermissionsConfig = ToolPermissionsConfig(),
+        guidanceController: GuidanceController? = null,
     ) {
         val toolNamePrefix = McpToolUtils.buildToolNamePrefix(deviceSlug)
-        val registrar = LoggedToolRegistrar(server, deps.serverLog, inFlightToolCalls = deps.inFlightToolCalls)
+        val registrar =
+            LoggedToolRegistrar(
+                server,
+                deps.serverLog,
+                inFlightToolCalls = deps.inFlightToolCalls,
+                elderGuidance = guidanceController?.let { elderGuidance(it, deps) },
+            )
         registerScreenIntrospectionTools(
             registrar,
             deps.treeParser,
@@ -283,6 +294,24 @@ object McpIntegrationTestHelper {
         registerInteractionToolBundle(registrar, deps, toolNamePrefix, perms)
         registerNonAccessibilityTools(registrar, deps, toolNamePrefix, perms)
     }
+
+    /** Elder guidance over [controller] with the mocked dependencies, as the production registration builds it. */
+    private fun elderGuidance(
+        controller: GuidanceController,
+        deps: MockDependencies,
+    ): ElderToolGuidance =
+        ElderToolGuidance(
+            controller,
+            ElderGuidanceTargets(
+                deps.treeParser,
+                deps.accessibilityServiceProvider,
+                deps.nodeCache,
+                deps.elementFinder,
+                NodeTargetResolver(deps.elementFinder, deps.privacyToolGate, deps.placeholderSubstitutor),
+                deps.placeholderSubstitutor,
+            ),
+            deps.placeholderSubstitutor,
+        )
 
     private fun registerInteractionToolBundle(
         registrar: LoggedToolRegistrar,
@@ -389,6 +418,7 @@ object McpIntegrationTestHelper {
         deps: MockDependencies,
         deviceSlug: String = "",
         perms: ToolPermissionsConfig = ToolPermissionsConfig(),
+        guidanceController: GuidanceController? = null,
     ): Server {
         val server =
             Server(
@@ -405,7 +435,7 @@ object McpIntegrationTestHelper {
                             ),
                     ),
             )
-        registerAllTools(server, deps, deviceSlug, perms)
+        registerAllTools(server, deps, deviceSlug, perms, guidanceController)
         return server
     }
 
@@ -424,9 +454,10 @@ object McpIntegrationTestHelper {
         deps: MockDependencies = createMockDependencies(),
         deviceSlug: String = "",
         perms: ToolPermissionsConfig = ToolPermissionsConfig(),
+        guidanceController: GuidanceController? = null,
         testBlock: suspend (client: Client, deps: MockDependencies) -> Unit,
     ) {
-        val sdkServer = createSdkServer(deps, deviceSlug, perms)
+        val sdkServer = createSdkServer(deps, deviceSlug, perms, guidanceController)
 
         testApplication {
             application {

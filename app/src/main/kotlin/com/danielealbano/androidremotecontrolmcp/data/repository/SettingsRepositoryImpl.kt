@@ -52,6 +52,7 @@ private val JWT_SIGNING_SECRET_KEY = stringPreferencesKey("jwt_signing_secret")
 private val AUTO_START_KEY = booleanPreferencesKey("auto_start_on_boot")
 private val HIDE_FROM_RECENTS_KEY = booleanPreferencesKey("hide_from_recents")
 private val TOOL_CALL_INDICATOR_ENABLED_KEY = booleanPreferencesKey("tool_call_indicator_enabled")
+private val ELDER_GUIDANCE_ENABLED_KEY = booleanPreferencesKey("elder_guidance_enabled")
 private val SERVER_RUNNING_KEY = booleanPreferencesKey("server_running")
 private val HTTPS_ENABLED_KEY = booleanPreferencesKey("https_enabled")
 private val CERTIFICATE_SOURCE_KEY = stringPreferencesKey("certificate_source")
@@ -119,6 +120,7 @@ private fun mapPreferencesToServerConfig(prefs: Preferences): ServerConfig {
         bearerToken = prefs[BEARER_TOKEN_KEY] ?: "",
         autoStartOnBoot = prefs[AUTO_START_KEY] ?: false,
         toolCallIndicatorEnabled = prefs[TOOL_CALL_INDICATOR_ENABLED_KEY] ?: true,
+        elderGuidanceEnabled = prefs[ELDER_GUIDANCE_ENABLED_KEY] ?: true,
         httpsEnabled = prefs[HTTPS_ENABLED_KEY] ?: false,
         certificateSource =
             CertificateSource.entries.firstOrNull { it.name == certificateSourceName }
@@ -308,10 +310,12 @@ class SettingsRepositoryImpl
         eventChannelSettings: EventChannelSettings,
         arcTunnelSettings: ArcTunnelSettings,
         downloadSettings: DownloadSettings,
+        assistantSettings: AssistantSettings,
     ) : SettingsRepository,
         EventChannelSettings by eventChannelSettings,
         ArcTunnelSettings by arcTunnelSettings,
-        DownloadSettings by downloadSettings {
+        DownloadSettings by downloadSettings,
+        AssistantSettings by assistantSettings {
         override val serverConfig: Flow<ServerConfig> =
             dataStore.data.map { prefs ->
                 mapPreferencesToServerConfig(prefs)
@@ -484,6 +488,10 @@ class SettingsRepositoryImpl
                 prefs[TOOL_CALL_INDICATOR_ENABLED_KEY] = enabled
                 logToggle("tool_call_indicator", old, enabled, "Tool-call indicator")
             }
+        }
+
+        override suspend fun updateElderGuidanceEnabled(enabled: Boolean) {
+            dataStore.edit { prefs -> prefs[ELDER_GUIDANCE_ENABLED_KEY] = enabled }
         }
 
         override val serverRunning: Flow<Boolean> =

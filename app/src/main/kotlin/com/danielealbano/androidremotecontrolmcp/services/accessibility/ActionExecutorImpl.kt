@@ -874,47 +874,49 @@ class ActionExecutorImpl
             gesture: GestureDescription,
             description: String,
         ): Result<Unit> =
-            withTimeoutOrNull(GESTURE_TIMEOUT_MS) {
-                suspendCancellableCoroutine { continuation ->
-                    val callback =
-                        object :
-                            android.accessibilityservice.AccessibilityService.GestureResultCallback() {
-                            override fun onCompleted(gestureDescription: GestureDescription?) {
-                                Log.d(TAG, "Gesture completed: $description")
-                                if (continuation.isActive) {
-                                    continuation.resume(Result.success(Unit))
+            McpAccessibilityService.assistantOverlayHider.hiddenDuring {
+                withTimeoutOrNull(GESTURE_TIMEOUT_MS) {
+                    suspendCancellableCoroutine { continuation ->
+                        val callback =
+                            object :
+                                android.accessibilityservice.AccessibilityService.GestureResultCallback() {
+                                override fun onCompleted(gestureDescription: GestureDescription?) {
+                                    Log.d(TAG, "Gesture completed: $description")
+                                    if (continuation.isActive) {
+                                        continuation.resume(Result.success(Unit))
+                                    }
+                                }
+
+                                override fun onCancelled(gestureDescription: GestureDescription?) {
+                                    Log.w(TAG, "Gesture cancelled: $description")
+                                    if (continuation.isActive) {
+                                        continuation.resume(
+                                            Result.failure(
+                                                RuntimeException("Gesture cancelled: $description"),
+                                            ),
+                                        )
+                                    }
                                 }
                             }
 
-                            override fun onCancelled(gestureDescription: GestureDescription?) {
-                                Log.w(TAG, "Gesture cancelled: $description")
-                                if (continuation.isActive) {
-                                    continuation.resume(
-                                        Result.failure(
-                                            RuntimeException("Gesture cancelled: $description"),
-                                        ),
-                                    )
-                                }
+                        val dispatched = service.dispatchGesture(gesture, callback, null)
+                        if (!dispatched) {
+                            Log.e(TAG, "Failed to dispatch gesture: $description")
+                            if (continuation.isActive) {
+                                continuation.resume(
+                                    Result.failure(
+                                        RuntimeException("Failed to dispatch gesture: $description"),
+                                    ),
+                                )
                             }
-                        }
-
-                    val dispatched = service.dispatchGesture(gesture, callback, null)
-                    if (!dispatched) {
-                        Log.e(TAG, "Failed to dispatch gesture: $description")
-                        if (continuation.isActive) {
-                            continuation.resume(
-                                Result.failure(
-                                    RuntimeException("Failed to dispatch gesture: $description"),
-                                ),
-                            )
                         }
                     }
+                } ?: run {
+                    Log.e(TAG, "Gesture timed out after ${GESTURE_TIMEOUT_MS}ms: $description")
+                    Result.failure(
+                        RuntimeException("Gesture timed out after ${GESTURE_TIMEOUT_MS}ms: $description"),
+                    )
                 }
-            } ?: run {
-                Log.e(TAG, "Gesture timed out after ${GESTURE_TIMEOUT_MS}ms: $description")
-                Result.failure(
-                    RuntimeException("Gesture timed out after ${GESTURE_TIMEOUT_MS}ms: $description"),
-                )
             }
 
         /**

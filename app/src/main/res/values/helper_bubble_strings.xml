@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bubble_label">도움</string>
+    <string name="bubble_label_busy">생각 중</string>
+    <string name="bubble_open">도우미 열기</string>
+    <string name="bubble_title">도우미</string>
+    <string name="bubble_close">닫기</string>
+    <string name="bubble_input_hint">무엇을 도와드릴까요?</string>
+    <string name="bubble_send">보내기</string>
+    <string name="bubble_stop">멈추기</string>
+    <string name="bubble_new_chat">새 대화</string>
+    <string name="bubble_mic_start">말로 물어보기</string>
+    <string name="bubble_mic_stop">듣기 멈추기</string>
+    <string name="bubble_running">도우미가 생각하고 있어요</string>
+    <string name="bubble_confirm">%1$s 작업을 허용할까요?</string>
+    <string name="bubble_allow">허용</string>
+    <string name="bubble_deny">거부</string>
+    <string name="bubble_notice_step_limit">한 번에 할 수 있는 단계를 넘었어요. 다시 말씀해 주세요.</string>
+    <string name="bubble_notice_stopped">멈췄어요.</string>
+    <string name="bubble_error_key">AI 연결 키를 확인해 주세요.</string>
+    <string name="bubble_error_quota">지금은 사용량이 가득 찼어요. 잠시 후에 다시 해 주세요.</string>
+    <string name="bubble_error_unavailable">AI에 연결할 수 없어요. 인터넷을 확인해 주세요.</string>
+    <string name="bubble_error_blocked">이 요청에는 답할 수 없어요.</string>
+    <string name="bubble_error_generic">문제가 생겼어요. 다시 해 주세요.</string>
+    <string name="bubble_error_server">도우미를 준비하지 못했어요. 앱을 다시 열어 주세요.</string>
+    <string name="bubble_error_voice">음성을 사용할 수 없어요.</string>
+    <string name="bubble_error_mic_permission">마이크 사용을 허용해 주세요.</string>
+    <string name="bubble_error_disabled">도우미가 꺼져 있어요. 설정을 확인해 주세요.</string>
+    <string name="bubble_move_up">도움 버튼을 위로 옮기기</string>
+    <string name="bubble_move_down">도움 버튼을 아래로 옮기기</string>
+</resources>

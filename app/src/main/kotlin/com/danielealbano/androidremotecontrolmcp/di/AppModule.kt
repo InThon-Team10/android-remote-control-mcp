@@ -4,8 +4,24 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnectionImpl
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarterImpl
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioCapture
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioPlayback
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidVoiceServiceLauncher
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioCapture
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioPlayback
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.GeminiSdkLiveGateway
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveGateway
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSessionImpl
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceServiceLauncher
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettings
@@ -16,6 +32,9 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogReposi
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepositoryImpl
+import com.danielealbano.androidremotecontrolmcp.data.security.AndroidKeystoreAeadProvider
+import com.danielealbano.androidremotecontrolmcp.data.security.ApiKeyCipher
+import com.danielealbano.androidremotecontrolmcp.data.security.TinkApiKeyCipher
 import com.danielealbano.androidremotecontrolmcp.geo.DbIpGeoResolver
 import com.danielealbano.androidremotecontrolmcp.geo.GeoIpResolver
 import com.danielealbano.androidremotecontrolmcp.mcp.McpListenerRules
@@ -133,6 +152,13 @@ object AppModule {
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = context.oauthClientsDataStore
 
+    /** Provides the Tink cipher (Android Keystore master key) protecting the assistant's Gemini API key. */
+    @Provides
+    @Singleton
+    fun provideApiKeyCipher(
+        @ApplicationContext context: Context,
+    ): ApiKeyCipher = TinkApiKeyCipher(AndroidKeystoreAeadProvider(context)::get)
+
     /**
      * Provides [Dispatchers.IO] for background work.
      */
@@ -181,6 +207,11 @@ abstract class RepositoryModule {
     @Singleton
     abstract fun bindDownloadSettings(impl: DownloadSettingsImpl): DownloadSettings
 
+    /** Binds the assistant settings slice (also reachable through [SettingsRepository]). */
+    @Binds
+    @Singleton
+    abstract fun bindAssistantSettings(impl: AssistantSettingsImpl): AssistantSettings
+
     /** Binds the persisted OAuth client registry. */
     @Binds
     @Singleton
@@ -224,6 +255,14 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindAccessibilityServiceProvider(impl: AccessibilityServiceProviderImpl): AccessibilityServiceProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindAssistantMcpConnection(impl: AssistantMcpConnectionImpl): AssistantMcpConnection
+
+    @Binds
+    @Singleton
+    abstract fun bindAssistantServerStarter(impl: AssistantServerStarterImpl): AssistantServerStarter
 
     @Binds
     @Singleton
@@ -341,4 +380,25 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindArcTunnelCtAlerts(impl: ArcTunnelCtAlertsImpl): ArcTunnelCtAlerts
+
+    /** Binds the assistant live voice session. */
+    @Binds
+    @Singleton
+    abstract fun bindLiveVoiceSession(impl: LiveVoiceSessionImpl): LiveVoiceSession
+
+    /** Binds the microphone capture used by the live voice session. */
+    @Binds
+    abstract fun bindAudioCapture(impl: AndroidAudioCapture): AudioCapture
+
+    /** Binds the foreground service launcher of the live voice session. */
+    @Binds
+    abstract fun bindVoiceServiceLauncher(impl: AndroidVoiceServiceLauncher): VoiceServiceLauncher
+
+    /** Binds the Gemini Live API gateway. */
+    @Binds
+    abstract fun bindLiveGateway(impl: GeminiSdkLiveGateway): LiveGateway
+
+    /** Binds the speaker playback used by the live voice session. */
+    @Binds
+    abstract fun bindAudioPlayback(impl: AndroidAudioPlayback): AudioPlayback
 }
