@@ -70,8 +70,9 @@ class TextToSpeechHelperSpeaker
         }
 
         override fun speak(text: String) {
-            Log.d(VOICE_TRACE, "tts speak len=${text.length} enabled=${enabled.get()} ready=${ready.get()}")
-            if (!speechAllowed(enabled.get(), ready.get(), liveConversation.get(), text)) return
+            val allowed = speechAllowed(enabled.get(), ready.get(), liveConversation.get(), text)
+            Log.d(VOICE_TRACE, "tts speak len=${text.length} allowed=$allowed live=${liveConversation.get()}")
+            if (!allowed) return
             // Queued so a guidance instruction never cuts off the answer being read; stop() clears the queue.
             engine.get()?.speak(text, TextToSpeech.QUEUE_ADD, null, UTTERANCE_ID)
         }

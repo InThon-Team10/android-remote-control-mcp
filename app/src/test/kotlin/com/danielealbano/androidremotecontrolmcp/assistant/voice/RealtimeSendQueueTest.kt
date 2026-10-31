@@ -33,7 +33,11 @@ class RealtimeSendQueueTest {
             }
         }
 
-        override fun close() = Unit
+        var closed = false
+
+        override fun close() {
+            closed = true
+        }
     }
 
     @Test
@@ -81,5 +85,43 @@ class RealtimeSendQueueTest {
             runCurrent()
 
             assertEquals("boom", failures.single().message)
+        }
+
+    @Test
+    fun `a timeout closes the link and reports the failure`() =
+        runTest {
+            val failures = mutableListOf<Throwable>()
+            val link = Link { awaitCancellation() }
+            val queue = RealtimeSendQueue(backgroundScope, link, 1000) { failures += it }
+
+            queue.enqueue(RealtimeTestEvents.type("a"))
+            runCurrent()
+            advanceTimeBy(1001)
+            runCurrent()
+
+            assertTrue(link.closed)
+            assertEquals(1, failures.size)
+        }
+
+    @Test
+    fun `stale audio is dropped oldest first while control events are kept in order`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val link = Link { gate.await() }
+            val queue = RealtimeSendQueue(backgroundScope, link, 60_000) { }
+            val chunk = ByteArray(LiveAudio.CHUNK_BYTES)
+
+            queue.enqueue(RealtimeTestEvents.type("first"))
+            runCurrent()
+            queue.enqueue(RealtimeTestEvents.type("truncate"))
+            repeat(25) { queue.enqueue(RealtimeProtocol.audioAppend(chunk)) }
+            queue.enqueue(RealtimeTestEvents.type("response.create"))
+            gate.complete(Unit)
+            runCurrent()
+
+            val audio = link.sent.count { it == "\"input_audio_buffer.append\"" }
+            assertEquals(20, audio)
+            val control = link.sent.filter { !it.contains("audio") }
+            assertEquals(listOf("\"first\"", "\"truncate\"", "\"response.create\""), control)
         }
 }
