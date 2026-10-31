@@ -364,7 +364,7 @@ class WriteFileHandler
         suspend fun execute(arguments: JsonObject?): CallToolResult =
             try {
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
-                val path = McpToolUtils.requireString(arguments, "path")
+                val path = requireFilePath(arguments)
                 val content = McpToolUtils.requireString(arguments, "content")
 
                 fileOperationProvider.writeFile(locationId, path, content)
@@ -445,7 +445,7 @@ class AppendFileHandler
         suspend fun execute(arguments: JsonObject?): CallToolResult =
             try {
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
-                val path = McpToolUtils.requireString(arguments, "path")
+                val path = requireFilePath(arguments)
                 val content = McpToolUtils.requireString(arguments, "content")
 
                 fileOperationProvider.appendFile(locationId, path, content)
@@ -527,7 +527,7 @@ class FileReplaceHandler
         suspend fun execute(arguments: JsonObject?): CallToolResult =
             try {
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
-                val path = McpToolUtils.requireString(arguments, "path")
+                val path = requireFilePath(arguments)
                 val oldString = McpToolUtils.requireString(arguments, "old_string")
                 if (oldString.isEmpty()) {
                     throw McpToolException.InvalidParams("Parameter 'old_string' must be non-empty")
@@ -798,4 +798,13 @@ fun registerFileTools(
     if (perms.isToolEnabled(DeleteFileHandler.TOOL_NAME)) {
         DeleteFileHandler(fileOperationProvider).register(registrar, toolNamePrefix)
     }
+}
+
+/** Reads the `path` parameter of a write operation and rejects one that names a directory. */
+private fun requireFilePath(arguments: JsonObject?): String {
+    val path = McpToolUtils.requireString(arguments, "path")
+    if (path.endsWith("/")) {
+        throw McpToolException.InvalidParams("Parameter 'path' must name a file, not a directory")
+    }
+    return path
 }
