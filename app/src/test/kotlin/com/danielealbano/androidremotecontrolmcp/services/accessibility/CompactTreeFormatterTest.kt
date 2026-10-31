@@ -524,6 +524,14 @@ class CompactTreeFormatterTest {
         }
 
         @Test
+        @DisplayName("does not split a surrogate pair when truncating")
+        fun doesNotSplitSurrogatePairWhenTruncating() {
+            val text = "a".repeat(99) + "😀" + "b".repeat(50)
+            val result = formatter.sanitizeText(text)
+            assertEquals("a".repeat(99) + "...truncated", result)
+        }
+
+        @Test
         @DisplayName("does not truncate when truncate=false (merged WebView content)")
         fun doesNotTruncateWhenTruncateFalse() {
             val longText = "a".repeat(150)

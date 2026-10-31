@@ -252,7 +252,8 @@ class CompactTreeFormatter
                 }
 
                 truncate && sanitized.length > MAX_TEXT_LENGTH -> {
-                    sanitized.substring(0, MAX_TEXT_LENGTH) + TRUNCATION_SUFFIX
+                    val splitsPair = sanitized[MAX_TEXT_LENGTH - 1].isHighSurrogate()
+                    sanitized.substring(0, if (splitsPair) MAX_TEXT_LENGTH - 1 else MAX_TEXT_LENGTH) + TRUNCATION_SUFFIX
                 }
 
                 else -> {
