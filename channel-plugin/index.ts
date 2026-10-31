@@ -17,7 +17,7 @@ const ENV_FILE = join(STATE_DIR, ".env");
 try {
   if (existsSync(ENV_FILE)) {
     chmodSync(ENV_FILE, 0o600);
-    for (const line of readFileSync(ENV_FILE, "utf8").split("\n")) {
+    for (const line of readFileSync(ENV_FILE, "utf8").split(/\r?\n/)) {
       const m = line.match(/^(\w+)=(.*)$/);
       if (m && process.env[m[1]] === undefined) {
         process.env[m[1]] = m[2];
@@ -98,9 +98,14 @@ Bun.serve({
         data: unknown;
       };
 
-      if (!event.type || !event.timestamp) {
+      // type/timestamp are interpolated into the channel text and meta, so they
+      // must be single-line strings or they could forge extra lines/fields.
+      const isSingleLine = (v: unknown): v is string =>
+        typeof v === "string" && v.length > 0 && !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(v);
+
+      if (!isSingleLine(event.type) || !isSingleLine(event.timestamp)) {
         return new Response(
-          JSON.stringify({ error: "Missing type or timestamp" }),
+          JSON.stringify({ error: "Missing or invalid type or timestamp" }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
