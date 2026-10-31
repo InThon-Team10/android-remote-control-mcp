@@ -469,6 +469,15 @@ class ScreenIntrospectionToolsTest {
         }
 
         @Test
+        @DisplayName("include_screenshot given as a string is rejected as invalid params")
+        fun includeScreenshotStringIsRejected() =
+            runTest {
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(buildJsonObject { put("include_screenshot", "true") })
+                }
+            }
+
+        @Test
         @DisplayName("annotate=false encodes the plain screenshot without annotating it")
         fun annotateFalseEncodesThePlainScreenshot() =
             runTest {

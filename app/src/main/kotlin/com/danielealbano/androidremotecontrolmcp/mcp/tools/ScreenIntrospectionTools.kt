@@ -33,10 +33,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
@@ -93,7 +91,7 @@ class GetScreenStateHandler
 
         private fun parseIncludeScreenshot(arguments: JsonObject?): Boolean =
             if (includeScreenshotEnabled) {
-                arguments?.get("include_screenshot")?.jsonPrimitive?.booleanOrNull ?: false
+                McpToolUtils.optionalBoolean(arguments, "include_screenshot", false)
             } else {
                 false
             }
