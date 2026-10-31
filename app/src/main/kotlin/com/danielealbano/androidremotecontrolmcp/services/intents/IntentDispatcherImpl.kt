@@ -162,7 +162,8 @@ class IntentDispatcherImpl
                 }
 
                 "int" -> {
-                    intent.putExtra(key, (value as? Number)?.toInt() ?: value.toString().toInt())
+                    val exactInt = (value as? Number)?.toLong()?.let(Math::toIntExact)
+                    intent.putExtra(key, exactInt ?: value.toString().toInt())
                 }
 
                 "long" -> {
@@ -231,7 +232,7 @@ class IntentDispatcherImpl
             value: Number,
         ) {
             val doubleVal = value.toDouble()
-            if (doubleVal % 1.0 == 0.0) {
+            if (doubleVal % 1.0 == 0.0 && Math.abs(doubleVal) < Long.MAX_VALUE.toDouble()) {
                 val longVal = value.toLong()
                 if (longVal in Int.MIN_VALUE..Int.MAX_VALUE) {
                     intent.putExtra(key, longVal.toInt())
