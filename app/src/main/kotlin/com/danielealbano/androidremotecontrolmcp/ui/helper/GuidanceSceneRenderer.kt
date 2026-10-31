@@ -92,7 +92,7 @@ internal class GuidanceSceneRenderer(
     private fun PxRect.union(other: PxRect) =
         PxRect(minOf(left, other.left), minOf(top, other.top), maxOf(right, other.right), maxOf(bottom, other.bottom))
 
-    /** The 1 px touch watcher sits on a corner pixel that is never the swipe start (a window there would swallow the touch). */
+    /** The 1 px touch watcher sits on a corner pixel that is never the swipe start. */
     private fun watcherRect(
         start: ScreenPoint?,
         screen: PxSize,
