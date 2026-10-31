@@ -512,6 +512,9 @@ class FileReplaceHandler
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
                 val path = McpToolUtils.requireString(arguments, "path")
                 val oldString = McpToolUtils.requireString(arguments, "old_string")
+                if (oldString.isEmpty()) {
+                    throw McpToolException.InvalidParams("Parameter 'old_string' must be non-empty")
+                }
                 val newString = McpToolUtils.requireString(arguments, "new_string")
                 val replaceAll = McpToolUtils.optionalBoolean(arguments, "replace_all", false)
 

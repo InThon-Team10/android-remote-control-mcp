@@ -530,6 +530,32 @@ class FileToolsIntegrationTest {
             }
         }
 
+    @Test
+    fun `file_replace rejects an empty old_string as invalid params`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_file_replace",
+                        arguments =
+                            mapOf(
+                                "location_id" to "loc1",
+                                "path" to "file.txt",
+                                "old_string" to "",
+                                "new_string" to "new",
+                            ),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("'old_string' must be non-empty"))
+                coVerify(exactly = 0) {
+                    deps.fileOperationProvider.replaceInFile(any(), any(), any(), any(), any())
+                }
+            }
+        }
+
     // ─────────────────────────────────────────────────────────────────────────
     // download_from_url
     // ─────────────────────────────────────────────────────────────────────────
