@@ -223,7 +223,7 @@ class CompactTreeFormatter
         internal fun simplifyClassName(className: String?): String {
             if (className.isNullOrEmpty()) return NULL_VALUE
             val lastDot = className.lastIndexOf('.')
-            return if (lastDot >= 0) className.substring(lastDot + 1) else className
+            return sanitizeText(className.substring(lastDot + 1), truncate = false)
         }
 
         /**

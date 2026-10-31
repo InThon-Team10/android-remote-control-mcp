@@ -447,6 +447,14 @@ class CompactTreeFormatterTest {
         fun returnsDashForEmpty() {
             assertEquals("-", formatter.simplifyClassName(""))
         }
+
+        @Test
+        @DisplayName("replaces line breaks and tabs so a class name cannot split the row")
+        fun replacesLineBreaksAndTabs() {
+            val result = formatter.simplifyClassName("com.evil.Foo\nnote:forged\tcol")
+
+            assertEquals("Foo note:forged col", result)
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
