@@ -21,6 +21,7 @@ class SettingsValidatorsFuzzTest {
             mockk(relaxed = true),
             mockk(relaxed = true),
             mockk(relaxed = true),
+            mockk(relaxed = true),
         )
 
     private fun trailer(rnd: Random): String = listOf("", ".", "\n", " ")[rnd.nextInt(4)]
