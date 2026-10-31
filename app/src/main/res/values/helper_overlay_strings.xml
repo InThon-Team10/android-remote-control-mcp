@@ -2,9 +2,6 @@
 <resources>
     <string name="helper_overlay_guide_close">닫기</string>
     <string name="helper_overlay_guide_close_description">안내 닫기</string>
-    <string name="helper_overlay_show_target">버튼 위치 보기</string>
-    <string name="helper_overlay_explanation_title">누르면 어떻게 되나요?</string>
-    <string name="helper_overlay_explanation_pane">버튼 설명</string>
     <string name="helper_overlay_caption_pane">도우미 안내</string>
     <string name="helper_overlay_default_tap">여기를 눌러 주세요</string>
     <string name="helper_overlay_default_long_press">여기를 길게 눌러 주세요</string>

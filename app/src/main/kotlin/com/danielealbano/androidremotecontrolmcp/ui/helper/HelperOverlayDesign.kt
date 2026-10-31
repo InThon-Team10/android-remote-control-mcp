@@ -15,16 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,13 +36,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 
@@ -67,10 +65,14 @@ internal fun DimLayer(content: @Composable BoxScope.() -> Unit = {}) {
     Box(Modifier.fillMaxSize().background(DIM_COLOR), content = content)
 }
 
-/** Text bubble; [pointerX] (px from its left edge) draws a tail toward the target, up when [pointerUp]. */
+/**
+ * Text bubble: the instruction and, as a smaller second line, the explanation; the text scrolls when the bubble is
+ * given less room than it needs. [pointerX] (px from its left edge) draws a tail toward the target, up when
+ * [pointerUp].
+ */
 @Composable
 internal fun CaptionBubble(
-    text: String,
+    caption: GuidanceCaption,
     modifier: Modifier = Modifier,
     pointerX: Int? = null,
     pointerUp: Boolean = false,
@@ -83,14 +85,25 @@ internal fun CaptionBubble(
             contentColor = colors.onSurface,
             border = BorderStroke(1.dp, colors.outline),
         ) {
-            Text(
-                text,
-                style = MaterialTheme.typography.titleLarge,
-                modifier =
-                    Modifier
-                        .padding(horizontal = 18.dp, vertical = 14.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-            )
+            Column(
+                Modifier
+                    .padding(horizontal = 18.dp, vertical = 14.dp)
+                    .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(GuidanceDisplay.CAPTION_LINE_GAP_DP.dp),
+            ) {
+                Text(caption.instruction, style = MaterialTheme.typography.titleLarge)
+                caption.explanation?.let { explanation ->
+                    Text(
+                        explanation,
+                        style =
+                            MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = GuidanceDisplay.EXPLANATION_TEXT_SP.sp,
+                                lineHeight = GuidanceDisplay.EXPLANATION_LINE_SP.sp,
+                            ),
+                    )
+                }
+            }
         }
         if (pointerX != null) {
             val surface = colors.surface
@@ -131,29 +144,36 @@ internal fun GuidanceCloseButton(
     }
 }
 
-/** Contents of a blocker window beside the hole: dim plus the caption and close button this band owns. */
+/**
+ * Contents of a blocker window beside the hole: dim plus the caption and close button this band owns. The caption
+ * hugs the hole inside its room ([SpotlightLayout.caption]) and scrolls when it needs more.
+ */
 @Composable
 internal fun SpotlightBand(
     band: PxRect,
     layout: SpotlightLayout,
     side: BandSide?,
-    caption: String,
+    caption: GuidanceCaption,
     holeCenterX: Int,
     onClose: () -> Unit,
 ) {
     val density = LocalDensity.current
     DimLayer {
         if (layout.captionSide == side) {
-            val bubble = layout.caption
-            CaptionBubble(
-                caption,
-                modifier =
-                    Modifier
-                        .offset { IntOffset(bubble.left - band.left, bubble.top - band.top) }
-                        .width(with(density) { bubble.width.toDp() }),
-                pointerX = if (layout.captionFits) holeCenterX - bubble.left else null,
-                pointerUp = layout.captionBelow,
-            )
+            val room = layout.caption
+            Box(
+                Modifier
+                    .offset { IntOffset(room.left - band.left, room.top - band.top) }
+                    .size(with(density) { DpSize(room.width.toDp(), room.height.toDp()) }),
+                contentAlignment = if (layout.captionBelow) Alignment.TopStart else Alignment.BottomStart,
+            ) {
+                CaptionBubble(
+                    caption,
+                    modifier = Modifier.fillMaxWidth(),
+                    pointerX = if (layout.captionFits) holeCenterX - room.left else null,
+                    pointerUp = layout.captionBelow,
+                )
+            }
         }
         if (layout.closeSide == side) {
             GuidanceCloseButton(
@@ -166,65 +186,21 @@ internal fun SpotlightBand(
     }
 }
 
-/** Caption window without dim: the bubble sits next to the target (pointer side), the close button opposite. */
+/**
+ * Caption window without dim: the bubble sits next to the target (pointer side), the close button opposite. At most
+ * [maxHeight] tall: the close button stays whole and the bubble's text scrolls.
+ */
 @Composable
 internal fun TypeHintCaption(
-    caption: String,
+    caption: GuidanceCaption,
     pointerX: Int?,
     pointerUp: Boolean,
-    onClose: () -> Unit,
-) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!pointerUp) GuidanceCloseButton(onClose, Modifier.align(Alignment.End))
-        CaptionBubble(caption, Modifier.fillMaxWidth(), pointerX, pointerUp)
-        if (pointerUp) GuidanceCloseButton(onClose, Modifier.align(Alignment.End))
-    }
-}
-
-/** Version A: explains what the action will do before the target is shown. */
-@Composable
-internal fun ExplanationPanel(
-    text: String,
     maxHeight: Dp,
-    onShowTarget: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val pane = stringResource(R.string.helper_overlay_explanation_pane)
-    Surface(
-        shape = BUBBLE_SHAPE,
-        color = colors.surface,
-        contentColor = colors.onSurface,
-        border = BorderStroke(1.dp, colors.outline),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .heightIn(max = maxHeight)
-                .semantics { paneTitle = pane },
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Column(
-                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    stringResource(R.string.helper_overlay_explanation_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text(
-                    text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
-            }
-            Button(onShowTarget, Modifier.fillMaxWidth().heightIn(min = MIN_TOUCH).padding(top = 8.dp)) {
-                Text(stringResource(R.string.helper_overlay_show_target), style = MaterialTheme.typography.titleMedium)
-            }
-            TextButton(onClose, Modifier.fillMaxWidth().heightIn(min = MIN_TOUCH)) {
-                Text(stringResource(R.string.helper_overlay_guide_close), style = MaterialTheme.typography.titleMedium)
-            }
-        }
+    Column(Modifier.fillMaxWidth().heightIn(max = maxHeight), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!pointerUp) GuidanceCloseButton(onClose, Modifier.align(Alignment.End))
+        CaptionBubble(caption, Modifier.fillMaxWidth().weight(1f, fill = false), pointerX, pointerUp)
+        if (pointerUp) GuidanceCloseButton(onClose, Modifier.align(Alignment.End))
     }
 }

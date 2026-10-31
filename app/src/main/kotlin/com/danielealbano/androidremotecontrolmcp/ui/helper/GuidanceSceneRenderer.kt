@@ -1,6 +1,5 @@
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
-import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceTarget
@@ -15,36 +14,22 @@ internal class GuidanceSceneRenderer(
     private val windows: GuidanceWindowSet,
     private val detector: HoleTouchDetector,
     private val controller: GuidanceController,
-    private val onShowTarget: () -> Unit,
 ) {
     fun show(scene: GuidanceScene) {
         val screen = display.screenSize()
         when (scene) {
             GuidanceScene.Empty -> Unit
-            is GuidanceScene.Explanation -> showExplanation(scene.text, screen)
             is GuidanceScene.Spotlight -> showSpotlight(scene.target, screen)
             is GuidanceScene.TypeHint -> showTypeHint(scene.target, screen)
             is GuidanceScene.SwipeHint -> showSwipeHint(scene.target, screen)
         }
     }
 
-    private fun showExplanation(
-        text: String,
-        screen: PxSize,
-    ) {
-        val full = PxRect(0, 0, screen.width, screen.height)
-        windows.add(BLOCKER_ID, GuidanceWindowSpec(full, touchable = true)) { DimLayer() }
-        val maxHeight = (screen.height * EXPLANATION_MAX_HEIGHT_FRACTION / display.dp(1)).dp
-        val bottomMargin = display.dp(PANEL_BOTTOM_MARGIN_DP)
-        val spec = GuidanceWindowSpec(PxRect(0, bottomMargin, screen.width, 0), touchable = true, bottomAnchored = true)
-        windows.add(PANEL_ID, spec) { ExplanationPanel(text, maxHeight, onShowTarget, controller::cancel) }
-    }
-
     private fun showSpotlight(
         target: GuidanceTarget,
         screen: PxSize,
     ) {
-        val caption = display.captionText(target)
+        val caption = display.caption(target)
         val hole = display.holeFor(target.bounds, screen)
         if (hole == null) {
             showFloatingCaption(caption, screen)
@@ -83,7 +68,7 @@ internal class GuidanceSceneRenderer(
         target: GuidanceTarget,
         screen: PxSize,
     ) {
-        val caption = display.captionText(target)
+        val caption = display.caption(target)
         val area = display.holeFor(target.bounds, screen)
         if (area == null) {
             showFloatingCaption(caption, screen)
@@ -105,7 +90,7 @@ internal class GuidanceSceneRenderer(
         target: GuidanceTarget,
         screen: PxSize,
     ) {
-        val caption = display.captionText(target)
+        val caption = display.caption(target)
         val hole = display.holeFor(target.bounds, screen)
         if (hole == null) {
             showFloatingCaption(caption, screen)
@@ -115,43 +100,49 @@ internal class GuidanceSceneRenderer(
         showCaptionNear(hole, caption, screen)
     }
 
-    /** The caption with its close button next to [anchor], pointing at it, without dimming anything. */
+    /**
+     * The caption with its close button next to [anchor], pointing at it, without dimming anything. The window stays
+     * in the room on its side of [anchor] and never covers it; a caption taller than that room scrolls.
+     */
     private fun showCaptionNear(
         anchor: PxRect,
-        caption: String,
+        caption: GuidanceCaption,
         screen: PxSize,
     ) {
-        val hole = anchor
         val size = display.captionSize(caption, screen, extraHeight = display.dp(CONTROLS_HEIGHT_DP + CONTROLS_GAP_DP))
         val separation = display.dp(CAPTION_SEPARATION_DP)
-        val placement = placeHelperCaption(screen, hole, size, display.dp(MARGIN_DP), separation)
+        val placement = placeHelperCaption(screen, anchor, size, display.dp(MARGIN_DP), separation)
         val right = placement.left + size.width
         val spec =
             if (placement.below) {
                 GuidanceWindowSpec(PxRect(placement.left, placement.top, right, 0), touchable = true, wrapHeight = true)
             } else {
-                val bottomMargin = screen.height - (hole.top - separation)
-                val rect = PxRect(placement.left, bottomMargin, right, 0)
+                val rect = PxRect(placement.left, screen.height - placement.bottom, right, 0)
                 GuidanceWindowSpec(rect, touchable = true, bottomAnchored = true)
             }
-        val pointerX = if (placement.fits) hole.centerX - placement.left else null
-        windows.add(CAPTION_ID, spec) { TypeHintCaption(caption, pointerX, placement.below, controller::cancel) }
+        val pointerX = if (placement.fits) anchor.centerX - placement.left else null
+        val maxHeight = display.toDp(placement.height)
+        windows.add(CAPTION_ID, spec) {
+            TypeHintCaption(caption, pointerX, placement.below, maxHeight, controller::cancel)
+        }
     }
 
     /** The target is unknown or off screen: a caption at the bottom, nothing dimmed or blocked. */
     private fun showFloatingCaption(
-        caption: String,
+        caption: GuidanceCaption,
         screen: PxSize,
     ) {
         val size = display.captionSize(caption, screen, extraHeight = 0)
         val left = (screen.width - size.width) / 2
+        val bottomMargin = display.dp(MARGIN_DP * 2)
         val spec =
             GuidanceWindowSpec(
-                PxRect(left, display.dp(MARGIN_DP * 2), left + size.width, 0),
+                PxRect(left, bottomMargin, left + size.width, 0),
                 touchable = true,
                 bottomAnchored = true,
             )
-        windows.add(CAPTION_ID, spec) { TypeHintCaption(caption, null, true, controller::cancel) }
+        val maxHeight = display.toDp(screen.height - bottomMargin - display.dp(MARGIN_DP))
+        windows.add(CAPTION_ID, spec) { TypeHintCaption(caption, null, true, maxHeight, controller::cancel) }
     }
 
     /** The outline as strips around the hole (a window over the hole would make apps ignore touches there). */
@@ -169,8 +160,6 @@ internal class GuidanceSceneRenderer(
     }
 
     private companion object {
-        const val BLOCKER_ID = 0
-        const val PANEL_ID = 1
         const val CAPTION_ID = 2
         const val OUTLINE_FIRST_ID = 4
         const val ARROW_ID = 8
@@ -179,7 +168,5 @@ internal class GuidanceSceneRenderer(
         const val ARROW_THICKNESS_DP = 56
         const val ARROW_LENGTH_DP = 128
         val WATCHER_RECT = PxRect(0, 0, 1, 1)
-        const val PANEL_BOTTOM_MARGIN_DP = 24
-        const val EXPLANATION_MAX_HEIGHT_FRACTION = 0.6f
     }
 }

@@ -12,12 +12,6 @@ import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceTarge
 internal sealed interface GuidanceScene {
     data object Empty : GuidanceScene
 
-    /** Version A: what the action will do, before the target is highlighted. */
-    data class Explanation(
-        val stateId: Long,
-        val text: String,
-    ) : GuidanceScene
-
     /** Dimmed screen with a hole over the target; touches outside the hole are blocked. */
     data class Spotlight(
         val stateId: Long,
@@ -38,48 +32,46 @@ internal sealed interface GuidanceScene {
 }
 
 /**
- * Chooses the [GuidanceScene] per state: an explanation first for pointing actions that carry one, then the
- * spotlight. The phase is per state id; the same id emitted again keeps it, a new id starts over.
+ * The [GuidanceScene] for [state]: every step highlights its target at once (an explanation is the caption's
+ * second line, never a step of its own). The same state gives an equal scene, so the renderer keeps what it shows.
  */
-internal class GuidanceScenePlanner {
-    private var current: GuidanceState? = null
-    private var explained = false
-
-    fun plan(state: GuidanceState?): GuidanceScene {
-        if (state?.id != current?.id) explained = false
-        current = state
-        return scene()
-    }
-
-    /** Ends the explanation phase of the current step. */
-    fun showTarget(): GuidanceScene {
-        explained = true
-        return scene()
-    }
-
-    private fun scene(): GuidanceScene {
-        val state = current ?: return GuidanceScene.Empty
-        val target = state.target
-        val explanation = target.explanation
-        return when {
-            target.kind == GuidanceKind.TYPE -> {
-                GuidanceScene.TypeHint(state.id, target)
-            }
-
-            target.kind == GuidanceKind.SCROLL -> {
-                GuidanceScene.SwipeHint(state.id, target)
-            }
-
-            !explanation.isNullOrBlank() && !explained -> {
-                GuidanceScene.Explanation(state.id, explanation)
-            }
-
-            else -> {
-                GuidanceScene.Spotlight(state.id, target)
-            }
-        }
+internal fun guidanceScene(state: GuidanceState?): GuidanceScene {
+    val shown = state ?: return GuidanceScene.Empty
+    val target = shown.target
+    return when (target.kind) {
+        GuidanceKind.TYPE -> GuidanceScene.TypeHint(shown.id, target)
+        GuidanceKind.SCROLL -> GuidanceScene.SwipeHint(shown.id, target)
+        GuidanceKind.TAP, GuidanceKind.LONG_PRESS, GuidanceKind.DOUBLE_TAP -> GuidanceScene.Spotlight(shown.id, target)
     }
 }
+
+/** What the caption bubble says: the [instruction] and, as a smaller second line, the [explanation] if any. */
+internal data class GuidanceCaption(
+    val instruction: String,
+    val explanation: String? = null,
+) {
+    /** What the helper reads aloud: the instruction, then the explanation as a sentence of its own. */
+    val spokenText: String
+        get() = if (explanation == null) instruction else "${withSentenceEnd(instruction)} $explanation"
+}
+
+/** The caption of [target]: its instruction ([defaultInstruction] when blank) and its non-blank explanation. */
+internal fun guidanceCaption(
+    target: GuidanceTarget,
+    defaultInstruction: () -> String,
+): GuidanceCaption =
+    GuidanceCaption(
+        instruction = target.instruction.ifBlank(defaultInstruction),
+        explanation = target.explanation?.trim()?.takeIf { it.isNotEmpty() },
+    )
+
+/** [text] ending with sentence punctuation, so speech pauses before what follows it. */
+private fun withSentenceEnd(text: String): String {
+    val trimmed = text.trimEnd()
+    return if (trimmed.lastOrNull() in SENTENCE_ENDS) trimmed else "$trimmed."
+}
+
+private val SENTENCE_ENDS = setOf('.', '!', '?', '…', '。', '！', '？')
 
 @StringRes
 internal fun defaultCaptionRes(
@@ -125,19 +117,45 @@ internal fun clipHighlight(
     return target.intersect(viewport).takeIf { it.width > 0f && it.height > 0f }
 }
 
-/** Estimated caption height; Korean glyphs are about one em wide, so latin text is over-estimated (safe). */
+/** Size of one caption text in pixels: [glyphPx] per (Korean) glyph and [linePx] per line. */
+internal data class CaptionTextSize(
+    val glyphPx: Float,
+    val linePx: Float,
+)
+
+/** Caption text sizes, the gap between the instruction and the explanation, and the bubble padding, in pixels. */
+internal data class CaptionTextMetrics(
+    val instruction: CaptionTextSize,
+    val explanation: CaptionTextSize,
+    val gapPx: Int,
+    val padding: PxSize,
+)
+
+/**
+ * Estimated height of [caption] in a bubble [width] pixels wide: the instruction's lines, then the gap and the
+ * explanation's lines when there is one. Korean glyphs are about one em wide, so latin text is over-estimated (safe).
+ */
 internal fun estimateCaptionHeight(
-    text: String,
+    caption: GuidanceCaption,
     width: Int,
-    textPx: Float,
-    paddingPx: PxSize,
+    metrics: CaptionTextMetrics,
 ): Int {
-    val charsPerLine = ((width - 2 * paddingPx.width) / textPx).toInt().coerceAtLeast(1)
-    val lines = ((text.length + charsPerLine - 1) / charsPerLine).coerceAtLeast(1)
-    return (lines * textPx * CAPTION_LINE_HEIGHT_FACTOR).toInt() + 2 * paddingPx.height
+    val textWidth = width - 2 * metrics.padding.width
+    val instruction = estimateTextHeight(caption.instruction, textWidth, metrics.instruction)
+    val explanation =
+        caption.explanation?.let { estimateTextHeight(it, textWidth, metrics.explanation) + metrics.gapPx } ?: 0
+    return instruction + explanation + 2 * metrics.padding.height
 }
 
-private const val CAPTION_LINE_HEIGHT_FACTOR = 1.4f
+private fun estimateTextHeight(
+    text: String,
+    width: Int,
+    size: CaptionTextSize,
+): Int {
+    val charsPerLine = (width / size.glyphPx).toInt().coerceAtLeast(1)
+    val lines = ((text.length + charsPerLine - 1) / charsPerLine).coerceAtLeast(1)
+    return (lines * size.linePx).toInt()
+}
 
 internal enum class BandSide { TOP, BOTTOM }
 
@@ -151,7 +169,9 @@ internal data class SpotlightMetrics(
 
 /**
  * Geometry of the four blocker pieces around the hole plus the caption and the close button, in screen pixels.
- * The caption sits in the band on its side of the hole; the close button on the opposite side when there is room.
+ * The caption sits in the band on its side of the hole, the close button at that band's screen edge when there is
+ * room. [caption] is the room the caption may fill, hugging the hole (a taller caption scrolls inside it): never
+ * over the hole, and clear of the close button in the same band.
  */
 internal data class SpotlightLayout(
     val top: PxRect,
@@ -172,7 +192,9 @@ internal fun computeSpotlightLayout(
     metrics: SpotlightMetrics,
 ): SpotlightLayout {
     val screen = metrics.screen
-    val placement = placeHelperCaption(screen, hole, metrics.caption, metrics.margin, metrics.separation)
+    // The close button goes to the caption's band when it fits there, so that side must hold both.
+    val withClose = PxSize(metrics.caption.width, metrics.caption.height + metrics.controlsHeight + metrics.margin)
+    val placement = placeHelperCaption(screen, hole, withClose, metrics.margin, metrics.separation)
     val closeTop =
         helperControlsTop(screen.height, hole, metrics.controlsHeight, metrics.margin, preferTop = !placement.below)
             ?: if (hole.top >= screen.height - hole.bottom) {
@@ -180,23 +202,44 @@ internal fun computeSpotlightLayout(
             } else {
                 screen.height - metrics.margin - metrics.controlsHeight
             }
+    val closeSide = if (closeTop < hole.top) BandSide.TOP else BandSide.BOTTOM
     return SpotlightLayout(
         top = PxRect(0, 0, screen.width, hole.top),
         bottom = PxRect(0, hole.bottom, screen.width, screen.height),
         left = PxRect(0, hole.top, hole.left, hole.bottom),
         right = PxRect(hole.right, hole.top, screen.width, hole.bottom),
-        caption =
-            PxRect(
-                placement.left,
-                placement.top,
-                placement.left + metrics.caption.width,
-                placement.top + metrics.caption.height,
-            ),
+        caption = captionRoom(placement, closeTop, closeSide, metrics),
         captionBelow = placement.below,
         captionFits = placement.fits,
         closeTop = closeTop,
-        closeSide = if (closeTop < hole.top) BandSide.TOP else BandSide.BOTTOM,
+        closeSide = closeSide,
     )
+}
+
+/**
+ * The caption's room from [placement], minus the close button's row (and a margin) when the button is in the same
+ * band. When that would leave nothing (no room even for the button), the caption keeps the whole band.
+ */
+private fun captionRoom(
+    placement: HelperCaptionPlacement,
+    closeTop: Int,
+    closeSide: BandSide,
+    metrics: SpotlightMetrics,
+): PxRect {
+    val shared = closeSide == (if (placement.below) BandSide.BOTTOM else BandSide.TOP)
+    val top =
+        if (shared && !placement.below) {
+            maxOf(placement.top, closeTop + metrics.controlsHeight + metrics.margin)
+        } else {
+            placement.top
+        }
+    val bottom = if (shared && placement.below) minOf(placement.bottom, closeTop - metrics.margin) else placement.bottom
+    val right = placement.left + metrics.caption.width
+    return if (bottom > top) {
+        PxRect(placement.left, top, right, bottom)
+    } else {
+        PxRect(placement.left, placement.top, right, placement.bottom)
+    }
 }
 
 internal enum class WindowTouch { DOWN, OUTSIDE }

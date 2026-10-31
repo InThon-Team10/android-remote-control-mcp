@@ -21,9 +21,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Renders the [GuidanceController] state over other apps: an explanation panel, then a dimmed screen with a hole
- * over the target (four touchable blocker windows around it, so touches inside the hole reach the app), or, for
- * typing, just an outline and a caption so the keyboard stays usable. Hosted by the accessibility service.
+ * Renders the [GuidanceController] state over other apps as soon as a step arrives: a dimmed screen with a hole over
+ * the target (four touchable blocker windows around it, so touches inside the hole reach the app), or, for typing,
+ * just an outline and a caption so the keyboard stays usable, or, for a swipe, an arrow and a caption. A step's
+ * explanation is the caption's second line and is read aloud after the instruction. Hosted by the accessibility
+ * service.
  */
 @Singleton
 class GuidanceOverlayHost
@@ -33,7 +35,6 @@ class GuidanceOverlayHost
         private val speaker: HelperSpeaker,
     ) : AccessibilityOverlayHost {
         private val hider = RefCountedOverlayHider(Dispatchers.Main.immediate) { windows?.setHidden(it) }
-        private val planner = GuidanceScenePlanner()
         private val detector = HoleTouchDetector()
         private val handler = Handler(Looper.getMainLooper())
         private var service: AccessibilityService? = null
@@ -46,9 +47,10 @@ class GuidanceOverlayHost
             object : ComponentCallbacks {
                 override fun onConfigurationChanged(newConfig: Configuration) {
                     shown = null
-                    render(planner.plan(controller.state.value))
+                    render(guidanceScene(controller.state.value))
                 }
 
+                @Deprecated("Deprecated in Java")
                 override fun onLowMemory() = Unit
             }
 
@@ -61,19 +63,12 @@ class GuidanceOverlayHost
             val windowSet =
                 GuidanceWindowSet(service, service.getSystemService(WindowManager::class.java), ::onWindowTouch)
             windows = windowSet
-            renderer =
-                GuidanceSceneRenderer(
-                    GuidanceDisplay(service),
-                    windowSet,
-                    detector,
-                    controller,
-                    onShowTarget = { render(planner.showTarget()) },
-                )
+            renderer = GuidanceSceneRenderer(GuidanceDisplay(service), windowSet, detector, controller)
             service.registerComponentCallbacks(configurationCallbacks)
             controller.setRendererAttached(true)
             scope =
                 CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope ->
-                    scope.launch { controller.state.collect { render(planner.plan(it)) } }
+                    scope.launch { controller.state.collect { render(guidanceScene(it)) } }
                 }
         }
 
@@ -89,7 +84,6 @@ class GuidanceOverlayHost
             detector.reset(emptySet())
             shown = null
             speaker.stop()
-            planner.plan(null)
             service = null
             controller.setRendererAttached(false)
         }
@@ -135,21 +129,20 @@ class GuidanceOverlayHost
             }
         }
 
+        /** The caption read aloud: the instruction, then the explanation when the step has one. */
         private fun spokenText(scene: GuidanceScene): String? {
             val display = service?.let { GuidanceDisplay(it) }
             return when (scene) {
                 GuidanceScene.Empty -> null
-                is GuidanceScene.Explanation -> scene.text
-                is GuidanceScene.Spotlight -> display?.captionText(scene.target)
-                is GuidanceScene.TypeHint -> display?.captionText(scene.target)
-                is GuidanceScene.SwipeHint -> display?.captionText(scene.target)
+                is GuidanceScene.Spotlight -> display?.caption(scene.target)?.spokenText
+                is GuidanceScene.TypeHint -> display?.caption(scene.target)?.spokenText
+                is GuidanceScene.SwipeHint -> display?.caption(scene.target)?.spokenText
             }
         }
 
         private fun sceneKey(scene: GuidanceScene?): Pair<Long, Class<*>>? =
             when (scene) {
                 null, GuidanceScene.Empty -> null
-                is GuidanceScene.Explanation -> scene.stateId to scene.javaClass
                 is GuidanceScene.Spotlight -> scene.stateId to scene.javaClass
                 is GuidanceScene.TypeHint -> scene.stateId to scene.javaClass
                 is GuidanceScene.SwipeHint -> scene.stateId to scene.javaClass

@@ -20,6 +20,8 @@ class HelperCaptionPlacementTest {
 
         assertTrue(result.below)
         assertEquals(156, result.top)
+        assertEquals(784, result.bottom)
+        assertTrue(result.fits)
     }
 
     @Test
@@ -27,7 +29,8 @@ class HelperCaptionPlacementTest {
         val result = place(PxRect(160, 660, 220, 720), 100)
 
         assertFalse(result.below)
-        assertEquals(544, result.top)
+        assertEquals(16, result.top)
+        assertEquals(644, result.bottom)
     }
 
     @Test
@@ -35,7 +38,29 @@ class HelperCaptionPlacementTest {
         val result = place(PxRect(160, 400, 220, 460), 350)
 
         assertFalse(result.below)
-        assertEquals(34, result.top)
+        assertEquals(16, result.top)
+        assertEquals(384, result.bottom)
+    }
+
+    @Test
+    fun `a caption too tall for both sides gets the roomier side and never covers the target`() {
+        val target = PxRect(100, 160, 180, 220)
+
+        val result = place(target, 350, PxSize(320, 400))
+
+        assertTrue(result.below)
+        assertEquals(236, result.top)
+        assertEquals(148, result.height)
+        assertTrue(result.top >= target.bottom + 16)
+    }
+
+    @Test
+    fun `a side without any room gives an empty room instead of covering the target`() {
+        val result = place(PxRect(0, 10, 400, 790), 100)
+
+        assertTrue(result.top >= 790 || result.bottom <= 10)
+        assertEquals(0, result.height)
+        assertFalse(result.fits)
     }
 
     @Test

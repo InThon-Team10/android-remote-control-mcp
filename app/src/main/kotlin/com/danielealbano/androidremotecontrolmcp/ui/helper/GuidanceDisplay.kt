@@ -3,6 +3,8 @@ package com.danielealbano.androidremotecontrolmcp.ui.helper
 import android.accessibilityservice.AccessibilityService
 import android.view.WindowManager
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceTarget
 import kotlin.math.roundToInt
@@ -14,6 +16,8 @@ internal class GuidanceDisplay(
     private val density: Float get() = service.resources.displayMetrics.density
 
     fun dp(value: Int): Int = (value * density).roundToInt()
+
+    fun toDp(px: Int): Dp = (px / density).dp
 
     fun screenSize(): PxSize {
         val bounds = service.getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
@@ -37,23 +41,27 @@ internal class GuidanceDisplay(
         )
     }
 
-    /** Caption box for [caption], plus [extraHeight] for controls stacked with it. */
+    /** Caption box for [caption] (both of its lines at the user's font scale), plus [extraHeight] for controls. */
     fun captionSize(
-        caption: String,
+        caption: GuidanceCaption,
         screen: PxSize,
         extraHeight: Int,
     ): PxSize {
         val width = minOf(dp(CAPTION_MAX_WIDTH_DP), screen.width - 2 * dp(MARGIN_DP))
-        val textPx = CAPTION_TEXT_SP * density * service.resources.configuration.fontScale
-        val padding = PxSize(dp(CAPTION_PADDING_H_DP), dp(CAPTION_PADDING_V_DP))
-        return PxSize(width, estimateCaptionHeight(caption, width, textPx, padding) + extraHeight)
+        val spPx = density * service.resources.configuration.fontScale
+        val metrics =
+            CaptionTextMetrics(
+                instruction = CaptionTextSize(CAPTION_TEXT_SP * spPx, CAPTION_TEXT_SP * CAPTION_LINE_FACTOR * spPx),
+                explanation = CaptionTextSize(EXPLANATION_TEXT_SP * spPx, EXPLANATION_LINE_SP * spPx),
+                gapPx = dp(CAPTION_LINE_GAP_DP),
+                padding = PxSize(dp(CAPTION_PADDING_H_DP), dp(CAPTION_PADDING_V_DP)),
+            )
+        return PxSize(width, estimateCaptionHeight(caption, width, metrics) + extraHeight)
     }
 
-    /** The target's instruction, or the default for its kind and scroll direction. */
-    fun captionText(target: GuidanceTarget): String =
-        target.instruction.ifBlank {
-            service.getString(defaultCaptionRes(target.kind, target.scrollDirection))
-        }
+    /** The caption of [target]; a blank instruction becomes the default for its kind and scroll direction. */
+    fun caption(target: GuidanceTarget): GuidanceCaption =
+        guidanceCaption(target) { service.getString(defaultCaptionRes(target.kind, target.scrollDirection)) }
 
     companion object {
         const val MARGIN_DP = 16
@@ -63,6 +71,12 @@ internal class GuidanceDisplay(
         private const val HOLE_PADDING_DP = 4
         private const val CAPTION_MAX_WIDTH_DP = 320
         private const val CAPTION_TEXT_SP = 22f
+        private const val CAPTION_LINE_FACTOR = 1.4f
+
+        /** The explanation line: the project's 18sp body text, [CAPTION_LINE_GAP_DP] below the instruction. */
+        const val EXPLANATION_TEXT_SP = 18f
+        const val EXPLANATION_LINE_SP = 26f
+        const val CAPTION_LINE_GAP_DP = 4
         private const val CAPTION_PADDING_H_DP = 18
         private const val CAPTION_PADDING_V_DP = 14
     }

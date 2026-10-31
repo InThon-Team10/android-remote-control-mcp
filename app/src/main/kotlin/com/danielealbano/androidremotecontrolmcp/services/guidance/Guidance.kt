@@ -9,8 +9,8 @@ enum class GuidanceKind { TAP, LONG_PRESS, DOUBLE_TAP, TYPE, SCROLL }
 
 /**
  * One guidance step shown to the user instead of acting on the device: [bounds] in screen pixels, a short
- * [instruction] (shown and spoken), an optional [explanation] of what the action will do, and the
- * [scrollDirection] the user should swipe for [GuidanceKind.SCROLL].
+ * [instruction] (shown and spoken), an optional [explanation] of what the action will do (shown under the
+ * instruction and spoken after it), and the [scrollDirection] the user should swipe for [GuidanceKind.SCROLL].
  */
 data class GuidanceTarget(
     val bounds: BoundsData,
