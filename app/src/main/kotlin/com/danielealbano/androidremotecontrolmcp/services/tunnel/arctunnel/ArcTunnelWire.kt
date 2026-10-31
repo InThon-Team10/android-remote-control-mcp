@@ -76,4 +76,12 @@ class ArcTunnelApiException(
     val retryable: Boolean,
     val retryAfterSec: Long,
     val status: Int,
-) : RuntimeException("tunnel service: $reason (status $status)")
+) : RuntimeException("tunnel service: $reason (status $status)") {
+    /** [retryAfterSec] in milliseconds, saturating at [Long.MAX_VALUE] instead of overflowing. */
+    val retryAfterMs: Long
+        get() = if (retryAfterSec > Long.MAX_VALUE / MS_PER_S) Long.MAX_VALUE else retryAfterSec * MS_PER_S
+
+    private companion object {
+        const val MS_PER_S = 1_000L
+    }
+}

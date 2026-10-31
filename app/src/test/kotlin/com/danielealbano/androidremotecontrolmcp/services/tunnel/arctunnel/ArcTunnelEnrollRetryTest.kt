@@ -102,4 +102,16 @@ class ArcTunnelEnrollRetryTest {
             assertEquals(1, attempts.size)
             assertEquals(0L, currentTime)
         }
+
+    @Test
+    fun `an overflowing retry_after is waited out instead of wrapping to the minimum wait`() {
+        // Arrange
+        val failure = ArcTunnelApiException("busy", true, Long.MAX_VALUE, 503)
+
+        // Act
+        val wait = ArcTunnelEnrollRetry.waitMs(failure)
+
+        // Assert
+        assertEquals(Long.MAX_VALUE, wait)
+    }
 }

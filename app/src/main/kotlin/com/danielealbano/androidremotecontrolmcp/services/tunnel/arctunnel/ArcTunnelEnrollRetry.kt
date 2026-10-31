@@ -9,12 +9,11 @@ object ArcTunnelEnrollRetry {
     const val REFUSAL_WAIT_MS = 1_000L
     const val NETWORK_WAIT_MS = 2_000L
     const val KEYGEN_WAIT_MS = 3_000L
-    private const val MS_PER_S = 1_000L
 
     /** The wait before the next attempt, or null when [t] is not retryable. */
     fun waitMs(t: Throwable): Long? =
         when (t) {
-            is ArcTunnelApiException -> if (t.retryable) maxOf(t.retryAfterSec * MS_PER_S, REFUSAL_WAIT_MS) else null
+            is ArcTunnelApiException -> if (t.retryable) maxOf(t.retryAfterMs, REFUSAL_WAIT_MS) else null
             is IOException -> NETWORK_WAIT_MS
             is ProviderException -> KEYGEN_WAIT_MS
             else -> null

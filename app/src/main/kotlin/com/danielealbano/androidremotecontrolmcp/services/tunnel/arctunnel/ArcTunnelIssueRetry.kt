@@ -9,7 +9,6 @@ object ArcTunnelIssueRetry {
     const val KEYGEN_RETRIES = 5
     const val KEYGEN_WAIT_MS = 2_000L
     private const val STEP_WAIT_MS = 5_000L
-    private const val MS_PER_S = 1_000L
 
     fun waitMs(
         t: Throwable,
@@ -27,7 +26,7 @@ object ArcTunnelIssueRetry {
     ): Long? =
         when {
             !t.retryable -> null
-            t.retryAfterSec > 0 -> t.retryAfterSec * MS_PER_S
+            t.retryAfterSec > 0 -> t.retryAfterMs
             else -> (retry + 1) * STEP_WAIT_MS
         }
 

@@ -102,4 +102,16 @@ class ArcTunnelIssueRetryTest {
             assertSame(failures[3], thrown)
             assertEquals(4, attempts.size)
         }
+
+    @Test
+    fun `an overflowing retry_after is waited out instead of wrapping to a negative delay`() {
+        // Arrange
+        val failure = refusal(retryable = true, retryAfterSec = Long.MAX_VALUE)
+
+        // Act
+        val wait = ArcTunnelIssueRetry.waitMs(failure, 0)
+
+        // Assert
+        assertEquals(Long.MAX_VALUE, wait)
+    }
 }
