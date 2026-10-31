@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="helper_overlay_service_name">도우미 오버레이 디자인</string>
+    <string name="helper_overlay_service_description">다른 앱 위에 도움 캐릭터와 말풍선을 표시하는 디자인 미리보기입니다. 화면 내용 읽기, 녹음, 자동 조작은 하지 않습니다.</string>
+    <string name="helper_overlay_help">도움</string>
+    <string name="helper_overlay_preview">디자인 미리보기</string>
+    <string name="helper_overlay_exit">미리보기 종료</string>
+    <string name="helper_overlay_title">어디가 어려우세요?</string>
+    <string name="helper_overlay_body">제가 옆에서 하나씩 알려드릴게요.</string>
+    <string name="helper_overlay_guide_title">여기를 함께 볼까요?</string>
+    <string name="helper_overlay_guide_body">밝은 영역은 강조 위치 예시예요. 뒤 화면은 직접 누르거나 움직일 수 있어요.</string>
+    <string name="helper_overlay_speak">말로 물어보기</string>
+    <string name="helper_overlay_type">글로 물어보기</string>
+    <string name="helper_overlay_hide_input">입력창 접기</string>
+    <string name="helper_overlay_highlight">강조 화면 보기</string>
+    <string name="helper_overlay_hide_highlight">강조 표시 끄기</string>
+    <string name="helper_overlay_collapse">버블로 돌아가기</string>
+    <string name="helper_overlay_launch">다른 앱 위에 띄워보기</string>
+    <string name="helper_overlay_ready">도우미 · 한 단계씩 안내</string>
+    <string name="helper_overlay_input_hint">무엇을 도와드릴까요?</string>
+    <string name="helper_overlay_voice_title">편하게 말씀해 주세요</string>
+    <string name="helper_overlay_voice_preview">음성 입력 화면 예시예요. 아직 녹음하거나 요청을 실행하지 않아요.</string>
+    <string name="helper_overlay_voice_close">입력창으로 돌아가기</string>
+    <string name="helper_overlay_search_demo">유튜브 검색 안내 예시 보기</string>
+    <string name="helper_overlay_search_instruction">이 검색 버튼을 눌러 주세요.</string>
+    <string name="helper_overlay_guide_close">닫기</string>
+    <string name="helper_overlay_guidance_status">도우미 안내 중 · 화면 예시</string>
+    <string name="helper_overlay_retry">다시 질문하기</string>
+    <string name="helper_overlay_read">안내 읽어주기</string>
+    <string name="helper_overlay_read_unavailable">한국어 음성을 사용할 수 없어요</string>
+    <string name="helper_overlay_fold">작게 접기</string>
+    <string name="helper_overlay_stop">도우미 종료</string>
+    <string name="helper_overlay_menu">도우미 메뉴</string>
+    <string name="helper_overlay_menu_close">메뉴 닫기</string>
+    <string name="helper_overlay_hide_guide">안내 잠시 숨기기</string>
+    <string name="helper_overlay_resume">안내 다시 보기</string>
+    <string name="helper_overlay_move_menu">메뉴 위치 옮기기</string>
+    <string name="helper_result_again">결과 설명 다시 보기</string>
+    <string name="helper_result_simulate">테스트: 화면·정보 변경</string>
+    <string name="helper_result_read">다시 읽어주기</string>
+    <string name="helper_result_auto_read">설명 자동으로 읽기</string>
+    <string name="helper_overlay_run_test">테스트 실행</string>
+    <string name="helper_branch_a">버전 A · 설명 먼저</string>
+    <string name="helper_branch_b">버전 B · 말풍선 먼저</string>
+</resources>

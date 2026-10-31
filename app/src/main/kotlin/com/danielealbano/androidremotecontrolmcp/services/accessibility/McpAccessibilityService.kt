@@ -86,11 +86,13 @@ class McpAccessibilityService : AccessibilityService() {
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                event.packageName?.toString()?.let { packageName ->
-                    currentPackageName = packageName
-                }
-                event.className?.toString()?.let { className ->
-                    currentActivityName = className
+                if (!isOwnOverlayEvent(event)) {
+                    event.packageName?.toString()?.let { packageName ->
+                        currentPackageName = packageName
+                    }
+                    event.className?.toString()?.let { className ->
+                        currentActivityName = className
+                    }
                 }
                 Log.d(
                     TAG,
@@ -142,6 +144,7 @@ class McpAccessibilityService : AccessibilityService() {
         currentActivityName = null
         inputMethodInstance = null
         removeToolCallIndicator()
+        assistantOverlayHider = AssistantOverlayHider.NONE
         instance = null
 
         super.onDestroy()
@@ -171,17 +174,24 @@ class McpAccessibilityService : AccessibilityService() {
 
     /**
      * Returns the root [AccessibilityNodeInfo] of the currently active window,
-     * or null if no window is available.
+     * or null when no window is available or the active window is an own accessibility overlay.
      */
-    fun getRootNode(): AccessibilityNodeInfo? = rootInActiveWindow
+    fun getRootNode(): AccessibilityNodeInfo? = rootInActiveWindow?.takeUnless { isOwnOverlayRoot(it, packageName) }
 
     /**
      * Returns all on-screen windows via [AccessibilityService.getWindows].
      * Requires [AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS].
      *
+     * Own accessibility overlays are excluded.
+     *
      * @return List of [AccessibilityWindowInfo], or empty list if unavailable.
      */
-    fun getAccessibilityWindows(): List<AccessibilityWindowInfo> =
+    fun getAccessibilityWindows(): List<AccessibilityWindowInfo> {
+        val windows = getAccessibilityWindowsUnfiltered()
+        return filterOwnOverlayWindows(windows, packageName)
+    }
+
+    private fun getAccessibilityWindowsUnfiltered(): List<AccessibilityWindowInfo> =
         try {
             windows ?: emptyList()
         } catch (
@@ -190,6 +200,15 @@ class McpAccessibilityService : AccessibilityService() {
             Log.w(TAG, "getWindows() failed: ${e.message}")
             emptyList()
         }
+
+    private fun isOwnOverlayEvent(event: AccessibilityEvent): Boolean =
+        isOwnOverlayStateEvent(
+            event.eventType,
+            event.packageName,
+            event.windowId,
+            packageName,
+            ::getAccessibilityWindowsUnfiltered,
+        )
 
     /**
      * Returns the package name of the currently focused application,
@@ -299,6 +318,7 @@ class McpAccessibilityService : AccessibilityService() {
             ).apply {
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                 y = TOOL_INDICATOR_TOP_MARGIN_DP.dpToPx()
+                title = OWN_OVERLAY_ACCESSIBILITY_TITLE
             }
 
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
@@ -344,7 +364,7 @@ class McpAccessibilityService : AccessibilityService() {
      * @return Bitmap of the screenshot, or null if capture failed or timed out.
      */
     suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? =
-        screenshotPacer.paced { captureScreenshotBitmap(timeoutMs) }
+        screenshotPacer.paced { assistantOverlayHider.hiddenDuring { captureScreenshotBitmap(timeoutMs) } }
 
     private suspend fun captureScreenshotBitmap(timeoutMs: Long): Bitmap? =
         withTimeoutOrNull(timeoutMs) {
@@ -431,6 +451,13 @@ class McpAccessibilityService : AccessibilityService() {
         @Volatile
         var inputMethodInstance: McpInputMethod? = null
             private set
+
+        /**
+         * Hides the assistant overlays around screenshots and gestures; installed by the UI (D18/D19). `onDestroy`
+         * resets it to [AssistantOverlayHider.NONE], so it must be (re)installed after each `onServiceConnected`.
+         */
+        @Volatile
+        var assistantOverlayHider: AssistantOverlayHider = AssistantOverlayHider.NONE
 
         fun showToolCallIndicator(toolName: String) {
             if (instance == null) return

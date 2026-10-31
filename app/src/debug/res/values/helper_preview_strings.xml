@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="helper_preview_name">도우미 UI 개발</string>
+    <string name="helper_preview_notice">화면 개발용 · 실제 앱 조작 및 녹음 없음</string>
+    <string name="helper_preview_microphone">마이크는 아직 연결하지 않았어요. 지금은 글로 입력해 화면을 확인할 수 있어요.</string>
+    <string name="helper_preview_target">연습 버튼</string>
+    <string name="helper_preview_instruction">밝게 표시한 연습 버튼을 눌러보세요.</string>
+    <string name="helper_preview_success">잘하셨어요. 강조 영역의 버튼이 눌렸어요.</string>
+    <string name="helper_preview_voice">음성 출력은 아직 연결하지 않았어요. 안내 문장을 음성 합성 기능에 전달할 자리예요.</string>
+    <string name="helper_preview_bubble_hint">도움받기를 누르면 이 연습 화면의 강조 표시를 켜고 끌 수 있어요.</string>
+</resources>

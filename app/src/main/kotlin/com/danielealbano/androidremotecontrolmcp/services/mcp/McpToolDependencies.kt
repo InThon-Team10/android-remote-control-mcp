@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.services.mcp
 
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.InFlightToolCallSignal
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
@@ -26,7 +27,10 @@ import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationP
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import javax.inject.Inject
 
-/** What the accessibility-driven tools (actions, node actions, text input, utilities) act through. */
+/**
+ * What the accessibility-driven tools (actions, node actions, text input, utilities) act through, and the in-flight
+ * tool-call signal.
+ */
 class AccessibilityToolDeps
     @Inject
     constructor(
@@ -36,6 +40,7 @@ class AccessibilityToolDeps
         val elementFinder: ElementFinder,
         val nodeCache: AccessibilityNodeCache,
         val typeInputController: TypeInputController,
+        val inFlightToolCallSignal: InFlightToolCallSignal,
     )
 
 /** What the screen introspection tools capture and format with. */

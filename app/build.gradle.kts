@@ -295,6 +295,12 @@ android {
             excludes += "/META-INF/io.netty.*"
             excludes += "/META-INF/LICENSE.md"
             excludes += "/META-INF/LICENSE-notice.md"
+            // google-genai ships ~800 KB of GraalVM native-image metadata; unused on Android.
+            excludes += "/META-INF/native-image/com.google.genai/**"
+            // google-genai's auth dependency brings Apache httpclient + httpcore, each with a Maven metadata file.
+            excludes += "/META-INF/DEPENDENCIES"
+            // jakarta.annotation-api and jakarta.inject-api (via google-genai) ship the same Eclipse notice.
+            pickFirsts += "/META-INF/NOTICE.md"
             // Ktor 3.6.0's Netty engine depends on the HTTP/3 codec, which brings desktop QUIC binaries
             // (Linux/macOS/Windows) Android cannot load; the app never enables HTTP/3. Their jars repeat the
             // same license texts: keep one copy.
@@ -373,6 +379,8 @@ dependencies {
     // Raw OkHttp: the free E2E tunnel control stream is an HTTP/2 duplex request body (not expressible
     // through the Ktor client), plus its /issue and Certificate Transparency calls.
     implementation(libs.okhttp)
+    implementation(libs.okhttp.tls)
+    implementation(libs.tink.android)
 
     // Pin Netty to the latest 4.2.x patch release (Ktor 3.6.0's server engine ships 4.2.17); keeps the patched floor.
     // Covers the HTTP Request Smuggling / HTTP/2 CONTINUATION-flood CVEs (CVE-2026-33870,
@@ -415,7 +423,13 @@ dependencies {
 
     // MCP SDK
     implementation(libs.mcp.kotlin.sdk.server)
+    // On-device assistant: MCP client (+ its SSE plugin) talking to this app's own server
+    implementation(libs.mcp.kotlin.sdk.client)
+    implementation(libs.ktor.sse)
     runtimeOnly(libs.slf4j.android)
+
+    // Gemini (on-device assistant): Google Gen AI Java SDK (async API driven from coroutines)
+    implementation(libs.google.genai)
 
     // OAuth (JWT signing/verification)
     // The Jackson BOM aligns java-jwt's transitive jackson-core/jackson-databind to a patched
@@ -463,11 +477,8 @@ dependencies {
     testImplementation(libs.bouncy.castle.pkix)
     testImplementation(libs.bouncy.castle.prov)
     testImplementation(libs.ktor.server.test.host)
-    testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
-    testImplementation(libs.ktor.sse)
     testImplementation(libs.okhttp.mockwebserver3)
-    testImplementation(libs.okhttp.tls)
 }
 
 dependencies {
