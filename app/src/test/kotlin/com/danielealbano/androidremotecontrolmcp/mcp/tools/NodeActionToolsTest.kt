@@ -993,6 +993,50 @@ class NodeActionToolsTest {
 
                 assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
+
+        @Test
+        fun `find_nodes rejects a string-encoded exact_match`() =
+            runTest {
+                val tool =
+                    FindNodesTool(
+                        mockTreeParser,
+                        realFinder,
+                        mockAccessibilityServiceProvider,
+                        mockNodeCache,
+                        PrivacyToolTestDoubles.passthroughGate(),
+                        PrivacyToolTestDoubles.identitySubstitutor(),
+                    )
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "OK")
+                        put("exact_match", "true")
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `find_nodes rejects a non-boolean exact_match`() =
+            runTest {
+                val tool =
+                    FindNodesTool(
+                        mockTreeParser,
+                        realFinder,
+                        mockAccessibilityServiceProvider,
+                        mockNodeCache,
+                        PrivacyToolTestDoubles.passthroughGate(),
+                        PrivacyToolTestDoubles.identitySubstitutor(),
+                    )
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "OK")
+                        put("exact_match", 1)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
     }
 
     @Nested
