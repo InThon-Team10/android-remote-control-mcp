@@ -15,6 +15,7 @@ import com.google.genai.types.GenerateContentConfig
 import com.google.genai.types.Part
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -138,15 +139,26 @@ private data class HelperReply(
     val category: String,
 )
 
+private val replyJson = Json { ignoreUnknownKeys = true }
+
+private const val INVALID_REPLY_MESSAGE = "AI 안내 형식을 확인할 수 없어요. 다시 요청해 주세요."
+
 internal fun decodeHelperAnswer(
     text: String,
     screen: HelperScreen,
 ): HelperAnswer {
-    val reply = Json.decodeFromString<HelperReply>(text)
+    val reply =
+        try {
+            replyJson.decodeFromString<HelperReply>(text)
+        } catch (_: SerializationException) {
+            throw HelperGuideException(INVALID_REPLY_MESSAGE)
+        } catch (_: IllegalArgumentException) {
+            throw HelperGuideException(INVALID_REPLY_MESSAGE)
+        }
     guideRequire(
         reply.explanation.isNotBlank() && reply.explanation.length <= 3000 &&
             reply.action.isNotBlank() && reply.action.length <= 500,
-    ) { "AI 안내 형식을 확인할 수 없어요. 다시 요청해 주세요." }
+    ) { INVALID_REPLY_MESSAGE }
     guideRequire(reply.category in setOf("payment", "transmission", "other")) {
         "AI 안내 종류를 확인할 수 없어요. 다시 요청해 주세요."
     }

@@ -127,4 +127,29 @@ class HelperAssistantConnectionTest {
             decodeHelperAnswer(json.replace("\"other\"", "\"unsupported\""), parsed)
         }
     }
+
+    @Test fun `answer with extra model fields is accepted`() {
+        val parsed = parseHelperScreen(screen)
+        val extra = json.replace("}", ",\"confidence\":0.9}")
+
+        val answer = decodeHelperAnswer(extra, parsed)
+
+        assertEquals(parsed.nodes["1:1"], answer.step.target)
+    }
+
+    @Test fun `malformed or wrong typed answer is a guide failure not a raw serialization error`() {
+        val parsed = parseHelperScreen(screen)
+        listOf(
+            "",
+            "not json",
+            """{"nodeId":"1:1","explanation":"a"""",
+            "[]",
+            """{"explanation":null,"action":"x"}""",
+            """{"explanation":"a","action":"b","nodeId":5}""",
+            """{"explanation":"a"}""",
+        ).forEach { text ->
+            val failure = runCatching { decodeHelperAnswer(text, parsed) }.exceptionOrNull()
+            assertTrue(failure is HelperGuideException, "input '$text' threw $failure")
+        }
+    }
 }
