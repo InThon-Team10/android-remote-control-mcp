@@ -149,6 +149,9 @@ class LoggedToolRegistrar internal constructor(
     private val inFlightToolCalls: InFlightToolCalls,
     private val currentRequestId: suspend () -> RequestId?,
 ) {
+    /** Installed by the production app; generic protocol fixtures may register their own test handlers. */
+    var guidance: GuidanceTools? = null
+
     constructor(
         server: Server,
         serverLog: ServerLogRepository,
@@ -167,8 +170,23 @@ class LoggedToolRegistrar internal constructor(
         inputSchema: ToolSchema,
         handler: suspend (CallToolRequest) -> CallToolResult,
     ) {
-        val cancellable = cancellableToolHandler(inFlightToolCalls, currentRequestId, handler)
-        server.addTool(name = name, description = description, inputSchema = inputSchema) { request ->
+        val guidanceHandler: suspend (CallToolRequest) -> CallToolResult = { request ->
+            val guide = guidance
+            if (guide == null || GuidanceToolPolicy.allows(toolName)) {
+                handler(request)
+            } else {
+                guide.intercept(toolName, request.arguments)
+            }
+        }
+        val cancellable = cancellableToolHandler(inFlightToolCalls, currentRequestId, guidanceHandler)
+        val guidanceDescription =
+            if (guidance != null && !GuidanceToolPolicy.allows(toolName)) {
+                "GUIDANCE ONLY: this tool never executes an action. Targeted taps/clicks show a rectangle; " +
+                    "other actions are refused. Use guidance_show to give instructions. Original action: $description"
+            } else {
+                description
+            }
+        server.addTool(name = name, description = guidanceDescription, inputSchema = inputSchema) { request ->
             // The caller is bound to this request's session, whether the session runs the call inline or launches it
             val caller = inFlightToolCalls.callerOf(sessionId)
             // Logging outermost: withContext refuses to start in a cancelled request, which is still logged then

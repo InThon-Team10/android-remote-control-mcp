@@ -82,7 +82,7 @@ class McpToolRegistrationTest {
         val actual = registered()
 
         assertTrue(expected.isNotEmpty())
-        assertEquals(expected, actual)
+        assertEquals(expected + guidanceNames("android_"), actual)
     }
 
     @Test
@@ -91,7 +91,10 @@ class McpToolRegistrationTest {
 
         val actual = registered(deviceSlug = DEVICE_SLUG)
 
-        assertEquals(McpIntegrationTestHelper.createSdkServer(deps, DEVICE_SLUG).tools.keys, actual)
+        assertEquals(
+            McpIntegrationTestHelper.createSdkServer(deps, DEVICE_SLUG).tools.keys + guidanceNames(prefix),
+            actual,
+        )
         assertTrue(actual.all { it.startsWith(prefix) }, "$actual")
     }
 
@@ -111,4 +114,9 @@ class McpToolRegistrationTest {
         const val DEVICE_SLUG = "pixel"
         const val DISABLED_TOOL = "press_home"
     }
+
+    private fun guidanceNames(prefix: String): List<String> =
+        setOf("start", "status", "show", "complete", "cancel").map {
+            "${prefix}guidance_$it"
+        }
 }

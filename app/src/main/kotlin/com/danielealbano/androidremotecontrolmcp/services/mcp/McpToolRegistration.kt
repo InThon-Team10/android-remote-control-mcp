@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.mcp
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.GuidanceTools
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
@@ -56,6 +57,9 @@ class McpToolRegistration
                     toolCallIndicator,
                     inFlightToolCalls,
                 )
+            val guidance = GuidanceTools(accessibility)
+            registrar.guidance = guidance
+            guidance.register(registrar, toolNamePrefix)
             registerAccessibilityToolBundle(registrar, toolNamePrefix, perms)
             val d = device
             registerFileTools(registrar, d.storageLocationProvider, d.fileOperationProvider, toolNamePrefix, perms)

@@ -22,6 +22,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.TextView
+import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotPacer
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -84,6 +85,15 @@ class McpAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
+        // Overlay window changes must not invalidate their own highlight. Real app input or
+        // content changes invalidate bounds immediately and require a fresh model analysis.
+        val overlayWindow =
+            getAccessibilityWindows().any {
+                it.id == event.windowId && it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            }
+        if (overlayWindow) return
+        notifyGuidance(event)
+
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 event.packageName?.toString()?.let { packageName ->
@@ -122,10 +132,38 @@ class McpAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        GuidanceController.onDisconnected()
         Log.w(TAG, "Accessibility service interrupted")
     }
 
+    private fun notifyGuidance(event: AccessibilityEvent) {
+        if (
+            event.packageName?.toString() == packageName || event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+        ) {
+            return
+        }
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                GuidanceController.onContentChanged(event.windowId)
+            }
+
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
+                if (event.source?.isEditable == true) GuidanceController.onScreenChanged()
+            }
+
+            else -> {
+                GuidanceController.onScreenChanged()
+            }
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        GuidanceController.onScreenChanged()
+    }
+
     override fun onDestroy() {
+        GuidanceController.onDisconnected()
         Log.i(TAG, "Accessibility service destroying")
 
         // Stop any pending debounced invalidation before tearing down the scope it runs on.
@@ -308,7 +346,11 @@ class McpAccessibilityService : AccessibilityService() {
             serviceInfo?.apply {
                 eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                     AccessibilityEvent.TYPE_WINDOWS_CHANGED or
-                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                    AccessibilityEvent.TYPE_VIEW_CLICKED or
+                    AccessibilityEvent.TYPE_VIEW_LONG_CLICKED or
+                    AccessibilityEvent.TYPE_VIEW_SCROLLED or
+                    AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
                 feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
                 flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
