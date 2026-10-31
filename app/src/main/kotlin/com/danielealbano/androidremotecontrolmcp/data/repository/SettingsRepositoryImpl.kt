@@ -308,10 +308,12 @@ class SettingsRepositoryImpl
         eventChannelSettings: EventChannelSettings,
         arcTunnelSettings: ArcTunnelSettings,
         downloadSettings: DownloadSettings,
+        assistantSettings: AssistantSettings,
     ) : SettingsRepository,
         EventChannelSettings by eventChannelSettings,
         ArcTunnelSettings by arcTunnelSettings,
-        DownloadSettings by downloadSettings {
+        DownloadSettings by downloadSettings,
+        AssistantSettings by assistantSettings {
         override val serverConfig: Flow<ServerConfig> =
             dataStore.data.map { prefs ->
                 mapPreferencesToServerConfig(prefs)

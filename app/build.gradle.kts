@@ -373,6 +373,7 @@ dependencies {
     // Raw OkHttp: the free E2E tunnel control stream is an HTTP/2 duplex request body (not expressible
     // through the Ktor client), plus its /issue and Certificate Transparency calls.
     implementation(libs.okhttp)
+    implementation(libs.tink.android)
 
     // Pin Netty to the latest 4.2.x patch release (Ktor 3.6.0's server engine ships 4.2.17); keeps the patched floor.
     // Covers the HTTP Request Smuggling / HTTP/2 CONTINUATION-flood CVEs (CVE-2026-33870,

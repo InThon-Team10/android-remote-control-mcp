@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
+import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.EventChannelSettings
@@ -16,6 +18,9 @@ import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogReposi
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepositoryImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepositoryImpl
+import com.danielealbano.androidremotecontrolmcp.data.security.AndroidKeystoreAeadProvider
+import com.danielealbano.androidremotecontrolmcp.data.security.ApiKeyCipher
+import com.danielealbano.androidremotecontrolmcp.data.security.TinkApiKeyCipher
 import com.danielealbano.androidremotecontrolmcp.geo.DbIpGeoResolver
 import com.danielealbano.androidremotecontrolmcp.geo.GeoIpResolver
 import com.danielealbano.androidremotecontrolmcp.mcp.McpListenerRules
@@ -133,6 +138,13 @@ object AppModule {
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = context.oauthClientsDataStore
 
+    /** Provides the Tink cipher (Android Keystore master key) protecting the assistant's Gemini API key. */
+    @Provides
+    @Singleton
+    fun provideApiKeyCipher(
+        @ApplicationContext context: Context,
+    ): ApiKeyCipher = TinkApiKeyCipher(AndroidKeystoreAeadProvider(context)::get)
+
     /**
      * Provides [Dispatchers.IO] for background work.
      */
@@ -180,6 +192,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindDownloadSettings(impl: DownloadSettingsImpl): DownloadSettings
+
+    /** Binds the assistant settings slice (also reachable through [SettingsRepository]). */
+    @Binds
+    @Singleton
+    abstract fun bindAssistantSettings(impl: AssistantSettingsImpl): AssistantSettings
 
     /** Binds the persisted OAuth client registry. */
     @Binds

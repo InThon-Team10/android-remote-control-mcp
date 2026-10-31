@@ -22,6 +22,8 @@ Gradle Plugin, ...) are not part of the app and are not listed.
 | Ktor | Apache-2.0 | https://github.com/ktorio/ktor |
 | Netty | Apache-2.0 | https://github.com/netty/netty |
 | OkHttp | Apache-2.0 | https://github.com/square/okhttp |
+| Tink (`com.google.crypto.tink:tink-android`) | Apache-2.0 | https://github.com/tink-crypto/tink-java |
+| Gson | Apache-2.0 | https://github.com/google/gson |
 | Okio | Apache-2.0 | https://github.com/square/okio |
 | Coil | Apache-2.0 | https://github.com/coil-kt/coil |
 | Dagger and Hilt | Apache-2.0 | https://github.com/google/dagger |

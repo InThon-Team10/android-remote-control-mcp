@@ -40,6 +40,7 @@ bouncy-castle = "1.86"
 
 # Free E2E tunnel client (raw OkHttp: HTTP/2 duplex control stream)
 okhttp = "5.5.0"
+tink = "1.24.0"
 
 # Serialization
 kotlinx-serialization = "1.11.0"
@@ -137,6 +138,7 @@ bouncy-castle-prov = { group = "org.bouncycastle", name = "bcprov-jdk18on", vers
 
 # Free E2E tunnel client
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink" }
 okhttp-mockwebserver3 = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "okhttp" }
 okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okhttp" }
 
