@@ -130,6 +130,7 @@ private val ALL_TOOL_CATEGORIES: List<ToolCategory> =
         ToolCategory(
             R.string.mcp_tools_category_utility,
             listOf(
+                ToolEntry("get_accessibility_status", R.string.mcp_tool_get_accessibility_status),
                 ToolEntry("get_clipboard", R.string.mcp_tool_get_clipboard),
                 ToolEntry("set_clipboard", R.string.mcp_tool_set_clipboard),
                 ToolEntry("wait_for_node", R.string.mcp_tool_wait_for_node),

@@ -87,6 +87,7 @@
     <string name="mcp_tool_type_replace_text">Type Replace Text</string>
     <string name="mcp_tool_type_clear_text">Type Clear Text</string>
     <string name="mcp_tool_press_key">Press Key</string>
+    <string name="mcp_tool_get_accessibility_status">Get Accessibility Status</string>
     <string name="mcp_tool_get_clipboard">Get Clipboard</string>
     <string name="mcp_tool_set_clipboard">Set Clipboard</string>
     <string name="mcp_tool_wait_for_node">Wait for Node</string>

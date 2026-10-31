@@ -830,6 +830,9 @@ fun registerUtilityTools(
     toolNamePrefix: String,
     perms: ToolPermissionsConfig,
 ) {
+    if (perms.isToolEnabled(GetAccessibilityStatusTool.TOOL_NAME)) {
+        GetAccessibilityStatusTool(accessibilityServiceProvider).register(registrar, toolNamePrefix)
+    }
     if (perms.isToolEnabled(GetClipboardTool.TOOL_NAME)) {
         GetClipboardTool(accessibilityServiceProvider, privacyToolGate).register(registrar, toolNamePrefix)
     }
