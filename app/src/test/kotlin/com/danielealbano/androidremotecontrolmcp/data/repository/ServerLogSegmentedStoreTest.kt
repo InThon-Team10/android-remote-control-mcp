@@ -149,6 +149,25 @@ class ServerLogSegmentedStoreTest {
         }
 
     @Test
+    fun `append after restart with partial tail index record keeps later entries aligned`() =
+        runTest {
+            val dir = File(tempDir, "logs")
+            val first = store()
+            first.append(1L, ServerLogEntry.Type.SERVER, "a", null, null)
+            first.append(2L, ServerLogEntry.Type.SERVER, "b", null, null)
+            FileOutputStream(ServerLogSegmentFiles.indexFile(dir, 1), true).use {
+                it.write(ByteArray(10) { 0x7F })
+            }
+
+            val restarted = store()
+            restarted.append(3L, ServerLogEntry.Type.SERVER, "c", null, null)
+
+            val index = restarted.readIndex()
+            assertEquals(listOf(1L, 2L, 3L), index.map { it.timestamp })
+            assertEquals(listOf("a", "b", "c"), index.map { restarted.readEntry(it).message })
+        }
+
+    @Test
     fun `unknown type id skipped`() =
         runTest {
             val store = store()

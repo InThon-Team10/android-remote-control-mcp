@@ -135,7 +135,9 @@ class ServerLogSegmentedStore(
         directory.mkdirs()
         segmentSeqsLocked().dropLast(maxSegments).forEach { deletePairLocked(it) }
         activeSeq = segmentSeqsLocked().lastOrNull() ?: 1
-        activeCount = ServerLogSegmentFiles.indexRecordCount(ServerLogSegmentFiles.indexFile(directory, activeSeq))
+        val activeIndex = ServerLogSegmentFiles.indexFile(directory, activeSeq)
+        activeCount = ServerLogSegmentFiles.indexRecordCount(activeIndex)
+        ServerLogSegmentFiles.dropPartialTailRecord(activeIndex, activeCount)
         activeDataLength = ServerLogSegmentFiles.dataFile(directory, activeSeq).length().toInt()
         openStreamsLocked()
         initialized = true
@@ -217,6 +219,17 @@ internal object ServerLogSegmentFiles {
 
     /** Integer division silently ignores a truncated partial tail record (crash mid-write). */
     fun indexRecordCount(file: File): Int = if (file.isFile) (file.length() / INDEX_RECORD_BYTES).toInt() else 0
+
+    /** Cuts a torn tail record (crash mid-write) so the next appended record stays record-aligned. */
+    fun dropPartialTailRecord(
+        file: File,
+        recordCount: Int,
+    ) {
+        val wholeBytes = recordCount.toLong() * INDEX_RECORD_BYTES
+        if (file.isFile && file.length() > wholeBytes) {
+            RandomAccessFile(file, "rw").use { it.setLength(wholeBytes) }
+        }
+    }
 
     fun readSegmentIndex(
         directory: File,
