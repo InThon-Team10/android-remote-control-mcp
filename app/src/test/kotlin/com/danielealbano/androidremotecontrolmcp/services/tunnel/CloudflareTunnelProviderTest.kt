@@ -494,6 +494,14 @@ class CloudflareTunnelProviderTest {
         }
 
         @Test
+        fun `quoted empty string is kept as an empty argument`() {
+            assertEquals(
+                listOf("--token", "", "--flag", ""),
+                CloudflareTunnelProvider.parseCommandLineArguments("--token '' --flag \"\""),
+            )
+        }
+
+        @Test
         fun `escaped characters are preserved`() {
             assertEquals(
                 listOf("--custom=hello\"world"),
