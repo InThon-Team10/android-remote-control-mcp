@@ -119,6 +119,7 @@ class LiveVoiceSessionImpl
             queue.enqueue(RealtimeProtocol.sessionUpdate())
             val eventHandler = RealtimeEventHandler(queue::enqueue, playback, deps.guide, listener, scope, events)
             handler = eventHandler
+            eventHandler.greet()
             playback.start()
             launcher.start()
             scope.guarded(events) { for (event in inbound) eventHandler.handle(event) }

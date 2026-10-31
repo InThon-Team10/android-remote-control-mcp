@@ -101,26 +101,19 @@ class RealtimeEventHandlerTest {
         }
 
     @Test
-    fun `barge in flushes the speaker, truncates at the played ms and cuts the cancelled reply`() =
+    fun `speech while the assistant speaks never cuts it off`() =
         runTest {
             val handler = handler()
             handler.handle(RealtimeTestEvents.created("r1"))
-            handler.handle(RealtimeTestEvents.audio("r1", "i1", 48 * 1000))
-            pending = 400
+            handler.handle(RealtimeTestEvents.audio("r1", "i1", 960))
 
             handler.handle(RealtimeTestEvents.type("input_audio_buffer.speech_started"))
-            log.clear()
             handler.handle(RealtimeTestEvents.audio("r1", "i1", 960))
-            handler.handle(RealtimeTestEvents.transcript("r1", "late"))
+            handler.handle(RealtimeTestEvents.transcript("r1", "계속"))
 
-            verify(exactly = 1) { playback.flush() }
-            verify(exactly = 1) { playback.write(any()) }
-            val truncate = sent.single()
-            assertEquals("conversation.item.truncate", truncate["type"]!!.jsonPrimitive.content)
-            assertEquals("i1", truncate["item_id"]!!.jsonPrimitive.content)
-            assertEquals(0, truncate["content_index"]!!.jsonPrimitive.int)
-            assertEquals(600, truncate["audio_end_ms"]!!.jsonPrimitive.int)
-            assertTrue(log.isEmpty())
+            verify(exactly = 2) { playback.write(any()) }
+            assertTrue(sent.isEmpty())
+            assertTrue("turnEnd" !in log && "assistant:계속" in log)
         }
 
     @Test
@@ -137,54 +130,67 @@ class RealtimeEventHandlerTest {
         }
 
     @Test
-    fun `a cancelled response is forgotten once it is done`() =
+    fun `speech with no reply running closes the user's turn`() =
         runTest {
             val handler = handler()
-            handler.handle(RealtimeTestEvents.created("r1"))
-            handler.handle(RealtimeTestEvents.type("input_audio_buffer.speech_started"))
-            handler.handle(RealtimeTestEvents.done("cancelled", responseId = "r1"))
-            handler.handle(RealtimeTestEvents.audio("r1", "i1", 960))
-
-            verify(exactly = 1) { playback.write(any()) }
-        }
-
-    @Test
-    fun `barge in truncates only the unplayed share of the current item when an earlier item is buffered`() =
-        runTest {
-            val handler = handler()
-            pending = 300
-            handler.handle(RealtimeTestEvents.created("r1"))
-            handler.handle(RealtimeTestEvents.audio("r1", "i2", 48 * 1000))
-            pending = 700
 
             handler.handle(RealtimeTestEvents.type("input_audio_buffer.speech_started"))
 
-            assertEquals(600, sent.single()["audio_end_ms"]!!.jsonPrimitive.int)
-        }
-
-    @Test
-    fun `barge in with nothing left to play sends no truncate`() =
-        runTest {
-            val handler = handler()
-            handler.handle(RealtimeTestEvents.audio("r1", "i1", 960))
-            pending = 0
-
-            handler.handle(RealtimeTestEvents.type("input_audio_buffer.speech_started"))
-
+            assertEquals(listOf("turnEnd"), log)
             assertTrue(sent.isEmpty())
         }
 
     @Test
-    fun `a reply after the barge in is played again`() =
+    fun `greet asks for one short greeting without tools`() =
+        runTest {
+            val handler = handler()
+
+            handler.greet()
+
+            val request = sent.single()
+            assertEquals("response.create", request["type"]!!.jsonPrimitive.content)
+            val response = request["response"]!!.jsonObject
+            assertEquals("none", response["tool_choice"]!!.jsonPrimitive.content)
+            assertTrue(response["instructions"]!!.jsonPrimitive.content.isNotBlank())
+        }
+
+    @Test
+    fun `a greeting asked during a running reply is sent once that reply is done`() =
         runTest {
             val handler = handler()
             handler.handle(RealtimeTestEvents.created("r1"))
-            handler.handle(RealtimeTestEvents.type("input_audio_buffer.speech_started"))
-            handler.handle(RealtimeTestEvents.done("cancelled"))
-            handler.handle(RealtimeTestEvents.created("r2"))
-            handler.handle(RealtimeTestEvents.audio("r2", "i2", 960))
 
-            verify(exactly = 1) { playback.write(any()) }
+            handler.greet()
+            assertTrue(sent.isEmpty())
+            handler.handle(RealtimeTestEvents.done())
+
+            assertEquals(listOf("response.create"), types())
+            assertTrue(sent.single().containsKey("response"))
+        }
+
+    @Test
+    fun `a finished step reaches the model as a system note followed by a reply request`() =
+        runTest {
+            val acted = CompletableDeferred<String>()
+            coEvery { guide.showNextStep("카톡 열기", any()) } returnsMany
+                listOf(GuideStepResult("앱 목록을 열어 주세요", true), GuideStepResult("카카오톡을 눌러 주세요", true))
+            coEvery { guide.waitForUser() } coAnswers { acted.await() } coAndThen {
+                CompletableDeferred<String>().await()
+            }
+            val handler = handler()
+            handler.handle(RealtimeTestEvents.call("show_next_step", "c1", """{"goal":"카톡 열기"}"""))
+            runCurrent()
+            handler.handle(RealtimeTestEvents.created("r1"))
+            handler.handle(RealtimeTestEvents.done())
+            sent.clear()
+
+            acted.complete("The user did it.")
+            runCurrent()
+
+            assertEquals(listOf("conversation.item.create", "response.create"), types())
+            val item = sent[0].item()
+            assertEquals("system", item["role"]!!.jsonPrimitive.content)
+            assertTrue(item.toString().contains("카카오톡을 눌러 주세요"))
         }
 
     @Test
@@ -219,8 +225,18 @@ class RealtimeEventHandlerTest {
     fun `a pending wait_for_user lets the conversation continue and answers when it resolves`() =
         runTest {
             val waiting = CompletableDeferred<String>()
-            coEvery { guide.waitForUser() } coAnswers { waiting.await() }
+            coEvery { guide.showNextStep("카톡 열기", any()) } returnsMany
+                listOf(GuideStepResult("앱을 눌러 주세요", true), GuideStepResult("다음을 눌러 주세요", true))
+            coEvery { guide.waitForUser() } coAnswers { waiting.await() } coAndThen {
+                CompletableDeferred<String>().await()
+            }
             val handler = handler()
+            handler.handle(RealtimeTestEvents.call("show_next_step", "c1", """{"goal":"카톡 열기"}"""))
+            runCurrent()
+            handler.handle(RealtimeTestEvents.created("r1"))
+            handler.handle(RealtimeTestEvents.done())
+            sent.clear()
+            log.clear()
             handler.handle(RealtimeTestEvents.call("wait_for_user", "w1"))
             runCurrent()
 
@@ -234,7 +250,13 @@ class RealtimeEventHandlerTest {
             runCurrent()
 
             assertEquals(listOf("conversation.item.create", "response.create"), types())
-            assertEquals("The user did it.", sent[0].item()["output"]!!.jsonPrimitive.content)
+            assertEquals("w1", sent[0].item()["call_id"]!!.jsonPrimitive.content)
+            assertTrue(
+                sent[0]
+                    .item()["output"]!!
+                    .jsonPrimitive.content
+                    .contains("다음을 눌러 주세요"),
+            )
         }
 
     @Test

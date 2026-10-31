@@ -35,15 +35,16 @@ internal class ResponseGate(
     private val send: (JsonObject) -> Unit,
 ) {
     private var active = false
-    private var queued = false
+    private var queued: JsonObject? = null
 
+    /** Sends [event] now, or once the running response is done (the first queued request wins). */
     @Synchronized
-    fun request() {
+    fun request(event: JsonObject = RealtimeProtocol.responseCreate()) {
         if (active) {
-            queued = true
+            if (queued == null) queued = event
         } else {
             active = true
-            send(RealtimeProtocol.responseCreate())
+            send(event)
         }
     }
 
@@ -56,17 +57,16 @@ internal class ResponseGate(
     @Synchronized
     fun rejected() {
         active = true
-        queued = true
+        if (queued == null) queued = RealtimeProtocol.responseCreate()
     }
 
     @Synchronized
     fun done() {
         active = false
-        if (queued) {
-            queued = false
-            active = true
-            send(RealtimeProtocol.responseCreate())
-        }
+        val next = queued ?: return
+        queued = null
+        active = true
+        send(next)
     }
 }
 
@@ -87,8 +87,8 @@ internal class RealtimeEventHandler(
     private val events: LiveEvents,
 ) {
     private val gate = ResponseGate(send)
-    private val calls = RealtimeFunctionCalls(guide, listener, scope, ::respond, ::reportFailure)
-    private val audio = RealtimeAudioOutput(playback, send, events)
+    private val calls = RealtimeFunctionCalls(guide, listener, scope, ::respond, ::pushNote, ::reportFailure)
+    private val audio = RealtimeAudioOutput(playback, events)
     private var activeResponse: String? = null
     private val handlers: Map<String, (JsonObject) -> Unit> =
         mapOf(
@@ -97,7 +97,8 @@ internal class RealtimeEventHandler(
             "response.output_audio.delta" to audio::delta,
             "response.output_audio_transcript.delta" to audio::transcript,
             "conversation.item.input_audio_transcription.completed" to ::onUserTranscript,
-            "input_audio_buffer.speech_started" to { _ -> bargeIn() },
+            // Voice barge-in is off (EchoGate, interrupt_response=false): speech never cuts a reply.
+            "input_audio_buffer.speech_started" to { _ -> if (activeResponse == null) events.turnEnd() },
             "response.output_item.done" to ::onOutputItemDone,
             "error" to ::onError,
         )
@@ -107,6 +108,9 @@ internal class RealtimeEventHandler(
         Log.d(VOICE_TRACE, "realtime <- ${realtimeEventTrace(event)}")
         handlers[type]?.invoke(event)
     }
+
+    /** The conversation just started: the assistant greets the user first. */
+    fun greet() = gate.request(RealtimeProtocol.greeting())
 
     /** Typed input of the user inside the conversation. */
     fun sendText(text: String) {
@@ -122,7 +126,6 @@ internal class RealtimeEventHandler(
     }
 
     private fun onResponseDone(event: JsonObject) {
-        audio.responseDone(event.obj("response")?.string("id"))
         activeResponse = null
         events.turnEnd()
         events.listening()
@@ -133,11 +136,6 @@ internal class RealtimeEventHandler(
             return
         }
         gate.done()
-    }
-
-    private fun bargeIn() {
-        audio.bargeIn(activeResponse)
-        events.turnEnd()
     }
 
     private fun onUserTranscript(event: JsonObject) {
@@ -154,6 +152,12 @@ internal class RealtimeEventHandler(
     ) {
         Log.d(VOICE_TRACE, "realtime -> function output (${output.length} chars)")
         send(RealtimeProtocol.functionOutput(callId, output))
+        gate.request()
+    }
+
+    private fun pushNote(note: String) {
+        Log.d(VOICE_TRACE, "realtime -> app note (${note.length} chars)")
+        send(RealtimeProtocol.systemNote(note))
         gate.request()
     }
 

@@ -64,7 +64,8 @@ class RealtimeProtocolTest {
             listOf(
                 RealtimeProtocol.sessionUpdate(),
                 RealtimeProtocol.audioAppend(ByteArray(4800)),
-                RealtimeProtocol.truncate("item_1", 250),
+                RealtimeProtocol.systemNote("앱 알림: 그대로 말하세요"),
+                RealtimeProtocol.greeting(),
                 RealtimeProtocol.functionOutput("call_1", "{}"),
                 RealtimeProtocol.userText("안녕"),
                 RealtimeProtocol.responseCreate(),
@@ -75,6 +76,22 @@ class RealtimeProtocolTest {
             val back = Json.parseToJsonElement(jsonMapper().writeValueAsString(typed)).jsonObject
             assertEquals(event["type"], back["type"])
         }
+    }
+
+    @Test
+    fun `an app note is a system message in the conversation`() {
+        val item = RealtimeProtocol.systemNote("앱 알림: 그대로 말하세요")["item"]!!.jsonObject
+
+        assertEquals("message", item["type"]!!.jsonPrimitive.content)
+        assertEquals("system", item["role"]!!.jsonPrimitive.content)
+        assertEquals(
+            "앱 알림: 그대로 말하세요",
+            item["content"]!!
+                .jsonArray
+                .single()
+                .jsonObject["text"]!!
+                .jsonPrimitive.content,
+        )
     }
 
     @Test

@@ -72,7 +72,7 @@ class AndroidAudioCapture
         }
     }
 
-/** `AudioTrack` speaker fed by a single writer thread; [flush] invalidates everything queued before it. */
+/** `AudioTrack` speaker fed by a single writer thread. */
 class AndroidAudioPlayback
     @Inject
     constructor(
@@ -81,9 +81,7 @@ class AndroidAudioPlayback
         private val lock = Any()
         private var track: AudioTrack? = null
         private var executor: ExecutorService? = null
-        private var generation = 0
         private var writtenFrames = 0L
-        private var headBase = 0L
 
         override fun start() {
             synchronized(lock) {
@@ -109,42 +107,22 @@ class AndroidAudioPlayback
         }
 
         override fun write(pcm: ByteArray) {
-            val queued =
-                synchronized(lock) {
-                    writtenFrames += pcm.size / FRAME_BYTES
-                    generation
-                }
+            synchronized(lock) { writtenFrames += pcm.size / FRAME_BYTES }
             executor?.execute {
-                val current = synchronized(lock) { track?.takeIf { queued == generation } } ?: return@execute
+                val current = synchronized(lock) { track } ?: return@execute
                 current.write(pcm, 0, pcm.size)
-            }
-        }
-
-        override fun flush() {
-            Log.d(VOICE_TRACE, "playback flushed (interrupted)")
-            synchronized(lock) {
-                generation++
-                track?.apply {
-                    pause()
-                    flush()
-                    play()
-                }
-                writtenFrames = 0
-                headBase = track?.playbackHeadPosition?.toLong() ?: 0L
             }
         }
 
         override fun pendingMs(): Long =
             synchronized(lock) {
-                val played = (track?.playbackHeadPosition?.toLong() ?: 0L) - headBase
+                val played = track?.playbackHeadPosition?.toLong() ?: 0L
                 (writtenFrames - played).coerceAtLeast(0) * MS_PER_SECOND / LiveAudio.SAMPLE_RATE
             }
 
         override fun release() {
             synchronized(lock) {
-                generation++
                 writtenFrames = 0
-                headBase = 0
                 executor?.shutdownNow()
                 executor = null
                 track?.release()

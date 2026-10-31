@@ -15,7 +15,6 @@ import java.util.Base64
 internal object RealtimeProtocol {
     const val SHOW_NEXT_STEP = "show_next_step"
     const val WAIT_FOR_USER = "wait_for_user"
-    const val TRUNCATE_EVENT_PREFIX = "trunc_"
     private const val TRANSCRIPTION_MODEL = "gpt-transcribe"
     private const val LANGUAGE = "ko"
     private const val VOICE = "marin"
@@ -105,18 +104,6 @@ internal object RealtimeProtocol {
             put("audio", Base64.getEncoder().encodeToString(pcm))
         }
 
-    fun truncate(
-        itemId: String,
-        playedMs: Long,
-    ): JsonObject =
-        buildJsonObject {
-            put("type", "conversation.item.truncate")
-            put("event_id", TRUNCATE_EVENT_PREFIX + itemId)
-            put("item_id", itemId)
-            put("content_index", 0)
-            put("audio_end_ms", playedMs)
-        }
-
     fun functionOutput(
         callId: String,
         output: String,
@@ -149,5 +136,37 @@ internal object RealtimeProtocol {
 
     fun responseCreate(): JsonObject = buildJsonObject { put("type", "response.create") }
 
+    /** An app note in the conversation (step progress the model reads out). */
+    fun systemNote(text: String): JsonObject =
+        buildJsonObject {
+            put("type", "conversation.item.create")
+            putJsonObject("item") {
+                put("type", "message")
+                put("role", "system")
+                putJsonArray("content") {
+                    add(
+                        buildJsonObject {
+                            put("type", "input_text")
+                            put("text", text)
+                        },
+                    )
+                }
+            }
+        }
+
+    /** The first reply of a conversation: one short greeting, no tools. */
+    fun greeting(): JsonObject =
+        buildJsonObject {
+            put("type", "response.create")
+            putJsonObject("response") {
+                put("instructions", GREETING)
+                put("tool_choice", "none")
+            }
+        }
+
     fun decodeAudio(base64: String): ByteArray = Base64.getDecoder().decode(base64)
+
+    private const val GREETING =
+        "대화를 막 시작했어요. 한국어 존댓말로 한 문장만 짧게 인사하고 무엇을 도와드릴지 물어보세요. " +
+            "예: '안녕하세요, 무엇을 도와드릴까요?'"
 }

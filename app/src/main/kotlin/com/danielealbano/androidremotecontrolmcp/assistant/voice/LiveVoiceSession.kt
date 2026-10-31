@@ -50,10 +50,7 @@ interface AudioPlayback {
 
     fun write(pcm: ByteArray)
 
-    /** Drops everything queued (the user interrupted the model). */
-    fun flush()
-
-    /** Milliseconds of audio written since the last [flush] that the speaker has not played yet. */
+    /** Milliseconds of audio written that the speaker has not played yet. */
     fun pendingMs(): Long
 
     fun release()

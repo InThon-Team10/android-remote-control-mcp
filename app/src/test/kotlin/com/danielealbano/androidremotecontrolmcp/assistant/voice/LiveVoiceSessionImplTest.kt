@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.assistant.voice
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.AssistantAgent
+import com.danielealbano.androidremotecontrolmcp.assistant.guide.GuideStepResult
 import com.danielealbano.androidremotecontrolmcp.assistant.guide.GuideSteps
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
@@ -145,7 +146,7 @@ class LiveVoiceSessionImplTest {
             runCurrent()
 
             assertEquals(1, gateway.connects)
-            assertEquals(listOf("session.update"), types())
+            assertEquals(listOf("session.update", "response.create"), types())
             assertEquals(LiveVoiceState.Listening, fx.live.state.value)
             assertEquals(SessionState.Running, fx.session.state.value)
             verify { playback.start() }
@@ -171,8 +172,8 @@ class LiveVoiceSessionImplTest {
             mic.trySend(byteArrayOf(1, 2, 3))
             runCurrent()
 
-            assertEquals(listOf("session.update", "input_audio_buffer.append"), types())
-            assertEquals("AQID", sent[1]["audio"]!!.jsonPrimitive.content)
+            assertEquals(listOf("session.update", "response.create", "input_audio_buffer.append"), types())
+            assertEquals("AQID", sent[2]["audio"]!!.jsonPrimitive.content)
             fx.live.stop()
         }
 
@@ -220,7 +221,7 @@ class LiveVoiceSessionImplTest {
             fx.live.sendText("  ")
             runCurrent()
 
-            assertEquals(listOf("session.update", "conversation.item.create", "response.create"), types())
+            assertEquals(listOf("session.update", "response.create", "conversation.item.create"), types())
             fx.live.stop()
             runCurrent()
             fx.live.sendText("after stop")
@@ -310,16 +311,17 @@ class LiveVoiceSessionImplTest {
                     cancelled = true
                 }
             }
+            coEvery { guide.showNextStep(any(), any()) } returns GuideStepResult("앱을 눌러 주세요", true)
             val fx = fixture()
             fx.begin()
-            onEvent(RealtimeTestEvents.call("wait_for_user", "w1"))
+            onEvent(RealtimeTestEvents.call("show_next_step", "s1", """{"goal":"카톡 열기"}"""))
             runCurrent()
 
             fx.live.stop()
             runCurrent()
 
             assertTrue(cancelled)
-            assertEquals(listOf("session.update"), types())
+            assertEquals(listOf("session.update", "response.create", "conversation.item.create"), types())
         }
 
     @Test

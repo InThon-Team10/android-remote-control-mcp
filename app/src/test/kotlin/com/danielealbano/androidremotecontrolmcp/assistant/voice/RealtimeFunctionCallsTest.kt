@@ -7,9 +7,10 @@ import com.danielealbano.androidremotecontrolmcp.assistant.guide.GuideSteps
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -27,12 +28,19 @@ import org.junit.jupiter.api.Test
 class RealtimeFunctionCallsTest {
     private val guide = mockk<GuideSteps>()
     private val listener = mockk<AgentListener>(relaxed = true)
-    private val outputs = mutableListOf<String>()
+    private val answers = mutableListOf<Pair<String, String>>()
+    private val notes = mutableListOf<String>()
     private val failures = mutableListOf<Throwable>()
+    private val outcomes = ArrayDeque<CompletableDeferred<String>>()
+
+    init {
+        coEvery { guide.waitForUser() } coAnswers { outcomes.removeFirst().await() }
+    }
 
     private fun TestScope.calls(): RealtimeFunctionCalls {
-        val respond: (String, String) -> Unit = { _, output -> outputs += output }
-        return RealtimeFunctionCalls(guide, listener, this, respond) { failures += it }
+        val respond: (String, String) -> Unit = { id, output -> answers += id to output }
+        val push: (String) -> Unit = { notes += it }
+        return RealtimeFunctionCalls(guide, listener, backgroundScope, respond, push) { failures += it }
     }
 
     private fun call(
@@ -47,83 +55,128 @@ class RealtimeFunctionCallsTest {
             put("arguments", arguments)
         }
 
-    private fun TestScope.showThenWait(calls: RealtimeFunctionCalls) {
-        calls.start(call("c1", RealtimeProtocol.SHOW_NEXT_STEP, """{"goal":"$GOAL"}"""))
-        advanceUntilIdle()
-        calls.start(call("c2", RealtimeProtocol.WAIT_FOR_USER))
-        advanceUntilIdle()
+    private fun nextOutcome(): CompletableDeferred<String> = CompletableDeferred<String>().also(outcomes::addLast)
+
+    private fun TestScope.show(calls: RealtimeFunctionCalls): CompletableDeferred<String> {
+        val outcome = nextOutcome()
+        calls.start(call("s1", RealtimeProtocol.SHOW_NEXT_STEP, """{"goal":"$GOAL"}"""))
+        runCurrent()
+        return outcome
     }
 
     @Test
-    fun `a finished step comes back with the next step already shown`() =
+    fun `a shown step is answered and the next one reaches a pending wait_for_user when the user acts`() =
         runTest {
             coEvery { guide.showNextStep(GOAL, listener) } returnsMany
                 listOf(GuideStepResult(FIRST, showing = true), GuideStepResult(SECOND, showing = true))
-            coEvery { guide.waitForUser() } returns GuideOutcomeTexts.USER_DID_IT
+            val calls = calls()
+            val outcome = show(calls)
+            calls.start(call("w1", RealtimeProtocol.WAIT_FOR_USER))
+            nextOutcome()
 
-            showThenWait(calls())
+            outcome.complete(GuideOutcomeTexts.USER_DID_IT)
+            runCurrent()
 
-            val answer = Json.parseToJsonElement(outputs.last()).jsonObject
+            assertEquals("s1", answers[0].first)
+            assertEquals("w1", answers[1].first)
+            val answer = Json.parseToJsonElement(answers[1].second).jsonObject
             assertEquals(GuideOutcomeTexts.USER_DID_IT, answer["result"]!!.jsonPrimitive.content)
             assertEquals(SECOND, answer["next"]!!.jsonObject["say"]!!.jsonPrimitive.content)
-            coVerify(exactly = 2) { guide.showNextStep(GOAL, listener) }
-            assertTrue(failures.isEmpty())
+            assertTrue(notes.isEmpty() && failures.isEmpty())
         }
 
     @Test
-    fun `a screen change also plans the next step`() =
+    fun `without a pending wait_for_user the next step is pushed as an app note`() =
         runTest {
             coEvery { guide.showNextStep(GOAL, listener) } returnsMany
                 listOf(GuideStepResult(FIRST, showing = true), GuideStepResult(SECOND, showing = true))
-            coEvery { guide.waitForUser() } returns GuideOutcomeTexts.SCREEN_CHANGED
+            val calls = calls()
+            val outcome = show(calls)
+            nextOutcome()
 
-            showThenWait(calls())
+            outcome.complete(GuideOutcomeTexts.SCREEN_CHANGED)
+            runCurrent()
 
-            val answer = Json.parseToJsonElement(outputs.last()).jsonObject
-            assertEquals(SECOND, answer["next"]!!.jsonObject["say"]!!.jsonPrimitive.content)
+            assertTrue(notes.single().contains(SECOND))
+            assertEquals(1, answers.size)
+            coVerify(exactly = 2) { guide.showNextStep(GOAL, listener) }
         }
 
     @Test
-    fun `a timed-out step is reported without planning again`() =
+    fun `a timed-out step pushes a reminder and keeps watching`() =
         runTest {
             coEvery { guide.showNextStep(GOAL, listener) } returns GuideStepResult(FIRST, showing = true)
-            coEvery { guide.waitForUser() } returns GuideOutcomeTexts.TIMED_OUT
+            val calls = calls()
+            val outcome = show(calls)
+            val again = nextOutcome()
 
-            showThenWait(calls())
+            outcome.complete(GuideOutcomeTexts.TIMED_OUT)
+            runCurrent()
 
-            assertEquals(GuideOutcomeTexts.TIMED_OUT, outputs.last())
+            assertTrue(notes.single().startsWith("앱 알림"))
+            assertTrue(again.isActive && outcomes.isEmpty())
             coVerify(exactly = 1) { guide.showNextStep(GOAL, listener) }
         }
 
     @Test
-    fun `without a goal the outcome is reported as is`() =
+    fun `wait_for_user with nothing shown answers at once`() =
         runTest {
-            coEvery { guide.waitForUser() } returns GuideOutcomeTexts.USER_DID_IT
             val calls = calls()
 
-            calls.start(call("c1", RealtimeProtocol.WAIT_FOR_USER))
-            advanceUntilIdle()
+            calls.start(call("w1", RealtimeProtocol.WAIT_FOR_USER))
+            runCurrent()
 
-            assertEquals(GuideOutcomeTexts.USER_DID_IT, outputs.single())
-            coVerify(exactly = 0) { guide.showNextStep(any(), any()) }
+            assertEquals("w1" to GuideOutcomeTexts.NOTHING_HIGHLIGHTED, answers.single())
+            coVerify(exactly = 0) { guide.waitForUser() }
         }
 
     @Test
-    fun `a goal reached ends it so a later wait does not plan again`() =
+    fun `a reached goal is announced and not planned again`() =
         runTest {
             coEvery { guide.showNextStep(GOAL, listener) } returnsMany
                 listOf(
                     GuideStepResult(FIRST, showing = true),
                     GuideStepResult(DONE_SAY, showing = false, kind = "done"),
                 )
-            coEvery { guide.waitForUser() } returns GuideOutcomeTexts.USER_DID_IT
             val calls = calls()
-            showThenWait(calls)
+            val outcome = show(calls)
 
-            calls.start(call("c3", RealtimeProtocol.WAIT_FOR_USER))
-            advanceUntilIdle()
+            outcome.complete(GuideOutcomeTexts.USER_DID_IT)
+            runCurrent()
 
-            assertEquals(GuideOutcomeTexts.USER_DID_IT, outputs.last())
+            assertTrue(notes.single().contains(DONE_SAY))
+            calls.start(call("w2", RealtimeProtocol.WAIT_FOR_USER))
+            runCurrent()
+            assertEquals(GuideOutcomeTexts.NOTHING_HIGHLIGHTED, answers.last().second)
+            coVerify(exactly = 2) { guide.showNextStep(GOAL, listener) }
+        }
+
+    @Test
+    fun `a closed guidance asks the user what they want`() =
+        runTest {
+            coEvery { guide.showNextStep(GOAL, listener) } returns GuideStepResult(FIRST, showing = true)
+            val calls = calls()
+            val outcome = show(calls)
+
+            outcome.complete(GuideOutcomeTexts.CLOSED)
+            runCurrent()
+
+            assertTrue(notes.single().contains("닫았어요"))
+            coVerify(exactly = 1) { guide.showNextStep(GOAL, listener) }
+        }
+
+    @Test
+    fun `a step replaced by a newer one is ignored`() =
+        runTest {
+            coEvery { guide.showNextStep(GOAL, listener) } returns GuideStepResult(FIRST, showing = true)
+            val calls = calls()
+            val first = show(calls)
+            show(calls)
+
+            first.complete(GuideOutcomeTexts.USER_DID_IT)
+            runCurrent()
+
+            assertTrue(notes.isEmpty())
             coVerify(exactly = 2) { guide.showNextStep(GOAL, listener) }
         }
 
