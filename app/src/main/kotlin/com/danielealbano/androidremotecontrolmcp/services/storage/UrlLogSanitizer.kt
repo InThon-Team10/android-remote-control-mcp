@@ -13,9 +13,15 @@ internal fun sanitizeUrlForLog(url: URL): String {
     return "${url.protocol}://${url.host}$port${url.path}".replace(CONTROL_CHAR_REGEX, "")
 }
 
-/** Log line for a finished download, with the source URL in its [sanitizeUrlForLog] form. */
+/**
+ * Log line for a finished download, with the source URL in its [sanitizeUrlForLog] form and the [destination]
+ * stripped of control characters (it carries a caller-supplied path that could otherwise forge a log line).
+ */
 internal fun downloadLogMessage(
     bytes: Long,
     url: URL,
     destination: String,
-): String = "Downloaded $bytes bytes from ${sanitizeUrlForLog(url)} to $destination"
+): String {
+    val safeDestination = destination.filterNot { it.isISOControl() }
+    return "Downloaded $bytes bytes from ${sanitizeUrlForLog(url)} to $safeDestination"
+}
