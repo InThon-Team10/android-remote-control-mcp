@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.mcp
 
 import android.content.Context
+import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -172,5 +173,19 @@ class CertificateManagerTest {
 
         val customFile = File(tempDir, CertificateManager.CUSTOM_KEYSTORE_FILENAME)
         assertTrue(customFile.exists())
+    }
+
+    @Test
+    fun `getOrCreateKeyStore regenerates when the stored auto-generated keystore is corrupt`() {
+        // Arrange - a truncated/garbage keystore, as left by an interrupted write
+        File(tempDir, CertificateManager.KEYSTORE_FILENAME).writeBytes(byteArrayOf(0x30, 0x82.toByte(), 0x01))
+        val config = ServerConfig(certificateHostname = "test.local")
+
+        // Act
+        val keyStore = certificateManager.getOrCreateKeyStore(config)
+
+        // Assert
+        val cert = keyStore.getCertificate(CertificateManager.KEY_ALIAS) as X509Certificate
+        assertTrue(cert.subjectX500Principal.name.contains("CN=test.local"))
     }
 }
