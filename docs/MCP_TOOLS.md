@@ -1008,6 +1008,7 @@ Each path is an array of point objects:
 - All coordinates must be >= 0
 - All time values must be >= 0
 - Time values must be strictly monotonically increasing within each path
+- At most 10 paths, and at most 100 points per path
 
 **Example Request** (single-finger drag):
 ```json
@@ -1138,7 +1139,8 @@ Find UI nodes matching the specified criteria in the accessibility tree.
       "longClickable": false,
       "scrollable": false,
       "editable": false,
-      "enabled": true
+      "enabled": true,
+      "visible": true
     }
   ]
 }
@@ -1814,7 +1816,11 @@ Wait until a node matching the specified criteria appears in the accessibility t
     "className": "android.widget.TextView",
     "bounds": { "left": 50, "top": 800, "right": 250, "bottom": 1000 },
     "clickable": false,
-    "enabled": true
+    "longClickable": false,
+    "scrollable": false,
+    "editable": false,
+    "enabled": true,
+    "visible": true
   }
 }
 ```
@@ -3454,7 +3460,7 @@ Replies to a notification action that accepts text input (e.g., messaging apps).
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `action_id` | string | Yes | The `action_id` from `android_notification_list` (must have `accepts_text=true`) |
-| `text` | string | Yes | The reply text to send |
+| `text` | string | Yes | The reply text to send (non-empty, max 10000 characters) |
 
 **Input Schema**:
 ```json
@@ -3496,7 +3502,7 @@ Replies to a notification action that accepts text input (e.g., messaging apps).
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Missing or empty `action_id`; missing or empty `text`
+- **Invalid params**: Missing or empty `action_id`; missing or empty `text`; `text` exceeds 10000 characters
 - **Action failed**: Action not found; action does not accept text input; action has no PendingIntent; PendingIntent cancelled
 - **Permission denied**: Notification listener not enabled
 
