@@ -3597,7 +3597,7 @@ Sharing tools bridge the Android Share sheet and MCP clients. The app is registe
 **Services**: `SharedContentInbox`, `EphemeralFileLinkService`, `FileOperationProvider`
 **Permission**: None (share intents are user-initiated; file access uses the authorized storage locations)
 
-**Capability URLs**: Both tools can return temporary download URLs served by the MCP server itself. Each URL embeds a random single-purpose token, expires after 1 hour, allows multiple fetches, and is served from memory (total in-memory budget 64 MB).
+**Capability URLs**: Both tools can return temporary download URLs served by the MCP server itself. Each URL embeds a random single-purpose token, expires after 1 hour, allows multiple fetches, and is served from memory (total in-memory budget 64 MB). Responses carry `X-Content-Type-Options: nosniff`.
 
 ### `android_get_shared_content`
 
