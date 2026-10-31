@@ -38,10 +38,10 @@ internal class HelperAssistantConnection
             question: String,
         ): HelperAnswer {
             val config = settings.getConfig()
-            guideRequire(config.enabled) { "AI 연결 설정에서 도우미를 켜 주세요." }
-            guideRequire(config.privacyNoticeAccepted) { "AI 연결 설정에서 화면 정보 전송 안내를 확인해 주세요." }
-            val key = settings.getApiKey() ?: throw HelperGuideException("AI 연결 설정에서 Gemini API 키를 등록해 주세요.")
-            guideRequire(key.isNotBlank()) { "AI 연결 설정에서 Gemini API 키를 등록해 주세요." }
+            guideRequire(config.enabled) { "콕콕이 앱에서 도움 버튼을 켜 주세요." }
+            guideRequire(config.privacyNoticeAccepted) { "콕콕이 앱에서 도움 버튼을 켜고 화면 정보 전송 안내를 확인해 주세요." }
+            val key = settings.getApiKey() ?: throw HelperGuideException("앱의 AI 연결이 아직 준비되지 않았어요.")
+            guideRequire(key.isNotBlank()) { "앱의 AI 연결이 아직 준비되지 않았어요." }
             val status = accessibility.getStatus()
             guideRequire(status.connected && status.capabilities.canRetrieveWindowContent) {
                 "Android Remote Control MCP 접근성 서비스를 켜 주세요. 연결된 뒤 다시 요청해 주세요."
@@ -74,7 +74,7 @@ internal class HelperAssistantConnection
 
         suspend fun readScreen(): HelperScreen {
             val config = settings.getConfig()
-            guideRequire(config.enabled && config.privacyNoticeAccepted && config.apiKeyConfigured) { "AI 연결 설정을 확인한 후 다시 요청해 주세요." }
+            guideRequire(config.enabled && config.privacyNoticeAccepted && config.apiKeyConfigured) { "콕콕이 앱에서 사용 준비를 마친 후 다시 요청해 주세요." }
             val name = McpToolUtils.buildToolNamePrefix(serverSettings.getServerConfig().deviceSlug) + "get_screen_state"
             val tool = connection.listTools().getOrThrow().singleOrNull { it.name == name }
             guideRequire(tool != null) { "화면 읽기 도구가 꺼져 있어요. MCP 도구 설정을 확인해 주세요." }

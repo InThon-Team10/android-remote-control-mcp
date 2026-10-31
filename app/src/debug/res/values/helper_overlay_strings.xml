@@ -47,4 +47,6 @@
     <string name="helper_overlay_voice_processing">말씀 확인 중…</string>
     <string name="helper_overlay_preparing">안내 준비 중…</string>
     <string name="helper_overlay_submit">요청 보내기</string>
+    <string name="helper_move_up">도움 버튼 위로 이동</string>
+    <string name="helper_move_down">도움 버튼 아래로 이동</string>
 </resources>

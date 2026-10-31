@@ -12,6 +12,15 @@ class EntryCheck {
         if (!value) throw new AssertionError(label);
     }
     public static void main(String[] args) {
+        var expected = "화면 설정은 어디에 있어요?";
+        require(!HelperEntryModelKt.practiceQuestionMatches("", expected), "Empty draft blocked");
+        require(!HelperEntryModelKt.practiceQuestionMatches("화면 설정", expected), "Incomplete draft blocked");
+        require(HelperEntryModelKt.practiceQuestionMatches("화면설정은 어디에 있어요", expected), "Dictation spacing accepted");
+        require(HelperEntryModelKt.practiceQuestionMatches(expected, expected), "Typed sentence accepted");
+        require(HelperEntryModelKt.helperSetupPage(false, true, true) == HelperEntryPage.CONSENT, "Existing Android permissions cannot bypass consent");
+        require(HelperEntryModelKt.helperSetupPage(true, false, false) == HelperEntryPage.PERMISSION, "Accessibility follows consent");
+        require(HelperEntryModelKt.helperSetupPage(true, true, false) == HelperEntryPage.MICROPHONE, "Optional microphone follows accessibility");
+        require(HelperEntryModelKt.helperSetupPage(true, true, true) == HelperEntryPage.HOME, "Completed setup is not repeated");
         var intro = new HelperEntryModel();
         require(intro.getPage() == HelperEntryPage.WELCOME, "First launch welcomes");
         require(intro.advance().equals(intro), "Non-practice cannot advance");

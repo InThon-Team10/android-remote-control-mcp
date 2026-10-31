@@ -26,7 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -66,7 +66,7 @@ class HelperOverlayPreviewService :
     SavedStateRegistryOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateController = SavedStateRegistryController.create(this)
-    private val windows = mutableListOf<ComposeView>()
+    private val windows = mutableListOf<AbstractComposeView>()
     private val windowManager by lazy { getSystemService(WindowManager::class.java) }
 
     @Inject internal lateinit var assistantConnection: HelperAssistantConnection
@@ -109,7 +109,7 @@ class HelperOverlayPreviewService :
         ConsequenceGuideHost(
             this,
             ::clearWindows,
-            ::attach,
+            { params, content -> attach(params, content = content) },
             ::showBubble,
             speak = { text ->
                 speech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "consequence") == TextToSpeech.SUCCESS
@@ -318,8 +318,73 @@ class HelperOverlayPreviewService :
         val metrics = windowManager.currentWindowMetrics
         val insets = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         params.x = insets.right
-        params.y = insets.top + (metrics.bounds.height() - insets.top - insets.bottom) / 3
-        attach(params) { HelperEdgeCharacter(onExpand = { showSpeech() }) }
+        val position = getSharedPreferences("helper_overlay_position", MODE_PRIVATE)
+        val minY = insets.top
+        val maxY = (metrics.bounds.height() - insets.bottom - params.height).coerceAtLeast(minY)
+        val fraction = position.getFloat("vertical_fraction", 1f / 3f).coerceIn(0f, 1f)
+        params.y = minY + ((maxY - minY) * fraction).toInt()
+        val token = renderGeneration
+        var fingerStartY = 0f
+        var windowStartY = params.y
+
+        fun savePosition() {
+            val relative = if (maxY > minY) (params.y - minY).toFloat() / (maxY - minY) else 0f
+            position.edit().putFloat("vertical_fraction", relative).apply()
+        }
+
+        fun moveTo(y: Int) {
+            if (token != renderGeneration || expanded) return
+            val view = windows.lastOrNull() ?: return
+            if (!view.isAttachedToWindow) return
+            params.y = y.coerceIn(minY, maxY)
+            windowManager.updateViewLayout(view, params)
+        }
+        var startX = 0f
+        var dragging = false
+        val slop =
+            android.view.ViewConfiguration
+                .get(this)
+                .scaledTouchSlop
+        attach(params, onTouch = { event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    fingerStartY = event.rawY
+                    startX = event.rawX
+                    windowStartY = params.y
+                    dragging = false
+                }
+
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (kotlin.math.abs(event.rawY - fingerStartY) > slop) dragging = true
+                    if (dragging) moveTo((windowStartY + event.rawY - fingerStartY).toInt())
+                }
+
+                android.view.MotionEvent.ACTION_UP -> {
+                    if (dragging) {
+                        savePosition()
+                    } else if (kotlin.math.abs(event.rawX - startX) <= slop || event.rawX - startX < -dp(28)) {
+                        showSpeech()
+                    }
+                }
+
+                android.view.MotionEvent.ACTION_CANCEL -> {
+                    if (dragging) savePosition()
+                }
+            }
+            true
+        }) {
+            HelperEdgeCharacter(
+                onExpand = { showSpeech() },
+                onMoveUp = {
+                    moveTo(params.y - dp(80))
+                    savePosition()
+                },
+                onMoveDown = {
+                    moveTo(params.y + dp(80))
+                    savePosition()
+                },
+            )
+        }
     }
 
     @Suppress("DEPRECATION") // Service window uses resize behavior for its inline text field.
@@ -330,6 +395,22 @@ class HelperOverlayPreviewService :
         val metrics = windowManager.currentWindowMetrics
         val insets = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         val usableHeight = metrics.bounds.height() - insets.top - insets.bottom
+        if (busy) {
+            attach(
+                windowParams(
+                    metrics.bounds.width() - insets.left - insets.right,
+                    usableHeight,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                ).apply {
+                    gravity = Gravity.TOP or Gravity.LEFT
+                    x = insets.left
+                    y = insets.top
+                },
+            ) {
+                HelperThinkingOverlay(onCancel = ::showBubble)
+            }
+            return
+        }
         val targetTop = (usableHeight * 0.095f).toInt() - dp(32)
         val targetBottom = targetTop + dp(64)
         val controlsTop = helperControlsTop(usableHeight, targetTop, targetBottom, guideControlsHeight, dp(16), menuCorner >= 2)
@@ -516,15 +597,23 @@ class HelperOverlayPreviewService :
 
     private fun attach(
         params: WindowManager.LayoutParams,
+        onTouch: ((android.view.MotionEvent) -> Boolean)? = null,
         content: @Composable () -> Unit,
     ) {
         if (!overlayConnected || HelperRuntime.suppressed || paused) return
         params.setTitle(OWN_OVERLAY_ACCESSIBILITY_TITLE)
         val view =
-            ComposeView(this).apply {
+            object : AbstractComposeView(this@HelperOverlayPreviewService) {
+                @Composable
+                override fun Content() {
+                    AndroidRemoteControlMcpTheme(dynamicColor = false, content = content)
+                }
+
+                override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean =
+                    if (onTouch?.invoke(event) == true) true else super.dispatchTouchEvent(event)
+            }.apply {
                 setViewTreeLifecycleOwner(this@HelperOverlayPreviewService)
                 setViewTreeSavedStateRegistryOwner(this@HelperOverlayPreviewService)
-                setContent { AndroidRemoteControlMcpTheme(dynamicColor = false, content = content) }
             }
         try {
             windowManager.addView(view, params)

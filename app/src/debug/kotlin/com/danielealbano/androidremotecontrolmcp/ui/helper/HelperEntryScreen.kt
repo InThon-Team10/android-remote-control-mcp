@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,9 +57,22 @@ fun HelperEntryScreen(
     onPermission: () -> Unit,
     onAsk: () -> Unit,
     onHide: () -> Unit,
-    onSettings: () -> Unit,
+    onConsent: () -> Unit,
+    onMicrophone: () -> Unit,
+    onSkipMicrophone: () -> Unit,
+    setupBusy: Boolean,
+    setupError: Boolean,
     onOpenPlayground: () -> Unit,
 ) {
+    if (model.page == HelperEntryPage.PRACTICE) {
+        HelperPracticeScreen(
+            model = model,
+            onNext = { onModelChange(model.advance()) },
+            onBackToHelp = { onModelChange(model.practice()) },
+            onExit = { onModelChange(model.copy(page = HelperEntryPage.HOME)) },
+        )
+        return
+    }
     val scrollState = key(model.page, model.step) { rememberScrollState() }
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -86,14 +100,7 @@ fun HelperEntryScreen(
                     }
                 }
             }
-            if (model.page == HelperEntryPage.PRACTICE) {
-                Surface(color = MaterialTheme.colorScheme.primaryContainer) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
-                        Text(stringResource(R.string.helper_onboard_practice_notice), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.helper_onboard_practice_safety), fontSize = 18.sp)
-                    }
-                }
-            }
+
             Column(
                 Modifier
                     .weight(1f)
@@ -115,7 +122,7 @@ fun HelperEntryScreen(
                     }
 
                     HelperEntryPage.PRACTICE -> {
-                        PracticePhone(model) { onModelChange(model.advance()) }
+                        Unit
                     }
 
                     HelperEntryPage.INVITE -> {
@@ -124,6 +131,25 @@ fun HelperEntryScreen(
                         EntryBody(stringResource(R.string.helper_onboard_invite_body))
                         EntryAction(stringResource(R.string.helper_onboard_enable_yes), onEnable)
                         EntryLink(stringResource(R.string.helper_onboard_replay)) { onModelChange(model.practice()) }
+                    }
+
+                    HelperEntryPage.CONSENT -> {
+                        EntryTitle(stringResource(R.string.helper_consent_title))
+                        EntryBody(stringResource(R.string.helper_consent_body))
+                        EntryBody(stringResource(R.string.helper_consent_control))
+                        if (setupError) EntryBody(stringResource(R.string.helper_consent_error))
+                        Button(onClick = onConsent, enabled = !setupBusy, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                            Text(stringResource(R.string.helper_consent_accept), fontSize = 18.sp)
+                        }
+                        EntryLink(stringResource(R.string.helper_consent_defer)) { onModelChange(model.copy(page = HelperEntryPage.HOME)) }
+                    }
+
+                    HelperEntryPage.MICROPHONE -> {
+                        EntryTitle(stringResource(R.string.helper_mic_setup_title))
+                        EntryBody(stringResource(R.string.helper_mic_setup_body))
+                        EntryBody(stringResource(R.string.helper_voice_privacy))
+                        EntryAction(stringResource(R.string.helper_mic_setup_allow), onMicrophone)
+                        EntryLink(stringResource(R.string.helper_mic_setup_skip), onSkipMicrophone)
                     }
 
                     HelperEntryPage.PERMISSION -> {
@@ -142,19 +168,6 @@ fun HelperEntryScreen(
 
                     HelperEntryPage.HOME -> {
                         HelperHomeStatus(visible = visible)
-                        Text(
-                            if (visible) {
-                                stringResource(
-                                    R.string.helper_onboard_home_on_body,
-                                )
-                            } else {
-                                stringResource(R.string.helper_onboard_home_off_body)
-                            },
-                            fontSize = 18.sp,
-                            lineHeight = 28.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.widthIn(max = 260.dp).fillMaxWidth().align(Alignment.CenterHorizontally),
-                        )
                         EntryAction(
                             if (visible) {
                                 stringResource(
@@ -168,7 +181,7 @@ fun HelperEntryScreen(
                         if (visible) EntryLink(stringResource(R.string.helper_onboard_pause), onHide)
                         HorizontalDivider()
                         EntryLink(stringResource(R.string.helper_onboard_practice_again)) { onModelChange(model.practice()) }
-                        EntryLink(stringResource(R.string.helper_onboard_ai_settings), onSettings)
+
                         EntryLink(stringResource(R.string.helper_onboard_developer_tools), onOpenPlayground)
                     }
                 }
@@ -210,7 +223,13 @@ private fun EntryAction(
     onClick: () -> Unit,
 ) {
     Button(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), contentPadding = PaddingValues(16.dp)) {
-        Text(text, fontSize = 18.sp, lineHeight = 26.sp)
+        Text(
+            text,
+            fontSize = 18.sp,
+            lineHeight = 26.sp,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelLarge.copy(lineBreak = LineBreak.Heading),
+        )
     }
 }
 
@@ -220,105 +239,4 @@ private fun EntryLink(
     onClick: () -> Unit,
 ) {
     TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(text, fontSize = 18.sp) }
-}
-
-@Composable
-private fun PracticePhone(
-    model: HelperEntryModel,
-    onNext: () -> Unit,
-) {
-    val step = model.step
-    EntryTitle(
-        when (step) {
-            HelperPracticeStep.OPEN -> stringResource(R.string.helper_onboard_practice_open_title)
-            HelperPracticeStep.ASK -> stringResource(R.string.helper_onboard_practice_ask_title)
-            HelperPracticeStep.FOLLOW -> stringResource(R.string.helper_onboard_practice_follow_title)
-            HelperPracticeStep.DONE -> stringResource(R.string.helper_onboard_practice_done_title)
-        },
-        small = true,
-    )
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface),
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("9:41", fontSize = 18.sp, modifier = Modifier.clearAndSetSemantics {})
-                Box(Modifier.size(width = 64.dp, height = 8.dp).background(MaterialTheme.colorScheme.onSurface, RoundedCornerShape(8.dp)))
-            }
-            Text(stringResource(R.string.helper_onboard_gallery_title), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            HorizontalDivider()
-            when (step) {
-                HelperPracticeStep.OPEN -> {
-                    EntryBody(stringResource(R.string.helper_onboard_gallery_task))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        listOf(
-                            stringResource(R.string.helper_onboard_album_travel),
-                            stringResource(R.string.helper_onboard_album_daily),
-                        ).forEach { label ->
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 96.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.secondaryContainer,
-                                        RoundedCornerShape(12.dp),
-                                    ).padding(16.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(label, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                            }
-                        }
-                    }
-                    Button(onClick = onNext, modifier = Modifier.align(Alignment.End).heightIn(min = 64.dp)) {
-                        Image(painterResource(R.drawable.helper_phone_mascot), null, Modifier.size(40.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.helper_onboard_help_button), fontSize = 18.sp)
-                    }
-                }
-
-                HelperPracticeStep.ASK -> {
-                    EntryBody(stringResource(R.string.helper_onboard_question_intro))
-                    Text(
-                        stringResource(R.string.helper_onboard_sample_question),
-                        fontSize = 22.sp,
-                        lineHeight = 32.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    EntryAction(stringResource(R.string.helper_onboard_ask_sample), onNext)
-                    EntryBody(stringResource(R.string.helper_onboard_request_is_fake))
-                }
-
-                HelperPracticeStep.FOLLOW -> {
-                    EntryBody(stringResource(R.string.helper_onboard_target_hint))
-                    OutlinedButton(
-                        onClick = onNext,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
-                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-                    ) { Text(stringResource(R.string.helper_onboard_search_photos), fontSize = 20.sp) }
-                    EntryBody(stringResource(R.string.helper_onboard_user_control))
-                }
-
-                HelperPracticeStep.DONE -> {
-                    Text(
-                        stringResource(R.string.helper_onboard_practice_success),
-                        fontSize = 22.sp,
-                        lineHeight = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    EntryBody(stringResource(R.string.helper_onboard_practice_recap))
-                    EntryBody(stringResource(R.string.helper_onboard_result_is_fake))
-                    EntryAction(stringResource(R.string.helper_onboard_finish_practice), onNext)
-                }
-            }
-            Box(
-                Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 12.dp)
-                    .size(width = 88.dp, height = 4.dp)
-                    .background(MaterialTheme.colorScheme.onSurface, RoundedCornerShape(4.dp)),
-            )
-        }
-    }
 }

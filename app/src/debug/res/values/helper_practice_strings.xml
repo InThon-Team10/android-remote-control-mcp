@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="helper_practice_notice">연습 중 · 실제 앱이 아니에요</string>
+    <string name="helper_practice_exit">연습 끝내기</string>
+    <string name="helper_practice_settings">연습용 설정</string>
+    <string name="helper_practice_open_help">화면 설정이 어디 있는지, 도움 버튼을 눌러 물어보세요.</string>
+    <string name="helper_practice_request_title">콕콕이에게 물어보기</string>
+    <string name="helper_practice_question">화면 설정은 어디에 있어요?</string>
+    <string name="helper_practice_ask">질문 보내기</string>
+    <string name="helper_practice_tap_display">테두리로 표시한 ‘화면’을 눌러보세요.</string>
+    <string name="helper_practice_connections">연결</string>
+    <string name="helper_practice_connections_detail">Wi-Fi · 블루투스</string>
+    <string name="helper_practice_sound">소리 및 진동</string>
+    <string name="helper_practice_sound_detail">벨소리 · 음량 · 진동</string>
+    <string name="helper_practice_notifications">알림</string>
+    <string name="helper_practice_notifications_detail">앱 알림 · 상태 표시</string>
+    <string name="helper_practice_display">화면</string>
+    <string name="helper_practice_display_detail">밝기 · 글자 크기</string>
+    <string name="helper_practice_battery">배터리</string>
+    <string name="helper_practice_battery_detail">사용량 · 절전 모드</string>
+    <string name="helper_practice_success">화면 설정을 직접 열었어요.</string>
+    <string name="helper_practice_text_size">글자 크기</string>
+    <string name="helper_practice_text_size_detail">기본 크기</string>
+    <string name="helper_practice_brightness">밝기</string>
+    <string name="helper_practice_brightness_detail">자동 밝기</string>
+    <string name="helper_practice_complete">연습 완료</string>
+    <string name="helper_tour_progress">콕콕이와 함께 · %1$d / 4</string>
+    <string name="helper_tour_open_title">제가 필요할 땐, 이 버튼!</string>
+    <string name="helper_tour_open_body">화면 설정을 찾는 연습을 해볼까요?\n어디를 눌러야 할지 모르겠다면 저를 불러주세요.\n\n아래 밝게 보이는 ‘도움 버튼’을 눌러보세요.</string>
+    <string name="helper_tour_ask_title">잘했어요! 이제 물어볼까요?</string>
+    <string name="helper_tour_ask_body">아래 입력창에 다음 문장을 직접 써보세요.\n\n“화면 설정은 어디에 있어요?”\n\n마이크를 눌러 말로 입력할 수도 있어요. 입력된 글을 확인한 뒤 질문을 보내세요. AI에 질문을 보내지는 않는 연습이에요.</string>
+    <string name="helper_tour_follow_title">이렇게 누를 곳을 알려드려요</string>
+    <string name="helper_tour_follow_body">화면 설정은 아래 ‘화면’ 메뉴에 있어요.\n제가 테두리로 표시하면 직접 눌러 이동하면 돼요.\n\n밝게 표시된 ‘화면’을 눌러보세요.</string>
+    <string name="helper_tour_done_title">직접 찾았어요!</string>
+    <string name="helper_tour_done_body">도움 버튼으로 저를 부르고, 질문하고, 표시된 곳을 누르면 돼요.\n제가 대신 누르지 않고 어디로 갈지 알려드릴게요.\n\n연습은 여기까지예요. 실제 휴대폰 설정은 바뀌지 않았어요.</string>
+    <string name="helper_tour_input_label">질문을 입력하세요</string>
+    <string name="helper_tour_voice_start">말로 입력하기</string>
+    <string name="helper_tour_voice_stop">음성 입력 멈추기</string>
+    <string name="helper_tour_input_hint">예문을 입력하면 질문을 보낼 수 있어요. 띄어쓰기와 물음표는 달라도 괜찮아요.</string>
+    <string name="helper_tour_input_ready">잘 입력했어요! 질문 보내기를 눌러보세요.</string>
+</resources>

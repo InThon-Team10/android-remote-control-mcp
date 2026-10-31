@@ -25,9 +25,7 @@
     <string name="helper_onboard_home_off_title">필요할 때\n콕콕이를 불러 주세요</string>
     <string name="helper_onboard_status_on">도움 버튼이 켜져 있어요</string>
     <string name="helper_onboard_status_off">도움 버튼이 꺼져 있어요</string>
-    <string name="helper_onboard_home_on_body">화면 옆의 도움 버튼을 눌러 궁금한 것을 물어보세요.</string>
-    <string name="helper_onboard_home_off_body">도움 버튼을 켜면 다른 앱에서도 콕콕이를 부를 수 있어요.</string>
-    <string name="helper_onboard_ask">콕콕이에게 물어보기</string>
+    <string name="helper_onboard_ask">물어보기</string>
     <string name="helper_onboard_enable_home">도움 버튼 켜기</string>
     <string name="helper_onboard_pause">도움 버튼 잠시 끄기</string>
     <string name="helper_onboard_practice_again">사용법 다시 연습하기</string>
@@ -53,4 +51,14 @@
     <string name="helper_onboard_practice_recap">도움 버튼 누르기 → 물어보기 → 안내에 따라 직접 누르기</string>
     <string name="helper_onboard_result_is_fake">지금 찾은 사진도 연습용이에요.</string>
     <string name="helper_onboard_finish_practice">연습 마치기</string>
+    <string name="helper_consent_title">안내를 받기 전에\n확인해 주세요</string>
+    <string name="helper_consent_body">질문을 보내면 질문과 현재 화면의 글자·버튼 이름·위치가 Google Gemini로 전송돼요. 화면에 개인정보가 있으면 함께 전송될 수 있어요. 스크린샷은 보내지 않아요.</string>
+    <string name="helper_consent_control">콕콕이는 누를 곳을 알려주고, 선택은 내가 직접 해요. 동의하지 않아도 사용법 연습은 할 수 있어요.</string>
+    <string name="helper_consent_accept">화면 정보 전송에 동의하고 계속</string>
+    <string name="helper_consent_defer">동의하지 않고 나중에 하기</string>
+    <string name="helper_consent_error">동의를 저장하지 못했어요. 다시 시도해 주세요.</string>
+    <string name="helper_mic_setup_title">말로도 물어볼까요?</string>
+    <string name="helper_mic_setup_body">마이크는 선택 사항이에요. 허용해도 마이크 버튼을 눌렀을 때만 듣기 시작해요. 허용하지 않아도 글로 질문할 수 있어요.</string>
+    <string name="helper_mic_setup_allow">마이크 허용하기</string>
+    <string name="helper_mic_setup_skip">글로 입력하며 시작하기</string>
 </resources>

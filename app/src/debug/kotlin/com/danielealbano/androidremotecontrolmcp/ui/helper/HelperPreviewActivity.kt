@@ -42,18 +42,29 @@ import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 
 /** Debug-only launcher. No microphone, network or accessibility actions are performed. */
+@dagger.hilt.android.AndroidEntryPoint
 class HelperPreviewActivity : ComponentActivity() {
+    @javax.inject.Inject lateinit var assistantSettings: com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             AndroidRemoteControlMcpTheme(dynamicColor = false) {
+                var thinkingPreview by rememberSaveable { mutableStateOf(intent.getBooleanExtra("preview_thinking", false)) }
+                if (thinkingPreview) {
+                    BackHandler { thinkingPreview = false }
+                    Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                        HelperThinkingOverlay(onCancel = { thinkingPreview = false })
+                    }
+                    return@AndroidRemoteControlMcpTheme
+                }
                 var playground by rememberSaveable { mutableStateOf(false) }
                 BackHandler(enabled = playground) { playground = false }
                 if (playground) {
                     HelperPlayground()
                 } else {
-                    HelperEntryPreview(onOpenPlayground = { playground = true })
+                    HelperEntryPreview(settings = assistantSettings, onOpenPlayground = { playground = true })
                 }
             }
         }

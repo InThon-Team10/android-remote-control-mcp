@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="helper_thinking_title">콕콕이가 생각 중이에요</string>
+    <string name="helper_thinking_body">지금 화면을 살펴보고\n어디를 누를지 찾고 있어요.</string>
+    <string name="helper_thinking_cancel">생각을 끝내고 도움 버튼으로</string>
+</resources>

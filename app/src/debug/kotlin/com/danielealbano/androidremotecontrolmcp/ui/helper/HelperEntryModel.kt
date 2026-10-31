@@ -1,7 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
 /** Practice navigation cannot grant permissions, start services, or send requests. */
-enum class HelperEntryPage { WELCOME, PRACTICE, INVITE, PERMISSION, HOME }
+enum class HelperEntryPage { WELCOME, PRACTICE, INVITE, CONSENT, PERMISSION, MICROPHONE, HOME }
 
 enum class HelperPracticeStep { OPEN, ASK, FOLLOW, DONE }
 
@@ -23,3 +23,22 @@ data class HelperEntryModel(
             }
         }
 }
+
+/** Ignore spacing and punctuation differences from dictation, but require the practice sentence. */
+internal fun practiceQuestionMatches(
+    draft: String,
+    expected: String,
+): Boolean =
+    draft.filter { it.isLetterOrDigit() }.let { it.isNotEmpty() && it == expected.filter { character -> character.isLetterOrDigit() } }
+
+internal fun helperSetupPage(
+    consented: Boolean,
+    accessible: Boolean,
+    microphoneDecided: Boolean,
+): HelperEntryPage =
+    when {
+        !consented -> HelperEntryPage.CONSENT
+        !accessible -> HelperEntryPage.PERMISSION
+        !microphoneDecided -> HelperEntryPage.MICROPHONE
+        else -> HelperEntryPage.HOME
+    }

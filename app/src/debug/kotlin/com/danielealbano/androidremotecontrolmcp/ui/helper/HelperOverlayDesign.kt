@@ -63,8 +63,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -78,7 +80,13 @@ import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMc
 import com.danielealbano.androidremotecontrolmcp.ui.theme.LightColorScheme
 
 @Composable
-internal fun HelperEdgeCharacter(onExpand: () -> Unit) {
+internal fun HelperEdgeCharacter(
+    onExpand: () -> Unit,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
+) {
+    val upLabel = stringResource(R.string.helper_move_up)
+    val downLabel = stringResource(R.string.helper_move_down)
     val threshold = with(LocalDensity.current) { 28.dp.toPx() }
     Surface(
         onClick = onExpand,
@@ -89,8 +97,22 @@ internal fun HelperEdgeCharacter(onExpand: () -> Unit) {
             Modifier
                 .padding(6.dp)
                 .size(width = 64.dp, height = 80.dp)
-                .semantics { role = Role.Button }
-                .pointerInput(onExpand) {
+                .semantics {
+                    role = Role.Button
+                    if (onMoveUp != null && onMoveDown != null) {
+                        customActions =
+                            listOf(
+                                CustomAccessibilityAction(upLabel) {
+                                    onMoveUp()
+                                    true
+                                },
+                                CustomAccessibilityAction(downLabel) {
+                                    onMoveDown()
+                                    true
+                                },
+                            )
+                    }
+                }.pointerInput(onExpand) {
                     var distance = 0f
                     detectHorizontalDragGestures(
                         onDragStart = { distance = 0f },
@@ -108,7 +130,10 @@ internal fun HelperEdgeCharacter(onExpand: () -> Unit) {
             verticalArrangement = Arrangement.Center,
         ) {
             CharacterFace()
-            Text(stringResource(R.string.helper_overlay_help), style = MaterialTheme.typography.labelLarge)
+            Text(
+                stringResource(R.string.helper_overlay_help),
+                style = MaterialTheme.typography.labelLarge,
+            )
         }
     }
 }
@@ -133,6 +158,7 @@ internal fun HelperOverlaySpeech(
     isRecognizing: Boolean = false,
     voiceStatus: String? = null,
     onVoiceToggle: () -> Unit = {},
+    submitAllowed: Boolean = true,
 ) {
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -247,7 +273,7 @@ internal fun HelperOverlaySpeech(
                 keyboard?.hide()
                 if (isConsequenceTestRequest(request)) onTest() else onSubmit()
             },
-            enabled = request.isNotBlank() && !busy && !isRecognizing && !isListening,
+            enabled = submitAllowed && request.isNotBlank() && !busy && !isRecognizing && !isListening,
             colors =
                 ButtonDefaults.buttonColors(
                     disabledContainerColor = LightColorScheme.surfaceVariant,
@@ -353,7 +379,7 @@ private fun HelperAnchoredCaption(
                     color = LightColorScheme.surface,
                     contentColor = LightColorScheme.onSurface,
                     shape = RoundedCornerShape(24.dp),
-                    shadowElevation = 0.dp,
+                    shadowElevation = 6.dp,
                 ) {
                     Text(
                         instruction,
@@ -489,7 +515,7 @@ private fun HelperOverlayTextButton(
         shape = RoundedCornerShape(24.dp),
         color = LightColorScheme.surface,
         contentColor = LightColorScheme.onSurface,
-        shadowElevation = 0.dp,
+        shadowElevation = 6.dp,
         modifier = modifier.heightIn(min = 56.dp).semantics { role = Role.Button },
     ) {
         Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
@@ -554,5 +580,5 @@ private fun OverlaySpeechPreview() {
 @Preview(name = "Edge character", showBackground = true, locale = "ko")
 @Composable
 private fun EdgeCharacterPreview() {
-    AndroidRemoteControlMcpTheme(dynamicColor = false) { HelperEdgeCharacter {} }
+    AndroidRemoteControlMcpTheme(dynamicColor = false) { HelperEdgeCharacter(onExpand = {}) }
 }
