@@ -495,6 +495,43 @@ class StorageLocationProviderTest {
             }
 
         @Test
+        fun `addLocation does not split a surrogate pair when truncating description`() =
+            runTest {
+                // Arrange: an emoji (surrogate pair) straddles the truncation boundary
+                val description =
+                    "A".repeat(StorageLocationProvider.MAX_DESCRIPTION_LENGTH - 1) + "😀" + "tail"
+                val mockTreeUri = mockk<Uri>()
+                every { mockTreeUri.scheme } returns "content"
+                every { mockTreeUri.authority } returns "com.test.provider"
+                every { mockTreeUri.toString() } returns
+                    "content://com.test.provider/tree/primary%3ADocuments"
+                every { DocumentsContract.isTreeUri(mockTreeUri) } returns true
+                every {
+                    DocumentsContract.getTreeDocumentId(mockTreeUri)
+                } returns "primary:Documents"
+                every {
+                    mockContentResolver.takePersistableUriPermission(any(), any())
+                } just Runs
+                val mockDocFile = mockk<DocumentFile>()
+                every { DocumentFile.fromTreeUri(mockContext, mockTreeUri) } returns mockDocFile
+                every { mockDocFile.name } returns "Documents"
+                coEvery { mockSettingsRepository.getStoredLocations() } returns emptyList()
+                coEvery { mockSettingsRepository.addStoredLocation(any()) } just Runs
+
+                // Act
+                provider.addLocation(mockTreeUri, description)
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.addStoredLocation(
+                        match { stored ->
+                            stored.description == "A".repeat(StorageLocationProvider.MAX_DESCRIPTION_LENGTH - 1)
+                        },
+                    )
+                }
+            }
+
+        @Test
         fun `addLocation rejects non-content URI scheme`() =
             runTest {
                 // Arrange
@@ -725,6 +762,28 @@ class StorageLocationProviderTest {
                 // Assert
                 coVerify {
                     mockSettingsRepository.updateLocationDescription(locationId, newDescription)
+                }
+            }
+
+        @Test
+        fun `updateLocationDescription does not split a surrogate pair when truncating`() =
+            runTest {
+                // Arrange: an emoji (surrogate pair) straddles the truncation boundary
+                val description =
+                    "A".repeat(StorageLocationProvider.MAX_DESCRIPTION_LENGTH - 1) + "😀" + "tail"
+                coEvery {
+                    mockSettingsRepository.updateLocationDescription(any(), any())
+                } just Runs
+
+                // Act
+                provider.updateLocationDescription("loc", description)
+
+                // Assert
+                coVerify {
+                    mockSettingsRepository.updateLocationDescription(
+                        "loc",
+                        "A".repeat(StorageLocationProvider.MAX_DESCRIPTION_LENGTH - 1),
+                    )
                 }
             }
 
