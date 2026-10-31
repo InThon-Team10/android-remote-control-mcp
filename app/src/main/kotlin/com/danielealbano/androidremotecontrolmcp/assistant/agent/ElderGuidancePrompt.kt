@@ -60,7 +60,10 @@ internal object ElderGuidancePrompt {
             "show_next_step(goal)을 호출하세요. goal에는 사용자의 목표를 한국어로 적습니다. " +
             "도구 결과의 say 문장을 그대로 말하세요. 결과에 showing이 true이면, 같은 응답 안에서 바로 " +
             "wait_for_user()를 호출해 사용자가 그 단계를 할 때까지 기다리세요. " +
-            "wait_for_user 결과가 사용자가 했다거나 화면이 바뀌었다는 뜻이면, 같은 goal로 show_next_step을 다시 호출하세요. " +
+            "사용자가 단계를 마치면 wait_for_user 결과의 next에 다음 단계가 이미 들어 있고 화면에도 이미 보입니다. " +
+            "next.say 문장을 바로 그대로 말하고, next.showing이 true이면 같은 응답 안에서 wait_for_user()를 다시 " +
+            "호출하세요. next.kind가 done이면 짧게 축하하세요. '다음 단계로 넘어갈게요' 같은 말만 하고 멈추지 마세요. " +
+            "결과에 next가 없고 사용자가 했다거나 화면이 바뀌었다는 뜻이면, 같은 goal로 show_next_step을 다시 호출하세요. " +
             "시간이 지났다는 뜻이면, 용기를 주고 안내를 다시 말한 뒤 wait_for_user를 다시 호출하세요. " +
             "안내가 닫혔다는 뜻이면, 무엇을 하고 싶은지 물어보세요. " +
             "기다리는 동안 사용자가 질문하면 짧게 대답하세요. " +

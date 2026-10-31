@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.assistant.guide
 
+import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.AgentFailure
@@ -13,6 +14,7 @@ import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiToolOutpu
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.toMcpFailure
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
 import com.danielealbano.androidremotecontrolmcp.assistant.openai.OpenAiResponsesGateway
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.VOICE_TRACE
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
@@ -133,11 +135,15 @@ class GuideStepsImpl
             run: Run,
             input: MutableList<ResponseInputItem>,
         ): GuideStepResult {
-            repeat(MAX_PLANNER_CALLS) {
+            repeat(MAX_PLANNER_CALLS) { index ->
                 val params = OpenAiRequestFactory.params(run.model, GuidePlannerPrompt.TEXT, run.tools, input)
+                val startedNs = System.nanoTime()
                 val response = gateway.create(run.apiKey, params)
                 input += OpenAiResponseReader.inputItems(response)
                 val calls = OpenAiResponseReader.functionCalls(response)
+                val tookMs = (System.nanoTime() - startedNs) / NANOS_PER_MS
+                val chose = calls.firstOrNull()?.name()?.removePrefix(run.prefix) ?: "text"
+                Log.d(VOICE_TRACE, "planner call ${index + 1} took $tookMs ms -> $chose")
                 val handled =
                     if (calls.isEmpty()) {
                         Handled(GuidePlainReply.parse(OpenAiResponseReader.texts(response).joinToString("\n")))
@@ -245,6 +251,7 @@ class GuideStepsImpl
 
         private companion object {
             const val MAX_PLANNER_CALLS = 6
+            const val NANOS_PER_MS = 1_000_000L
             const val EXTRA_CALL_MESSAGE = "Only one tool call per step: this one was not run."
             const val LIMIT_SENTENCE = "지금 화면에서 다음 단계를 찾지 못했어요. 지금 보이는 화면을 말씀해 주시겠어요?"
         }
