@@ -68,7 +68,7 @@ class StorageLocationProviderImpl
             }
 
             // Validate description length
-            val trimmedDescription = description.take(StorageLocationProvider.MAX_DESCRIPTION_LENGTH)
+            val trimmedDescription = truncateDescription(description)
 
             // Defense-in-depth duplicate check
             check(!isDuplicateTreeUri(treeUri)) {
@@ -138,7 +138,7 @@ class StorageLocationProviderImpl
             locationId: String,
             description: String,
         ) {
-            val trimmedDescription = description.take(StorageLocationProvider.MAX_DESCRIPTION_LENGTH)
+            val trimmedDescription = truncateDescription(description)
             settingsRepository.updateLocationDescription(locationId, trimmedDescription)
             Log.i(TAG, "Updated description for location: $locationId")
         }
@@ -374,6 +374,14 @@ class StorageLocationProviderImpl
             private const val TAG = "MCP:StorageProvider"
             private const val MAX_LOCATION_ID_LOG_LENGTH = 200
             private val CONTROL_CHAR_REGEX = Regex("[\\p{Cntrl}]")
+
+            /** Truncates [description] to the maximum length without leaving half of a surrogate pair at the end. */
+            private fun truncateDescription(description: String): String {
+                val truncated = description.take(StorageLocationProvider.MAX_DESCRIPTION_LENGTH)
+                val cutShort = truncated.length < description.length
+                val splitsPair = cutShort && truncated.lastOrNull()?.isHighSurrogate() == true
+                return if (splitsPair) truncated.dropLast(1) else truncated
+            }
 
             private fun sanitizeLocationId(locationId: String): String =
                 locationId.take(MAX_LOCATION_ID_LOG_LENGTH).replace(CONTROL_CHAR_REGEX, "")

@@ -25,9 +25,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
@@ -122,13 +119,7 @@ class SetClipboardTool
     ) {
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val text =
-                arguments
-                    ?.get("text")
-                    ?.jsonPrimitive
-                    ?.contentOrNull
-                    ?.let { substitutor.substitute(it) }
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'text'")
+            val text = substitutor.substitute(McpToolUtils.requireString(arguments, "text"))
 
             val context =
                 accessibilityServiceProvider.getContext()
@@ -215,13 +206,8 @@ class WaitForNodeTool
         )
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // Validate parameters
-            val byStr =
-                arguments?.get("by")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'by'")
-
-            val rawValue =
-                arguments["value"]?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'value'")
+            val byStr = McpToolUtils.requireString(arguments, "by")
+            val rawValue = McpToolUtils.requireString(arguments, "value")
 
             if (rawValue.isEmpty()) {
                 throw McpToolException.InvalidParams("Parameter 'value' must be non-empty")
@@ -236,9 +222,7 @@ class WaitForNodeTool
                         "Invalid 'by' value: '$byStr'. Must be one of: text, content_desc, resource_id, class_name",
                     )
 
-            val timeout =
-                arguments["timeout"]?.jsonPrimitive?.longOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'timeout'")
+            val timeout = McpToolUtils.requireLong(arguments, "timeout")
             if (timeout <= 0 || timeout > MAX_TIMEOUT_MS) {
                 throw McpToolException.InvalidParams(
                     "Timeout must be between 1 and $MAX_TIMEOUT_MS ms, got: $timeout",
@@ -523,9 +507,7 @@ class WaitForIdleTool
             "LongMethod",
         )
         suspend fun execute(arguments: JsonObject?): CallToolResult {
-            val timeout =
-                arguments?.get("timeout")?.jsonPrimitive?.longOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'timeout'")
+            val timeout = McpToolUtils.requireLong(arguments, "timeout")
             if (timeout <= 0 || timeout > MAX_TIMEOUT_MS) {
                 throw McpToolException.InvalidParams(
                     "Timeout must be between 1 and $MAX_TIMEOUT_MS ms, got: $timeout",
@@ -830,6 +812,9 @@ fun registerUtilityTools(
     toolNamePrefix: String,
     perms: ToolPermissionsConfig,
 ) {
+    if (perms.isToolEnabled(GetAccessibilityStatusTool.TOOL_NAME)) {
+        GetAccessibilityStatusTool(accessibilityServiceProvider).register(registrar, toolNamePrefix)
+    }
     if (perms.isToolEnabled(GetClipboardTool.TOOL_NAME)) {
         GetClipboardTool(accessibilityServiceProvider, privacyToolGate).register(registrar, toolNamePrefix)
     }

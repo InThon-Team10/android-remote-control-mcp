@@ -1896,6 +1896,26 @@ class SettingsRepositoryImplTest {
                 assertTrue(repository.validatePublicUrlOverride("ftp://host.example").isFailure)
                 assertTrue(repository.validatePublicUrlOverride("not a url").isFailure)
             }
+
+        @Test
+        fun `validatePublicUrlOverride rejects urls without a host, with a bad port, query or fragment`() {
+            val rejected =
+                listOf(
+                    "http://",
+                    "https://",
+                    "http:foo",
+                    "http:///path",
+                    "https://host.example:99999",
+                    "https://host.example?x=1",
+                    "https://host.example#frag",
+                )
+
+            rejected.forEach { url ->
+                assertTrue(repository.validatePublicUrlOverride(url).isFailure, "should reject '$url'")
+            }
+            assertTrue(repository.validatePublicUrlOverride("https://host.example:8443").isSuccess)
+            assertTrue(repository.validatePublicUrlOverride("http://[::1]:8080").isSuccess)
+        }
     }
 
     @Nested

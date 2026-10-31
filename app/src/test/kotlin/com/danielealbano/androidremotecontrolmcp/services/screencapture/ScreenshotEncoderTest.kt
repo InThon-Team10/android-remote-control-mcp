@@ -365,6 +365,22 @@ class ScreenshotEncoderTest {
         }
 
         @Test
+        @DisplayName("constraining side lands exactly on the bound despite float rounding")
+        fun constrainingSideLandsExactlyOnBound() {
+            val bitmap =
+                mockk<Bitmap>(relaxed = true) {
+                    every { width } returns 100
+                    every { height } returns 1248
+                }
+            val scaledBitmap = mockk<Bitmap>(relaxed = true)
+            // 700 / 1248f * 1248 evaluates to 699.99994 in Float; the height must still be exactly 700
+            every { Bitmap.createScaledBitmap(bitmap, 56, 700, true) } returns scaledBitmap
+
+            val result = encoder.resizeBitmapProportional(bitmap, 700, 700)
+            assertSame(scaledBitmap, result)
+        }
+
+        @Test
         @DisplayName("scales to exact height with proportional width when only maxHeight specified")
         fun scalesToHeightOnly() {
             val bitmap =

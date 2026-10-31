@@ -42,11 +42,7 @@ fun consentPageHtml(data: ConsentPageData): String {
     val safeCode = escapeHtml(data.matchCode)
     val initials =
         escapeHtml(
-            data.clientName
-                .trim()
-                .take(2)
-                .uppercase()
-                .ifEmpty { "?" },
+            clientInitials(data.clientName).ifEmpty { "?" },
         )
     val iconTag =
         data.iconUrl?.let { """<img class="icon" src="${escapeHtml(it)}" alt="" onerror="this.remove()">""" } ?: ""

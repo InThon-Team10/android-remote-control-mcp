@@ -6,9 +6,13 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.GestureP
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonUnquotedLiteral
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -563,6 +567,56 @@ class GestureToolsTest {
                     }
                 assertTrue(exception.message!!.contains("time"))
                 assertTrue(exception.message!!.contains(">= 0"))
+            }
+
+        @Test
+        @DisplayName("custom gesture with time that rounds up to 2^63 returns invalid params")
+        fun customGestureWithTimeAtLongOverflowReturnsInvalidParams() =
+            runTest {
+                val params = twoPointGestureParams(JsonUnquotedLiteral("9223372036854775808"))
+
+                assertThrows<McpToolException.InvalidParams> {
+                    tool.execute(params)
+                }
+            }
+
+        @Test
+        @DisplayName("custom gesture keeps full precision for time above 2^53")
+        fun customGestureKeepsTimePrecisionAboveTwoPow53() =
+            runTest {
+                val captured = slot<List<List<GesturePoint>>>()
+                coEvery { actionExecutor.customGesture(capture(captured)) } returns Result.success(Unit)
+
+                tool.execute(twoPointGestureParams(JsonUnquotedLiteral("9007199254740993")))
+
+                assertEquals(9007199254740993L, captured.captured[0][1].time)
+            }
+
+        private fun twoPointGestureParams(endTime: JsonElement): JsonObject =
+            buildJsonObject {
+                put(
+                    "paths",
+                    buildJsonArray {
+                        add(
+                            buildJsonArray {
+                                add(
+                                    buildJsonObject {
+                                        put("x", 100)
+                                        put("y", 100)
+                                        put("time", 0)
+                                    },
+                                )
+                                add(
+                                    buildJsonObject {
+                                        put("x", 200)
+                                        put("y", 200)
+                                        put("time", endTime)
+                                    },
+                                )
+                            },
+                        )
+                    },
+                )
             }
 
         @Test

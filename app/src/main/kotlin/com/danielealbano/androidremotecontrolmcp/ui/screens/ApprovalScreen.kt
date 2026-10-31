@@ -60,6 +60,7 @@ import com.danielealbano.androidremotecontrolmcp.geo.CountryDisplay
 import com.danielealbano.androidremotecontrolmcp.geo.GeoLocation
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.ClientIconUrl
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.PendingApproval
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.clientInitials
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.ApprovalViewModel
 import kotlinx.coroutines.delay
@@ -229,11 +230,7 @@ private fun ClientIcon(
 ) {
     val context = LocalContext.current
     val initials =
-        approval.clientName
-            .trim()
-            .take(2)
-            .uppercase()
-            .ifEmpty { "?" }
+        clientInitials(approval.clientName).ifEmpty { "?" }
     val iconUrl = ClientIconUrl.resolve(approval.logoUri, approval.redirectHost)
 
     // Decorative: the client's name is read next to it

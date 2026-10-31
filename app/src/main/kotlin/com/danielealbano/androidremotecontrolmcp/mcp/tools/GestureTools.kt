@@ -323,8 +323,10 @@ class CustomGestureTool
                         "Field '$field' in point at path[$pathIndex][$pointIndex] must be a number, " +
                             "got: '${primitive.content}'",
                     )
-            val longVal = doubleVal.toLong()
-            if (doubleVal != longVal.toDouble()) {
+            val literalVal = primitive.content.toLongOrNull()
+            val longVal = literalVal ?: doubleVal.toLong()
+            val exceedsLong = literalVal == null && (doubleVal >= LONG_RANGE_LIMIT || doubleVal < -LONG_RANGE_LIMIT)
+            if (exceedsLong || doubleVal != longVal.toDouble()) {
                 throw McpToolException.InvalidParams(
                     "Field '$field' in point at path[$pathIndex][$pointIndex] must be an integer, " +
                         "got: '${primitive.content}'",
@@ -388,6 +390,7 @@ class CustomGestureTool
             private const val MIN_POINTS_PER_PATH = 2
             private const val MAX_PATHS = 10
             private const val MAX_POINTS_PER_PATH = 100
+            private const val LONG_RANGE_LIMIT = 9.223372036854775807E18
         }
     }
 

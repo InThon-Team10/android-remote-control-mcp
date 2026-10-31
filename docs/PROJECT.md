@@ -204,7 +204,7 @@ Tool errors are returned as `CallToolResult(isError = true)` with an error messa
 
 ## MCP Tools Specification
 
-The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
+The MCP server exposes 59 tools across 14 categories. For full JSON-RPC schemas, detailed usage examples, and implementation notes, see [MCP_TOOLS.md](MCP_TOOLS.md).
 
 > **Tool Naming Convention**: All tool names are prefixed with `android_` by default (e.g., `android_tap`, `android_find_nodes`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`). See [MCP_TOOLS.md](MCP_TOOLS.md) for details.
 
@@ -273,10 +273,11 @@ The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas,
 | `android_pinch` | Pinch-to-zoom gesture | `center_x` (number), `center_y` (number), `scale` (number: >1 zoom in, <1 zoom out) | `duration` (number, ms, default 300) |
 | `android_custom_gesture` | Multi-touch gesture from path points | `paths` (array of arrays of {x, y, time} objects) | — |
 
-### 7. Utility Tools (5 tools)
+### 7. Utility Tools (6 tools)
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
+| `android_get_accessibility_status` | Diagnose accessibility enablement, connection, capabilities and windows | — | — |
 | `android_get_clipboard` | Get current clipboard content | — | — |
 | `android_set_clipboard` | Set clipboard content | `text` (string) | — |
 | `android_wait_for_node` | Wait until node appears | `by` (string), `value` (string), `timeout` (number, ms, 1-30000) | — |
@@ -728,7 +729,7 @@ MCP tools return data originating from the Android device (UI element text, cont
 - **File Size Limit**: 50 MB (range 1-500 MB, configurable via UI, applies to all file operations)
 - **Allow HTTP Downloads**: Disabled (must be explicitly enabled to allow non-HTTPS downloads)
 - **Allow Unverified HTTPS Certificates**: Disabled (must be explicitly enabled to accept self-signed/invalid certs for downloads)
-- **Block Local Network Downloads**: Disabled (when enabled, `android_download_from_url` refuses to connect to loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including IPv4-mapped/compatible IPv6 forms; checked on the real address of every connection, redirects included; while it is on downloads connect directly, never through a system proxy, so the real address is always the one checked; affects no other feature)
+- **Block Local Network Downloads**: Disabled (when enabled, `android_download_from_url` refuses to connect to loopback, unspecified, private LAN, link-local, CGNAT/Tailscale, 192.0.0.0/24 and IPv6 unique-local/site-local addresses, including IPv4-mapped/compatible IPv6 forms; checked on the real address of every connection, redirects included; while it is on downloads connect directly, never through a system proxy, so the real address is always the one checked; affects no other feature)
 - **Download Timeout**: 60 seconds (range 10-300 seconds, configurable via UI)
 - **Device Slug** (`String`, default: `""`): Optional device identifier used as part of the MCP tool name prefix. When empty, tools use the `android_` prefix. When set (e.g., `pixel7`), tools use `android_pixel7_` prefix. Valid characters: letters (a-z, A-Z), digits (0-9), underscores (_). Maximum length: 20 characters.
 
@@ -831,7 +832,7 @@ All common development tasks are accessible via `make <target>`. Run `make help`
 
 - **[TOOLS.md](TOOLS.md)** — Git branching conventions, commit format, PR creation, GitHub CLI commands, and local CI testing with `act`
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed application architecture: component interactions, service lifecycle diagrams, threading model, inter-service communication patterns
-- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 58 tools
+- **[MCP_TOOLS.md](MCP_TOOLS.md)** — Full MCP tools documentation with JSON-RPC schemas, usage examples, error codes, and implementation notes for all 59 tools
 
 ---
 

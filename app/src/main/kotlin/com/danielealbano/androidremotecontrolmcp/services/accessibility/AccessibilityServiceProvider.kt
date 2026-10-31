@@ -23,6 +23,9 @@ interface AccessibilityServiceProvider {
 
     fun isReady(): Boolean
 
+    /** Reads service diagnostics on the main thread, including when accessibility is disabled. */
+    suspend fun getStatus(): AccessibilityServiceStatus
+
     fun getContext(): Context?
 
     /**

@@ -126,23 +126,7 @@ internal object McpToolUtils {
                 "Parameter '$name' must be a number, got string: '${primitive.content}'",
             )
         }
-        val doubleVal =
-            primitive.content.toDoubleOrNull()
-                ?: throw McpToolException.InvalidParams(
-                    "Parameter '$name' must be a number, got: '${primitive.content}'",
-                )
-        if (doubleVal < Long.MIN_VALUE.toDouble() || doubleVal > Long.MAX_VALUE.toDouble()) {
-            throw McpToolException.InvalidParams(
-                "Parameter '$name' value exceeds long range",
-            )
-        }
-        val longVal = primitive.content.toLongOrNull() ?: doubleVal.toLong()
-        if (doubleVal != longVal.toDouble()) {
-            throw McpToolException.InvalidParams(
-                "Parameter '$name' must be an integer, got: '${primitive.content}'",
-            )
-        }
-        return longVal
+        return parseExactLong(primitive.content, name)
     }
 
     /**
@@ -207,18 +191,31 @@ internal object McpToolUtils {
                 "Parameter '$name' must be a number, got string: '${primitive.content}'",
             )
         }
-        val doubleVal =
-            primitive.content.toDoubleOrNull()
-                ?: throw McpToolException.InvalidParams(
-                    "Parameter '$name' must be a number, got: '${primitive.content}'",
-                )
-        val longVal = primitive.content.toLongOrNull() ?: doubleVal.toLong()
-        if (doubleVal != longVal.toDouble()) {
+        return parseExactLong(primitive.content, name)
+    }
+
+    /**
+     * Parses [content] as an exact [Long] without any rounding or saturation.
+     * Integer-valued floats (e.g. `5.0`) are accepted.
+     */
+    private fun parseExactLong(
+        content: String,
+        name: String,
+    ): Long {
+        content.toLongOrNull()?.let { return it }
+        val finite = content.toDoubleOrNull()?.takeIf { it.isFinite() }
+        if (finite == null) {
             throw McpToolException.InvalidParams(
-                "Parameter '$name' must be an integer, got: '${primitive.content}'",
+                "Parameter '$name' must be a finite number, got: '$content'",
             )
         }
-        return longVal
+        return try {
+            java.math.BigDecimal(content).longValueExact()
+        } catch (_: ArithmeticException) {
+            throw McpToolException.InvalidParams(
+                "Parameter '$name' must be an integer within the long range, got: '$content'",
+            )
+        }
     }
 
     /**

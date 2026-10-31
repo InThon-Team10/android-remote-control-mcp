@@ -327,5 +327,25 @@ class NodeTargetResolverTest {
                 assertTrue(text.contains("\"$shortened\""), text)
                 assertFalse(text.contains(long), text)
             }
+
+        @Test
+        fun `shortening candidate texts does not split a surrogate pair`() =
+            runTest {
+                val emoji = "😀"
+                val long = "x".repeat(CompactTreeFormatter.MAX_TEXT_LENGTH - 1) + emoji + "tail"
+                val withLongText =
+                    listOf(
+                        WindowData(
+                            windowId = 0,
+                            windowType = "APPLICATION",
+                            tree = node("node_root", children = listOf(node("node_1", long), node("node_2", long))),
+                        ),
+                    )
+
+                val resolution = resolver.resolve(selector("x", exactMatch = false), withLongText)
+
+                val text = ((resolution as NodeResolution.Ambiguous).result.content.single() as TextContent).text
+                assertFalse(text.any { it.isHighSurrogate() }, text)
+            }
     }
 }

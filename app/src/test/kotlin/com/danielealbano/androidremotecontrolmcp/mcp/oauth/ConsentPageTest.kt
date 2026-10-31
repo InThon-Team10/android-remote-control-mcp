@@ -15,6 +15,15 @@ class ConsentPageTest {
     ) = ConsentPageData("approval-id", "42", clientName, host, expiresInSeconds, iconUrl)
 
     @Test
+    @DisplayName("monogram does not split a surrogate pair in the client name")
+    fun monogramKeepsSurrogatePair() {
+        val html = consentPageHtml(data(clientName = "A😀B"))
+        val avatar = html.substringAfter("<div class=\"avatar\">").substringBefore("</div>")
+        assertTrue(avatar.startsWith("A😀"), "monogram must keep the whole emoji")
+        assertFalse(avatar.contains("A\uD83D<"), "monogram must not end in a lone high surrogate")
+    }
+
+    @Test
     @DisplayName("escapes a malicious client name")
     fun escapesClientName() {
         val html = consentPageHtml(data(clientName = "<script>alert(1)</script>"))

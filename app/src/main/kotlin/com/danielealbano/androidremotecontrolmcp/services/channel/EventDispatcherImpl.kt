@@ -73,7 +73,8 @@ class EventDispatcherImpl
             endpointUrl: String,
             authToken: String,
         ) {
-            this.endpointUrl = endpointUrl
+            // A trailing slash would otherwise produce "//event", which strict receivers answer with 404
+            this.endpointUrl = endpointUrl.trimEnd('/')
             this.authToken = authToken
             // No Logging plugin installed — it would expose the auth token in logs
             client =

@@ -294,14 +294,21 @@ class FileOperationProviderImpl
                     return@withContext FileReplaceResult(replacementCount = 0)
                 }
 
+                val replacementCount = if (replaceAll) occurrences else 1
+                requireReplacedSizeWithinLimit(
+                    documentFile.length(),
+                    replacementCount,
+                    oldString,
+                    newString,
+                    settingsRepository.getServerConfig(),
+                )
+
                 val modifiedContent =
                     if (replaceAll) {
                         originalContent.replace(oldString, newString)
                     } else {
                         originalContent.replaceFirst(oldString, newString)
                     }
-
-                val replacementCount = if (replaceAll) occurrences else 1
 
                 // Try to acquire advisory lock, then write back
                 writeWithOptionalLock(documentFile.uri, modifiedContent)
@@ -405,7 +412,7 @@ class FileOperationProviderImpl
                             throw e
                         }
 
-                        Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
+                        Log.i(TAG, downloadLogMessage(totalBytesWritten, parsedUrl, "$locationId/$path"))
                         totalBytesWritten
                     }
                 } catch (e: CancellationException) {

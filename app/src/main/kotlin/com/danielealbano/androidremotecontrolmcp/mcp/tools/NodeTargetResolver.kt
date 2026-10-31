@@ -176,7 +176,9 @@ class NodeTargetResolver
 
         private fun shorten(text: String?): String? =
             if (text != null && text.length > CompactTreeFormatter.MAX_TEXT_LENGTH) {
-                text.take(CompactTreeFormatter.MAX_TEXT_LENGTH) + CompactTreeFormatter.TRUNCATION_SUFFIX
+                val max = CompactTreeFormatter.MAX_TEXT_LENGTH
+                val end = if (text[max - 1].isHighSurrogate()) max - 1 else max
+                text.take(end) + CompactTreeFormatter.TRUNCATION_SUFFIX
             } else {
                 text
             }

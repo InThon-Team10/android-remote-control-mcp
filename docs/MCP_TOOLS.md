@@ -34,7 +34,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 
 ## Overview
 
-The MCP server exposes 58 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
+The MCP server exposes 59 tools via the JSON-RPC 2.0 protocol, organized into 14 categories:
 
 | Category | Tools | Plan |
 |----------|-------|------|
@@ -44,7 +44,7 @@ The MCP server exposes 58 tools via the JSON-RPC 2.0 protocol, organized into 14
 | Gestures | `android_pinch`, `android_custom_gesture` | 8 |
 | Node Actions | `android_find_nodes`, `android_click_node`, `android_long_click_node`, `android_tap_node`, `android_scroll_to_node`, `android_scroll_node` | 9, 35 |
 | Text Input | `android_type_append_text`, `android_type_insert_text`, `android_type_replace_text`, `android_type_clear_text`, `android_press_key` | 9, 22 |
-| Utilities | `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_node`, `android_wait_for_idle`, `android_get_node_details` | 9, 15 |
+| Utilities | `android_get_accessibility_status`, `android_get_clipboard`, `android_set_clipboard`, `android_wait_for_node`, `android_wait_for_idle`, `android_get_node_details` | 9, 15 |
 | File Operations | `android_list_storage_locations`, `android_list_files`, `android_read_file`, `android_write_file`, `android_append_file`, `android_file_replace`, `android_download_from_url`, `android_delete_file` | - |
 | App Management | `android_open_app`, `android_list_apps`, `android_close_app` | - |
 | Camera | `android_list_cameras`, `android_list_camera_photo_resolutions`, `android_list_camera_video_resolutions`, `android_take_camera_photo`, `android_save_camera_photo`, `android_save_camera_video` | 27 |
@@ -1654,6 +1654,57 @@ curl -X POST http://localhost:8080/mcp \
 
 ## 7. Utility Tools
 
+### android_get_accessibility_status
+
+Returns a read-only snapshot of the existing Android Accessibility Service. No parameters are required.
+Unlike screen and action tools, this diagnostic tool also succeeds when accessibility is disabled.
+It follows the configured device slug and can be disabled in MCP Tools settings.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": { "name": "android_get_accessibility_status", "arguments": {} }
+}
+```
+
+The response contains JSON text:
+
+```json
+{
+  "enabled": true,
+  "connected": true,
+  "capabilities": {
+    "can_retrieve_window_content": true,
+    "can_perform_gestures": true,
+    "can_take_screenshot": true,
+    "can_retrieve_interactive_windows": true,
+    "can_report_view_ids": true
+  },
+  "active_window_available": true,
+  "interactive_window_count": 2
+}
+```
+
+`enabled` reads Android's accessibility setting; `connected` checks the bound service instance.
+An enabled service can be disconnected while Android is binding or restarting it. Capabilities reflect
+the service information granted by Android, and are false while disconnected. Window availability is
+a snapshot: a connected service can temporarily have no active window. This tool does not return screen
+text, perform gestures, capture screenshots, or create overlays. Use `android_get_screen_state` to inspect
+node bounds for subsequent screen features. Actual device operation must be verified on a device or emulator.
+
+**Manual QA Steps** (requires a device or emulator):
+
+1. Install the updated app, enable its Accessibility Service in Android Settings, and start the MCP server.
+2. Connect an authenticated MCP client, confirm the tool appears in `tools/list`, and call it with `{}`.
+   Check `enabled`, `connected`, and the required capabilities. Call `android_get_screen_state` to confirm
+   that screen nodes and their bounds can actually be retrieved.
+3. Disable the Accessibility Service while leaving the MCP server running. Call the status tool again;
+   after Android unbinds the service, `enabled` and `connected` should both be false, with no tool error.
+4. Re-enable the service and repeat the status and screen-state calls to verify reconnection.
+
+
 ### `android_get_clipboard`
 
 Get the current clipboard text content. Accessibility services are exempt from Android 10+ background clipboard restrictions.
@@ -2327,7 +2378,7 @@ Downloads a file from a URL and saves it to a storage location.
 - Subject to file size limit, download timeout, and HTTP/HTTPS security settings configured in the app.
 - HTTP downloads (non-HTTPS) must be explicitly allowed in app settings.
 - Unverified HTTPS certificates must be explicitly allowed in app settings.
-- When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including their IPv4-mapped/compatible IPv6 forms). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
+- When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale, 192.0.0.0/24 and IPv6 unique-local/site-local addresses, including their IPv4-mapped/compatible IPv6 forms). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
 - Parent directories are created automatically if they don't exist.
 - Cancelling the call (see [Cancellation](#cancellation)) stops the transfer at once and deletes the partial file.
 
