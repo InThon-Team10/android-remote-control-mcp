@@ -412,7 +412,7 @@ class FileOperationProviderImpl
                             throw e
                         }
 
-                        Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $locationId/$path")
+                        Log.i(TAG, downloadLogMessage(totalBytesWritten, parsedUrl, "$locationId/$path"))
                         totalBytesWritten
                     }
                 } catch (e: CancellationException) {

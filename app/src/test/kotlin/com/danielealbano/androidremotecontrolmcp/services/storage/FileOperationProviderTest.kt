@@ -970,6 +970,25 @@ class FileOperationProviderTest {
             }
 
         @Test
+        fun `downloadFromUrl logs the URL without userinfo, query or fragment`() =
+            runTest {
+                // Arrange
+                setupAuthorizedLocation("loc1")
+                coEvery { mockSettingsRepository.getServerConfig() } returns
+                    ServerConfig(fileSizeLimitMb = DEFAULT_FILE_SIZE_LIMIT_MB, allowHttpDownloads = true)
+                val body = ByteArrayInputStream("hello".toByteArray())
+                mockDownloadHttpClient.stubDownload(FakeDownloadResponse(200, 5L, body))
+                setupDestinationFile()
+
+                // Act
+                provider.downloadFromUrl("loc1", "file.txt", "https://user:secret@example.com/file.txt?token=abc#frag")
+
+                // Assert
+                verify { Log.i(any(), match { it.contains("https://example.com/file.txt") }) }
+                verify(exactly = 0) { Log.i(any(), match { it.contains("secret") || it.contains("token=abc") }) }
+            }
+
+        @Test
         fun `downloadFromUrl downloads file and saves to location`() =
             runTest {
                 // Arrange
