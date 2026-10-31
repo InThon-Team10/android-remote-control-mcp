@@ -13,6 +13,7 @@ import com.google.genai.types.LiveServerContent
 import com.google.genai.types.LiveServerMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.jvm.optionals.getOrNull
 
@@ -37,11 +38,11 @@ internal class LiveToolRunner(
     private val listener: AgentListener,
     private val context: RunContext,
 ) {
-    private var batches = 0
+    private val batches = AtomicInteger()
 
     /** Null when the step limit is reached. */
     suspend fun run(calls: List<FunctionCall>): List<FunctionResponse>? {
-        if (++batches > context.stepLimit) return null
+        if (batches.incrementAndGet() > context.stepLimit) return null
         return calls.mapNotNull { runner.execute(it, listener, context).functionResponse().getOrNull() }
     }
 
