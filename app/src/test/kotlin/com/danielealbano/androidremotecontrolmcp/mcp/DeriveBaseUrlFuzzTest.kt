@@ -15,6 +15,7 @@ import io.mockk.unmockkStatic
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -144,6 +145,25 @@ class DeriveBaseUrlFuzzTest {
                     "host='${FuzzStrings.escape(hostHeader.orEmpty())}' proto='${FuzzStrings.escape(proto.orEmpty())}'"
             assertNull(runCatching { deriveBaseUrl(call) }.exceptionOrNull(), ctx)
             assertEquals("https://pinned.example:8443", effectiveBaseUrl(call, override), ctx)
+        }
+    }
+
+    @Test
+    fun `arbitrary header text derives either the listener fallback or a clean origin`() {
+        val seed = 0xDB0003L
+        val rnd = Random(seed)
+        val clean = Regex("^https?://(\\[[0-9a-f:]+]|[a-z0-9._~-]+)(:[0-9]{1,5})?$")
+        repeat(ITERATIONS) { i ->
+            val forwardedHost = if (rnd.nextBoolean()) FuzzStrings.random(rnd, 30) else null
+            val hostHeader = if (rnd.nextBoolean()) FuzzStrings.random(rnd, 30) else null
+            val proto = if (rnd.nextBoolean()) FuzzStrings.random(rnd, 8) else null
+            val listener = Listener("listener.local", 8080, "http")
+            val call = mockCall(forwardedHost, proto, hostHeader, listener)
+            val ctx =
+                "seed=$seed iteration=$i xfh='${FuzzStrings.escape(forwardedHost.orEmpty())}' " +
+                    "host='${FuzzStrings.escape(hostHeader.orEmpty())}' proto='${FuzzStrings.escape(proto.orEmpty())}'"
+            val result = deriveBaseUrl(call)
+            assertTrue(clean.matches(result), "$ctx result='${FuzzStrings.escape(result)}'")
         }
     }
 
