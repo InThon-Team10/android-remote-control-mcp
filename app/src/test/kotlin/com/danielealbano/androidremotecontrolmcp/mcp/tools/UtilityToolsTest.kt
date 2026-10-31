@@ -37,6 +37,8 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -189,6 +191,28 @@ class UtilityToolsTest {
             }
 
         @Test
+        fun `throws InvalidParams when text is a number`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("text", 123)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when text is an object`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        putJsonObject("text") {}
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
         fun `throws error when text missing`() =
             runTest {
                 val params = buildJsonObject {}
@@ -274,6 +298,68 @@ class UtilityToolsTest {
                 } finally {
                     unmockkStatic(SystemClock::class)
                 }
+            }
+
+        @Test
+        fun `throws InvalidParams when by is an object`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        putJsonObject("by") {}
+                        put("value", "test")
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when value is a number`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", 123)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when value is an array`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        putJsonArray("value") {}
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when timeout is a string`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "test")
+                        put("timeout", "5000")
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when timeout is fractional`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", "test")
+                        put("timeout", 1.5)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
 
         @Test
@@ -827,6 +913,28 @@ class UtilityToolsTest {
                 } finally {
                     unmockkStatic(SystemClock::class)
                 }
+            }
+
+        @Test
+        fun `throws InvalidParams when timeout is a string`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("timeout", "5000")
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when timeout is fractional`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("timeout", 1.5)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
 
         @Test
