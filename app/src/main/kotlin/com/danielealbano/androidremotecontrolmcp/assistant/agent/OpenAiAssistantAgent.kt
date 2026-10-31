@@ -2,30 +2,35 @@ package com.danielealbano.androidremotecontrolmcp.assistant.agent
 
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
+import com.danielealbano.androidremotecontrolmcp.assistant.openai.OpenAiResponsesGateway
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
-import com.google.genai.types.Content
+import com.openai.models.responses.ResponseInputItem
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 
-/** Gemini implementation of [AssistantAgent]: our own function-calling loop over the app's MCP tools. */
+/**
+ * OpenAI implementation of [AssistantAgent]: our own function-calling loop on the Responses API over the app's MCP
+ * tools. Nothing is stored server-side, so the history (input and output items, reasoning included) is replayed
+ * with every request.
+ */
 @Singleton
-class GeminiAssistantAgent
+class OpenAiAssistantAgent
     @Inject
     constructor(
-        private val gateway: GeminiModelGateway,
+        private val gateway: OpenAiResponsesGateway,
         private val connection: AssistantMcpConnection,
         private val assistantSettings: AssistantSettings,
         private val settingsRepository: SettingsRepository,
-        private val toolRunner: GeminiToolCallRunner,
+        private val toolRunner: OpenAiToolCallRunner,
     ) : AssistantAgent {
         private val runMutex = Mutex()
         private val lock = Any()
-        private val history = mutableListOf<Content>()
+        private val history = mutableListOf<ResponseInputItem>()
 
         /** A non-Completed outcome (limit, failure) or cancellation drops the whole turn from the history. */
         override suspend fun run(
@@ -38,7 +43,7 @@ class GeminiAssistantAgent
                     runCatching { execute(input, listener) }.getOrElse { error ->
                         locked { truncate(mark) }
                         if (error is CancellationException || error is Error) throw error
-                        AgentOutcome.Failed(GeminiErrorMapper.map(error))
+                        AgentOutcome.Failed(OpenAiErrorMapper.map(error))
                     }
                 if (outcome !is AgentOutcome.Completed) locked { truncate(mark) }
                 outcome
@@ -58,15 +63,15 @@ class GeminiAssistantAgent
             val deviceSlug = settingsRepository.getServerConfig().deviceSlug
             val tools = ElderToolFilter.usable(connection.listTools().getOrElse { throw it.toMcpFailure() }, deviceSlug)
             val context =
-                RunContext(
+                OpenAiRunContext(
                     apiKey = apiKey,
                     model = settings.model,
-                    config = GeminiRequestFactory.config(tools),
+                    tools = OpenAiRequestFactory.functionTools(tools),
                     stepLimit = settings.stepLimit,
                     deviceSlug = deviceSlug,
                     toolNames = tools.mapTo(HashSet()) { it.name },
                 )
-            locked { history.add(GeminiRequestFactory.userContent(input)) }
+            locked { history.add(OpenAiRequestFactory.userMessage(input)) }
             var steps = 0
             while (true) {
                 val outcome = step(context, listener, steps)
@@ -82,16 +87,18 @@ class GeminiAssistantAgent
 
         /** One model call; `null` = function calls were executed, continue. */
         private suspend fun step(
-            context: RunContext,
+            context: OpenAiRunContext,
             listener: AgentListener,
             stepsDone: Int,
         ): AgentOutcome? {
             val snapshot = locked { history.toList() }
-            val response = gateway.generate(context.apiKey, context.model, snapshot, context.config)
-            val content = GeminiResponseReader.modelContent(response)
-            locked { history.add(content) }
-            GeminiResponseReader.texts(content).forEach(listener::onAssistantText)
-            val calls = GeminiResponseReader.functionCalls(content)
+            val params =
+                OpenAiRequestFactory.params(context.model, OpenAiRequestFactory.SYSTEM_PROMPT, context.tools, snapshot)
+            val response = gateway.create(context.apiKey, params)
+            val items = OpenAiResponseReader.inputItems(response)
+            locked { history.addAll(items) }
+            OpenAiResponseReader.texts(response).forEach(listener::onAssistantText)
+            val calls = OpenAiResponseReader.functionCalls(response)
             return when {
                 calls.isEmpty() -> {
                     AgentOutcome.Completed
@@ -102,14 +109,8 @@ class GeminiAssistantAgent
                 }
 
                 else -> {
-                    val responses = calls.map { toolRunner.execute(it, listener, context) }
-                    val turn =
-                        Content
-                            .builder()
-                            .role(GeminiRequestFactory.USER_ROLE)
-                            .parts(responses)
-                            .build()
-                    locked { history.add(turn) }
+                    val outputs = calls.map { toolRunner.execute(it, listener, context) }
+                    locked { history.addAll(outputs) }
                     null
                 }
             }

@@ -139,7 +139,7 @@ class AssistantSessionTest {
             session.appendLiveAssistantText(" there")
             session.endLiveTurn()
             session.appendLiveAssistantText("Next")
-            session.reportError(AssistantError.GeminiUnavailable)
+            session.reportError(AssistantError.ModelUnavailable)
             session.appendLiveAssistantText("After")
 
             assertEquals(
@@ -147,7 +147,7 @@ class AssistantSessionTest {
                     ChatItem.User(1, "Hello"),
                     ChatItem.Assistant(2, "Hi there"),
                     ChatItem.Assistant(3, "Next"),
-                    ChatItem.Error(4, AssistantError.GeminiUnavailable),
+                    ChatItem.Error(4, AssistantError.ModelUnavailable),
                     ChatItem.Assistant(5, "After"),
                 ),
                 session.items.value,
@@ -277,15 +277,15 @@ class AssistantSessionTest {
             runCurrent()
             assertEquals(NoticeKind.StepLimitReached(5), (session.last() as ChatItem.Notice).kind)
 
-            agent.script = { _, _ -> AgentOutcome.Failed(AssistantError.GeminiUnavailable) }
+            agent.script = { _, _ -> AgentOutcome.Failed(AssistantError.ModelUnavailable) }
             session.send("b")
             runCurrent()
-            assertEquals(AssistantError.GeminiUnavailable, (session.last() as ChatItem.Error).error)
+            assertEquals(AssistantError.ModelUnavailable, (session.last() as ChatItem.Error).error)
 
             agent.script = { _, _ -> throw IllegalStateException("boom") }
             session.send("c")
             runCurrent()
-            assertInstanceOf(AssistantError.GeminiRequestFailed::class.java, (session.last() as ChatItem.Error).error)
+            assertInstanceOf(AssistantError.ModelRequestFailed::class.java, (session.last() as ChatItem.Error).error)
             assertEquals(SessionState.Idle, session.state.value)
         }
 
@@ -298,7 +298,7 @@ class AssistantSessionTest {
             session.send("x")
             runCurrent()
 
-            assertInstanceOf(AssistantError.GeminiRequestFailed::class.java, (session.last() as ChatItem.Error).error)
+            assertInstanceOf(AssistantError.ModelRequestFailed::class.java, (session.last() as ChatItem.Error).error)
             assertEquals(SessionState.Idle, session.state.value)
         }
 

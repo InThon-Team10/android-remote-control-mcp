@@ -12,9 +12,5 @@ import javax.inject.Singleton
 abstract class AssistantAgentModule {
     @Binds
     @Singleton
-    abstract fun bindAssistantAgent(impl: GeminiAssistantAgent): AssistantAgent
-
-    @Binds
-    @Singleton
-    abstract fun bindGeminiModelGateway(impl: GeminiSdkModelGateway): GeminiModelGateway
+    abstract fun bindAssistantAgent(impl: OpenAiAssistantAgent): AssistantAgent
 }

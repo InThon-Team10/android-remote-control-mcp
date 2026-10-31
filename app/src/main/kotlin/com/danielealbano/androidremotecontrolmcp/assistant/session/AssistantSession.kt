@@ -173,7 +173,7 @@ class AssistantSession
                     if (error is Error) throw error
                     if (error is CancellationException) currentCoroutineContext().ensureActive()
                     Logger.e(TAG, "Assistant run failed: ${error.javaClass.simpleName}")
-                    AgentOutcome.Failed(AssistantError.GeminiRequestFailed(error.javaClass.simpleName))
+                    AgentOutcome.Failed(AssistantError.ModelRequestFailed(error.javaClass.simpleName))
                 }
             synchronized(lock) {
                 if (!job.isActive) return

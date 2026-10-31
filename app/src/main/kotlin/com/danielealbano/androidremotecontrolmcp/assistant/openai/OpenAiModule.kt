@@ -6,11 +6,15 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/** Hilt binding of the OpenAI SDK client shared by the assistant's planner and live voice session. */
+/** Hilt bindings of the OpenAI SDK seams shared by the assistant's text agent and live voice session. */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class OpenAiModule {
     @Binds
     @Singleton
     abstract fun bindOpenAiClientProvider(impl: OpenAiSdkClientProvider): OpenAiClientProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindOpenAiResponsesGateway(impl: OpenAiSdkResponsesGateway): OpenAiResponsesGateway
 }

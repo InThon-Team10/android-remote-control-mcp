@@ -23,18 +23,18 @@ internal object GeminiErrorMapper {
             is AgentFailure -> error.error
             is AssistantException -> error.error
             is ApiException -> mapApi(error)
-            is GenAiIOException, is IOException -> AssistantError.GeminiUnavailable
-            else -> AssistantError.GeminiRequestFailed(error.javaClass.simpleName)
+            is GenAiIOException, is IOException -> AssistantError.ModelUnavailable
+            else -> AssistantError.ModelRequestFailed(error.javaClass.simpleName)
         }
 
     private fun mapApi(error: ApiException): AssistantError {
         val code = error.code()
         return when {
-            code == HTTP_BAD_REQUEST && isInvalidKey(error) -> AssistantError.GeminiAuthFailed
-            code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN -> AssistantError.GeminiAuthFailed
-            code == HTTP_TOO_MANY_REQUESTS || code == HTTP_PAYMENT_REQUIRED -> AssistantError.GeminiQuotaExceeded
-            code == HTTP_REQUEST_TIMEOUT || code >= HTTP_SERVER_ERROR -> AssistantError.GeminiUnavailable
-            else -> AssistantError.GeminiRequestFailed("HTTP $code ${error.status()}")
+            code == HTTP_BAD_REQUEST && isInvalidKey(error) -> AssistantError.ModelAuthFailed
+            code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN -> AssistantError.ModelAuthFailed
+            code == HTTP_TOO_MANY_REQUESTS || code == HTTP_PAYMENT_REQUIRED -> AssistantError.ModelQuotaExceeded
+            code == HTTP_REQUEST_TIMEOUT || code >= HTTP_SERVER_ERROR -> AssistantError.ModelUnavailable
+            else -> AssistantError.ModelRequestFailed("HTTP $code ${error.status()}")
         }
     }
 

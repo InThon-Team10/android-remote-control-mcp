@@ -2,20 +2,25 @@ package com.danielealbano.androidremotecontrolmcp.assistant.agent
 
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.GeminiTestResponses.calls
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.GeminiTestResponses.text
+import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.calls
+import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.errorObject
+import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.headers
+import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.text
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
-import com.google.genai.errors.ApiException
-import com.google.genai.errors.GenAiIOException
-import com.google.genai.types.BlockedReason
-import com.google.genai.types.Content
-import com.google.genai.types.FinishReason
-import com.google.genai.types.ThinkingLevel
+import com.openai.errors.BadRequestException
+import com.openai.errors.InternalServerException
+import com.openai.errors.OpenAIIoException
+import com.openai.errors.RateLimitException
+import com.openai.errors.UnauthorizedException
+import com.openai.models.ReasoningEffort
+import com.openai.models.responses.ResponseIncludable
+import com.openai.models.responses.ResponseInputItem
+import com.openai.models.responses.ToolChoiceOptions
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -32,8 +37,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -42,8 +47,8 @@ import kotlin.jvm.optionals.getOrNull
 import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpTool
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class GeminiAssistantAgentTest {
-    private val gateway = FakeGeminiModelGateway()
+class OpenAiAssistantAgentTest {
+    private val gateway = FakeOpenAiResponsesGateway()
     private val connection = mockk<AssistantMcpConnection>()
     private val assistantSettings = mockk<AssistantSettings>()
     private val settingsRepository = mockk<SettingsRepository>()
@@ -56,12 +61,12 @@ class GeminiAssistantAgentTest {
     private val tools = listOf("android_tap", "android_get_screen_state", "android_set_clipboard").map(::mcpTool)
 
     private val agent by lazy {
-        GeminiAssistantAgent(
+        OpenAiAssistantAgent(
             gateway,
             connection,
             assistantSettings,
             settingsRepository,
-            GeminiToolCallRunner(connection),
+            OpenAiToolCallRunner(connection),
         )
     }
 
@@ -76,10 +81,27 @@ class GeminiAssistantAgentTest {
 
     private fun userText(value: String) = AgentInput.Text(value)
 
-    private fun Content.fnResponses() = parts().get().map { it.functionResponse().get() }
+    private fun FakeOpenAiResponsesGateway.Call.toolNames() =
+        params
+            .tools()
+            .getOrNull()
+            .orEmpty()
+            .map { it.asFunction().name() }
+
+    private fun ResponseInputItem.kind(): String =
+        when {
+            isEasyInputMessage() -> "user"
+            isReasoning() -> "reasoning"
+            isResponseOutputMessage() -> "message"
+            isFunctionCall() -> "function_call"
+            isFunctionCallOutput() -> "function_call_output"
+            else -> "other"
+        }
+
+    private fun ResponseInputItem.outputText(): String = asFunctionCallOutput().output().asString()
 
     @Test
-    fun `text only answer completes, emits text and configures the request`() =
+    fun `text only answer completes, emits text and configures a stateless low-effort request`() =
         runTest {
             gateway.enqueue(text("Hi"))
 
@@ -88,70 +110,58 @@ class GeminiAssistantAgentTest {
             assertEquals(AgentOutcome.Completed, outcome)
             assertEquals(listOf("text:Hi"), listener.events)
             val call = gateway.calls.single()
-            assertEquals(AssistantConfig.DEFAULT_MODEL, call.model)
-            assertEquals(
-                ElderGuidancePrompt.TEXT,
-                call.config
-                    .systemInstruction()
-                    .get()
-                    .parts()
-                    .get()
-                    .single()
-                    .text()
-                    .get(),
-            )
+            val params = call.params
             assertEquals("key", call.apiKey)
+            assertEquals(AssistantConfig.DEFAULT_MODEL, params.model().get().asString())
+            assertEquals(ElderGuidancePrompt.TEXT, params.instructions().get())
             assertEquals(
-                ThinkingLevel.Known.LOW,
-                call.config
-                    .thinkingConfig()
+                ReasoningEffort.LOW,
+                params
+                    .reasoning()
                     .get()
-                    .thinkingLevel()
-                    .get()
-                    .knownEnum(),
-            )
-            assertEquals(
-                true,
-                call.config
-                    .automaticFunctionCalling()
-                    .get()
-                    .disable()
+                    .effort()
                     .get(),
             )
+            assertEquals(false, params.store().get())
+            assertEquals(listOf(ResponseIncludable.REASONING_ENCRYPTED_CONTENT), params.include().get())
+            assertEquals(false, params.parallelToolCalls().get())
+            assertEquals(ToolChoiceOptions.AUTO, params.toolChoice().get().asOptions())
+            assertEquals(listOf("android_tap", "android_get_screen_state"), call.toolNames())
+            assertTrue(params.tools().get().all { it.asFunction().strict().get() == false })
+            assertEquals(listOf("user"), call.input.map { it.kind() })
             assertEquals(
-                2,
-                call.config
-                    .tools()
-                    .get()
+                "hello",
+                call.input
                     .single()
-                    .functionDeclarations()
-                    .get()
-                    .size,
+                    .asEasyInputMessage()
+                    .content()
+                    .asTextInput(),
             )
         }
 
     @Test
-    fun `no tools omits tools`() =
+    fun `no tools omits tools, tool choice and parallel tool calls`() =
         runTest {
             coEvery { connection.listTools() } returns Result.success(emptyList())
             gateway.enqueue(text("Hi"))
 
             agent.run(userText("hello"), listener)
 
+            val params = gateway.calls.single().params
             assertTrue(
-                gateway.calls
-                    .single()
-                    .config
+                params
                     .tools()
                     .getOrNull()
                     .isNullOrEmpty(),
             )
+            assertFalse(params.toolChoice().isPresent)
+            assertFalse(params.parallelToolCalls().isPresent)
         }
 
     @Test
-    fun `tool call runs the loop and forwards arguments as json`() =
+    fun `tool call runs the loop, forwards arguments as json and replays the output items`() =
         runTest {
-            gateway.enqueue(calls("android_tap" to mapOf("x" to 500, "y" to 800.5, "s" to "a", "b" to true)))
+            gateway.enqueue(calls("android_tap" to """{"x":500,"y":800.5,"s":"a","b":true}"""))
             gateway.enqueue(text("done"))
 
             val outcome = agent.run(userText("tap"), listener)
@@ -171,50 +181,49 @@ class GeminiAssistantAgentTest {
                     ),
                 )
             coVerify { connection.callTool("android_tap", expected) }
-            val history = gateway.calls[1].history
-            assertEquals(listOf("user", "model", "user"), history.map { it.role().get() })
+            val input = gateway.calls[1].input
+            assertEquals(listOf("user", "reasoning", "function_call", "function_call_output"), input.map { it.kind() })
             assertEquals(
-                "ok",
-                history[2]
-                    .fnResponses()
-                    .single()
-                    .response()
-                    .get()["result"],
+                OpenAiTestResponses.ENCRYPTED_REASONING,
+                input[1]
+                    .asReasoning()
+                    .encryptedContent()
+                    .get(),
             )
+            assertEquals("call_1", input[2].asFunctionCall().callId())
+            assertEquals("call_1", input[3].asFunctionCallOutput().callId().get())
+            assertEquals("ok", input[3].outputText())
         }
 
     @Test
-    fun `parallel calls produce one user content in call order and preserve the thought signature`() =
+    fun `completed turn keeps the assistant message in the history`() =
         runTest {
-            val signature = byteArrayOf(9, 8, 7)
-            gateway.enqueue(
-                calls("android_tap" to emptyMap(), "android_get_screen_state" to emptyMap(), signature = signature),
-            )
+            gateway.enqueue(text("a"))
+            gateway.enqueue(text("b"))
+
+            agent.run(userText("1"), listener)
+            agent.run(userText("2"), listener)
+
+            assertEquals(listOf("user", "reasoning", "message", "user"), gateway.calls[1].input.map { it.kind() })
+        }
+
+    @Test
+    fun `several calls in one response are answered in call order`() =
+        runTest {
+            gateway.enqueue(calls("android_tap" to "{}", "android_get_screen_state" to "{}"))
             gateway.enqueue(text("done"))
 
             agent.run(userText("go"), listener)
 
-            val history = gateway.calls[1].history
-            assertEquals(3, history.size)
-            assertEquals(
-                listOf("android_tap", "android_get_screen_state"),
-                history[2].fnResponses().map { it.name().get() },
-            )
-            val signatureBack =
-                history[1]
-                    .parts()
-                    .get()
-                    .first()
-                    .thoughtSignature()
-                    .get()
-            assertArrayEquals(signature, signatureBack)
+            val outputs = gateway.calls[1].input.filter { it.isFunctionCallOutput() }
+            assertEquals(listOf("call_1", "call_2"), outputs.map { it.asFunctionCallOutput().callId().get() })
         }
 
     @Test
     fun `step limit stops with StepLimitReached and restores history`() =
         runTest {
             config = config.copy(stepLimit = 2)
-            repeat(3) { gateway.enqueue(calls("android_tap" to emptyMap())) }
+            repeat(3) { gateway.enqueue(calls("android_tap" to "{}")) }
 
             val outcome = agent.run(userText("loop"), listener)
             gateway.enqueue(text("again"))
@@ -225,7 +234,7 @@ class GeminiAssistantAgentTest {
                 1,
                 gateway.calls
                     .last()
-                    .history.size,
+                    .input.size,
             )
             coVerify(exactly = 2) { connection.callTool("android_tap", any()) }
         }
@@ -234,8 +243,7 @@ class GeminiAssistantAgentTest {
     fun `step is counted per response, not per call`() =
         runTest {
             config = config.copy(stepLimit = 1)
-            val tap = "android_tap" to emptyMap<String, Any>()
-            gateway.enqueue(calls(tap, tap, tap))
+            gateway.enqueue(calls("android_tap" to "{}", "android_tap" to "{}", "android_tap" to "{}"))
             gateway.enqueue(text("done"))
 
             assertEquals(AgentOutcome.Completed, agent.run(userText("x"), listener))
@@ -244,29 +252,15 @@ class GeminiAssistantAgentTest {
     @Test
     fun `refused tools are not declared and a call to one is answered with an error`() =
         runTest {
-            gateway.enqueue(calls("android_set_clipboard" to emptyMap()))
+            gateway.enqueue(calls("android_set_clipboard" to "{}"))
             gateway.enqueue(text("done"))
 
             agent.run(userText("x"), listener)
 
-            val names =
-                gateway.calls[0]
-                    .config
-                    .tools()
-                    .get()
-                    .single()
-                    .functionDeclarations()
-                    .get()
-                    .map { it.name().get() }
-            assertEquals(listOf("android_tap", "android_get_screen_state"), names)
+            assertEquals(listOf("android_tap", "android_get_screen_state"), gateway.calls[0].toolNames())
             coVerify(exactly = 0) { connection.callTool(any(), any()) }
             assertEquals(listOf("text:done"), listener.events)
-            val response =
-                gateway.calls[1]
-                    .history[2]
-                    .fnResponses()
-                    .single()
-            assertEquals("Unknown tool.", response.response().get()["error"])
+            assertEquals("ERROR: Unknown tool.", gateway.calls[1].input[3].outputText())
         }
 
     @Test
@@ -281,35 +275,26 @@ class GeminiAssistantAgentTest {
 
             agent.run(userText("x"), listener)
 
-            val names =
-                gateway.calls
-                    .single()
-                    .config
-                    .tools()
-                    .get()
-                    .single()
-                    .functionDeclarations()
-                    .get()
-                    .map { it.name().get() }
-            assertEquals(listOf("android_pixel7_tap"), names)
+            assertEquals(listOf("android_pixel7_tap"), gateway.calls.single().toolNames())
         }
 
     @Test
-    fun `unknown tool is answered without an MCP call or listener events`() =
+    fun `unknown tool and malformed arguments are answered without an MCP call or listener events`() =
         runTest {
-            gateway.enqueue(calls("nope" to emptyMap()))
+            gateway.enqueue(OpenAiTestResponses.response(OpenAiTestResponses.call("nope")))
+            gateway.enqueue(OpenAiTestResponses.response(OpenAiTestResponses.call("android_tap", "[1")))
             gateway.enqueue(text("done"))
 
             agent.run(userText("x"), listener)
 
             coVerify(exactly = 0) { connection.callTool(any(), any()) }
             assertEquals(listOf("text:done"), listener.events)
-            val response =
-                gateway.calls[1]
-                    .history[2]
-                    .fnResponses()
-                    .single()
-            assertEquals("Unknown tool.", response.response().get()["error"])
+            val outputs =
+                gateway.calls[2]
+                    .input
+                    .filter { it.isFunctionCallOutput() }
+                    .map { it.outputText() }
+            assertEquals(listOf("ERROR: Unknown tool.", "ERROR: The arguments are not a JSON object."), outputs)
         }
 
     @Test
@@ -319,63 +304,92 @@ class GeminiAssistantAgentTest {
                 Result.success(CallToolResult(content = listOf(TextContent("bad")), isError = true))
             coEvery { connection.callTool("android_get_screen_state", any()) } returns
                 Result.success(CallToolResult(content = listOf(ImageContent("AQID", "image/png"))))
-            gateway.enqueue(calls("android_tap" to emptyMap(), "android_get_screen_state" to emptyMap()))
+            gateway.enqueue(calls("android_tap" to "{}", "android_get_screen_state" to "{}"))
             gateway.enqueue(text("done"))
 
             agent.run(userText("x"), listener)
 
             assertTrue("finished:android_tap:true" in listener.events)
-            val responses = gateway.calls[1].history[2].fnResponses()
-            assertEquals("bad", responses[0].response().get()["error"])
-            assertEquals(1, responses[1].parts().get().size)
+            val outputs = gateway.calls[1].input.filter { it.isFunctionCallOutput() }
+            assertEquals("ERROR: bad", outputs[0].outputText())
+            val parts =
+                outputs[1]
+                    .asFunctionCallOutput()
+                    .output()
+                    .asResponseFunctionCallOutputItemList()
+            assertEquals("Image attached.", parts[0].asInputText().text())
+            assertEquals(
+                "data:image/png;base64,AQID",
+                parts[1]
+                    .asInputImage()
+                    .imageUrl()
+                    .get(),
+            )
         }
 
     @Test
     fun `failure is not retried by the agent and keeps earlier turns`() =
         runTest {
             gateway.enqueue(text("one"))
-            gateway.enqueueFailure(ApiException(400, "INVALID_ARGUMENT", "x"))
+            gateway.enqueueFailure(
+                BadRequestException
+                    .builder()
+                    .headers(headers())
+                    .error(errorObject(null))
+                    .build(),
+            )
             gateway.enqueue(text("three"))
 
             agent.run(userText("1"), listener)
             val failed = agent.run(userText("2"), listener)
             agent.run(userText("3"), listener)
 
-            assertEquals(AgentOutcome.Failed(AssistantError.GeminiRequestFailed("HTTP 400 INVALID_ARGUMENT")), failed)
+            assertEquals(AgentOutcome.Failed(AssistantError.ModelRequestFailed("HTTP 400")), failed)
             assertEquals(3, gateway.calls.size)
             assertEquals(
-                3,
+                listOf("user", "reasoning", "message", "user"),
                 gateway.calls
                     .last()
-                    .history.size,
+                    .input
+                    .map { it.kind() },
             )
         }
 
     @Test
     fun `gateway and response failures map to typed errors`() =
         runTest {
-            // Explicit element type: the inferred common supertype would be the SDK's package-private BaseException.
             val cases =
                 listOf<Pair<Throwable, AssistantError>>(
-                    ApiException(401, "UNAUTHENTICATED", "x") to AssistantError.GeminiAuthFailed,
-                    ApiException(429, "RESOURCE_EXHAUSTED", "x") to AssistantError.GeminiQuotaExceeded,
-                    ApiException(503, "UNAVAILABLE", "x") to AssistantError.GeminiUnavailable,
-                    GenAiIOException("x") to AssistantError.GeminiUnavailable,
+                    UnauthorizedException.builder().headers(headers()).build() to AssistantError.ModelAuthFailed,
+                    RateLimitException.builder().headers(headers()).build() to AssistantError.ModelQuotaExceeded,
+                    InternalServerException
+                        .builder()
+                        .statusCode(503)
+                        .headers(headers())
+                        .build() to
+                        AssistantError.ModelUnavailable,
+                    OpenAIIoException("x") to AssistantError.ModelUnavailable,
                 )
             cases.forEach { (failure, expected) ->
                 gateway.enqueueFailure(failure)
                 assertEquals(AgentOutcome.Failed(expected), agent.run(userText("x"), listener))
             }
-            gateway.enqueue(GeminiTestResponses.promptBlocked(BlockedReason.Known.SAFETY))
+            gateway.enqueue(
+                OpenAiTestResponses.response(
+                    status = "failed",
+                    extra = ""","error":{"code":"invalid_prompt","message":"flagged"}""",
+                ),
+            )
             assertEquals(
-                AgentOutcome.Failed(AssistantError.GeminiBlocked("SAFETY")),
+                AgentOutcome.Failed(AssistantError.ModelBlocked("invalid_prompt")),
                 agent.run(userText("x"), listener),
             )
-            gateway.enqueue(GeminiTestResponses.response(null, FinishReason.Known.SAFETY))
+            gateway.enqueue(OpenAiTestResponses.response(OpenAiTestResponses.refusal("no")))
             assertEquals(
-                AgentOutcome.Failed(AssistantError.GeminiBlocked("SAFETY")),
+                AgentOutcome.Failed(AssistantError.ModelBlocked("refusal")),
                 agent.run(userText("x"), listener),
             )
+            assertTrue(listener.events.isEmpty())
         }
 
     @Test
@@ -396,7 +410,7 @@ class GeminiAssistantAgentTest {
     fun `call tool failure finishes the row, maps to McpUnavailable and truncates history`() =
         runTest {
             coEvery { connection.callTool(any(), any()) } returns Result.failure(IllegalStateException())
-            gateway.enqueue(calls("android_tap" to emptyMap()))
+            gateway.enqueue(calls("android_tap" to "{}"))
             gateway.enqueue(text("ok"))
 
             val outcome = agent.run(userText("x"), listener)
@@ -408,7 +422,7 @@ class GeminiAssistantAgentTest {
                 1,
                 gateway.calls
                     .last()
-                    .history.size,
+                    .input.size,
             )
         }
 
@@ -438,7 +452,7 @@ class GeminiAssistantAgentTest {
                     CompletableDeferred<Unit>().await()
                     Result.success(McpToolUtils.textResult("never"))
                 }
-            gateway.enqueue(calls("android_tap" to emptyMap()))
+            gateway.enqueue(calls("android_tap" to "{}"))
             val job = launch { agent.run(userText("cancel me"), listener) }
             started.await()
             job.cancelAndJoin()
@@ -450,7 +464,7 @@ class GeminiAssistantAgentTest {
                 1,
                 gateway.calls
                     .last()
-                    .history.size,
+                    .input.size,
             )
         }
 
@@ -463,22 +477,30 @@ class GeminiAssistantAgentTest {
 
             agent.run(userText("1"), listener)
             agent.run(userText("2"), listener)
-            assertEquals(3, gateway.calls[1].history.size)
+            assertEquals(4, gateway.calls[1].input.size)
             agent.reset()
             agent.run(userText("3"), listener)
 
-            assertEquals(1, gateway.calls[2].history.size)
+            assertEquals(1, gateway.calls[2].input.size)
         }
 
     @Test
     fun `model and step limit come from settings`() =
         runTest {
-            config = config.copy(model = "gemini-3.5-flash-lite", stepLimit = 5)
-            gateway.enqueue(text("ok"))
+            config = config.copy(model = "gpt-test-model", stepLimit = 1)
+            repeat(2) { gateway.enqueue(calls("android_tap" to "{}")) }
 
-            agent.run(userText("hi"), listener)
+            val outcome = agent.run(userText("hi"), listener)
 
-            assertEquals("gemini-3.5-flash-lite", gateway.calls.single().model)
+            assertEquals(AgentOutcome.StepLimitReached(1), outcome)
+            assertEquals(
+                "gpt-test-model",
+                gateway.calls[0]
+                    .params
+                    .model()
+                    .get()
+                    .asString(),
+            )
         }
 
     @Test
@@ -490,7 +512,7 @@ class GeminiAssistantAgentTest {
                     gate.await()
                     Result.success(McpToolUtils.textResult("ok"))
                 }
-            gateway.enqueue(calls("android_tap" to emptyMap()))
+            gateway.enqueue(calls("android_tap" to "{}"))
             gateway.enqueue(text("first"))
             gateway.enqueue(text("second"))
 

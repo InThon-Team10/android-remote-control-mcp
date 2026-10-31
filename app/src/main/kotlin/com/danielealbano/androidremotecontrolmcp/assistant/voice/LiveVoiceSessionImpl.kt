@@ -103,7 +103,7 @@ class LiveVoiceSessionImpl
             checkNotNull(apiKey)
             val listener =
                 deps.session.beginLive(job)
-                    ?: throw AssistantException(AssistantError.GeminiRequestFailed("Assistant is busy"))
+                    ?: throw AssistantException(AssistantError.ModelRequestFailed("Assistant is busy"))
             val deviceSlug = deps.settingsRepository.getServerConfig().deviceSlug
             val tools = usableTools(deviceSlug)
             val scope = CoroutineScope(SupervisorJob() + deps.dispatcher)

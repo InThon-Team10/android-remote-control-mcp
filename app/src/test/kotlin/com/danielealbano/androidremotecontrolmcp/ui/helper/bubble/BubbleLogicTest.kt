@@ -44,7 +44,7 @@ class BubbleLogicTest {
 
     @Test
     fun `error and notice map to short messages`() {
-        val error = listOf(ChatItem.Error(1, AssistantError.GeminiQuotaExceeded))
+        val error = listOf(ChatItem.Error(1, AssistantError.ModelQuotaExceeded))
         val notice = listOf(ChatItem.Notice(1, NoticeKind.Stopped))
 
         assertEquals(PanelMessage.Problem(R.string.bubble_error_quota), panelMessage(error))

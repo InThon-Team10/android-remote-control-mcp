@@ -88,11 +88,11 @@ internal fun noticeTextRes(kind: NoticeKind): Int =
 @StringRes
 internal fun errorTextRes(error: AssistantError): Int =
     when (error) {
-        AssistantError.ApiKeyMissing, AssistantError.GeminiAuthFailed -> R.string.bubble_error_key
-        AssistantError.GeminiQuotaExceeded -> R.string.bubble_error_quota
-        AssistantError.GeminiUnavailable -> R.string.bubble_error_unavailable
-        is AssistantError.GeminiBlocked -> R.string.bubble_error_blocked
-        is AssistantError.GeminiRequestFailed -> R.string.bubble_error_generic
+        AssistantError.ApiKeyMissing, AssistantError.ModelAuthFailed -> R.string.bubble_error_key
+        AssistantError.ModelQuotaExceeded -> R.string.bubble_error_quota
+        AssistantError.ModelUnavailable -> R.string.bubble_error_unavailable
+        is AssistantError.ModelBlocked -> R.string.bubble_error_blocked
+        is AssistantError.ModelRequestFailed -> R.string.bubble_error_generic
         else -> setupErrorTextRes(error)
     }
 

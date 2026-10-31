@@ -16,22 +16,22 @@ sealed interface AssistantError {
         val message: String,
     ) : AssistantError
 
-    /** 400 API_KEY_INVALID / 401 / 403. */
-    data object GeminiAuthFailed : AssistantError
+    /** The AI service rejected the API key (401 / 403, or an invalid-key error code). */
+    data object ModelAuthFailed : AssistantError
 
-    /** 429 / 402 after retries. */
-    data object GeminiQuotaExceeded : AssistantError
+    /** Rate limit or quota exhausted (429 / 402) after the client's retries. */
+    data object ModelQuotaExceeded : AssistantError
 
-    /** 5xx / 503 / 504 after retries, network errors. */
-    data object GeminiUnavailable : AssistantError
+    /** Server errors and timeouts after the client's retries, network errors, a session the service ended. */
+    data object ModelUnavailable : AssistantError
 
-    /** promptFeedback.blockReason / finishReason SAFETY etc. */
-    data class GeminiBlocked(
+    /** The service refused the request or the reply (refusal, content filter, policy-flagged prompt). */
+    data class ModelBlocked(
         val reason: String,
     ) : AssistantError
 
-    /** Other 4xx, malformed responses. */
-    data class GeminiRequestFailed(
+    /** Other 4xx, failed, incomplete or malformed responses. */
+    data class ModelRequestFailed(
         val message: String,
     ) : AssistantError
 

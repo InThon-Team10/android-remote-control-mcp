@@ -79,7 +79,7 @@ internal class LiveMessageHandler(
             ?.ids()
             ?.getOrNull()
             ?.let(::onCancellation)
-        if (message.goAway().isPresent) events.end(AgentOutcome.Failed(AssistantError.GeminiUnavailable))
+        if (message.goAway().isPresent) events.end(AgentOutcome.Failed(AssistantError.ModelUnavailable))
     }
 
     private fun onContent(content: LiveServerContent) {

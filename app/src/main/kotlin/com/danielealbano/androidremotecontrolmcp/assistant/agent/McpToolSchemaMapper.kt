@@ -9,8 +9,22 @@ import kotlinx.serialization.json.put
 import com.google.genai.types.Tool as GeminiTool
 import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpTool
 
-/** Maps MCP tool definitions to Gemini function declarations. */
+/** Maps MCP tool definitions to the model providers' function declarations. */
 internal object McpToolSchemaMapper {
+    /**
+     * The tool's parameters schema rebuilt as `type: object` + `properties` + `required`; `$schema`/`$defs` and any
+     * other top-level keys are dropped (providers reject unknown ones). Property sub-schemas are passed through
+     * untouched, so the schema is not a strict one (optional properties, no `additionalProperties: false`).
+     */
+    fun parameters(tool: McpTool): JsonObject =
+        buildJsonObject {
+            put("type", "object")
+            put("properties", tool.inputSchema.properties ?: JsonObject(emptyMap()))
+            tool.inputSchema.required
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { put("required", JsonArray(it.map(::JsonPrimitive))) }
+        }
+
     /** One Gemini [GeminiTool] holding a declaration per MCP tool (order preserved). */
     fun toGeminiTool(tools: List<McpTool>): GeminiTool =
         GeminiTool
@@ -18,24 +32,12 @@ internal object McpToolSchemaMapper {
             .functionDeclarations(tools.map(::toDeclaration))
             .build()
 
-    /**
-     * The schema is rebuilt as `type: object` + `properties` + `required`; `$schema`/`$defs` are dropped because
-     * Gemini rejects unknown top-level keys. Property sub-schemas are passed through untouched.
-     */
-    fun toDeclaration(tool: McpTool): FunctionDeclaration {
-        val schema =
-            buildJsonObject {
-                put("type", "object")
-                put("properties", tool.inputSchema.properties ?: JsonObject(emptyMap()))
-                tool.inputSchema.required
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { put("required", JsonArray(it.map(::JsonPrimitive))) }
-            }
-        return FunctionDeclaration
+    /** A Gemini declaration with the [parameters] schema. */
+    fun toDeclaration(tool: McpTool): FunctionDeclaration =
+        FunctionDeclaration
             .builder()
             .name(tool.name)
             .description(tool.description.orEmpty())
-            .parametersJsonSchema(JsonBridge.toMap(schema))
+            .parametersJsonSchema(JsonBridge.toMap(parameters(tool)))
             .build()
-    }
 }

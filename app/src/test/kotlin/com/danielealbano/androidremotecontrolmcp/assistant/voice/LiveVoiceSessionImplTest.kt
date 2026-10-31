@@ -421,9 +421,9 @@ class LiveVoiceSessionImplTest {
             onMessage(LiveServerMessage.builder().goAway(LiveServerGoAway.builder().build()).build())
             runCurrent()
 
-            assertEquals(LiveVoiceState.Error(AssistantError.GeminiUnavailable), fx.live.state.value)
+            assertEquals(LiveVoiceState.Error(AssistantError.ModelUnavailable), fx.live.state.value)
             assertEquals(
-                AssistantError.GeminiUnavailable,
+                AssistantError.ModelUnavailable,
                 (
                     fx.session.items.value
                         .last() as ChatItem.Error
