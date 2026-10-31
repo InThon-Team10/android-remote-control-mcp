@@ -30,7 +30,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -56,13 +55,8 @@ class FindNodesTool
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // Validate parameters
-            val byStr =
-                arguments?.get("by")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'by'")
-
-            val rawValue =
-                arguments["value"]?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'value'")
+            val byStr = McpToolUtils.requireString(arguments, "by")
+            val rawValue = McpToolUtils.requireString(arguments, "value")
 
             if (rawValue.isEmpty()) {
                 throw McpToolException.InvalidParams("Parameter 'value' must be non-empty")
@@ -71,7 +65,7 @@ class FindNodesTool
             // Reverse any pseudonym placeholder so the search matches the real on-screen value.
             val value = substitutor.substitute(rawValue)
 
-            val exactMatch = arguments["exact_match"]?.jsonPrimitive?.booleanOrNull ?: false
+            val exactMatch = arguments?.get("exact_match")?.jsonPrimitive?.booleanOrNull ?: false
             val visibleOnly = McpToolUtils.optionalBoolean(arguments, PARAM_VISIBLE_ONLY, false)
 
             val findBy =

@@ -33,6 +33,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -289,6 +291,42 @@ class NodeActionToolsTest {
 
                 val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
                 assertTrue(exception.message!!.contains("non-empty"))
+            }
+
+        @Test
+        fun `throws InvalidParams when by is an object`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        putJsonObject("by") {}
+                        put("value", "test")
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when value is a number`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        put("value", 123)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when value is an array`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("by", "text")
+                        putJsonArray("value") {}
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
             }
 
         @Test
