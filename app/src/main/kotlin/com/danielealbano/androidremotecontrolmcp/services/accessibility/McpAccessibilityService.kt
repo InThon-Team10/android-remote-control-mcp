@@ -65,6 +65,10 @@ class McpAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
 
+        // A repeated connect must not leak the previous connection's scope or pending invalidation.
+        cacheInvalidationDebouncer?.cancel()
+        serviceScope?.cancel()
+
         instance = this
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         serviceScope = scope
@@ -140,9 +144,12 @@ class McpAccessibilityService : AccessibilityService() {
         serviceScope = null
         currentPackageName = null
         currentActivityName = null
-        inputMethodInstance = null
         removeToolCallIndicator()
-        instance = null
+        // A newer connection may already have replaced this instance; do not clear its singleton.
+        if (instance === this) {
+            inputMethodInstance = null
+            instance = null
+        }
 
         super.onDestroy()
     }
