@@ -69,7 +69,7 @@ class RequestBaseUrlValidationTest {
             "evil.com\u0009x",
             "evil.com\u0000",
             "evil.com\u007F",
-            "evil .com",
+            "evil\u00A0.com",
             "evil.com:abc",
             "evil.com:",
             "evil.com:0",
