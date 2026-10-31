@@ -283,8 +283,8 @@ class McpAccessibilityService : AccessibilityService() {
             }
         val params =
             createToolCallIndicatorLayoutParams().apply {
-                width = bounds.right - bounds.left
-                height = bounds.bottom - bounds.top
+                width = highlightOverlayExtent(bounds.left, bounds.right)
+                height = highlightOverlayExtent(bounds.top, bounds.bottom)
                 gravity = Gravity.TOP or Gravity.START
                 x = bounds.left
                 y = bounds.top
@@ -532,3 +532,12 @@ internal fun scheduleCacheInvalidationIfNeeded(
 internal fun invalidateCache(cache: AccessibilityNodeCache?) {
     cache?.clear()
 }
+
+/**
+ * Overlay extent for a node edge pair. Node bounds come from other apps and can be empty or inverted; a
+ * non-positive size must never reach the window manager, where -1/-2 mean MATCH_PARENT/WRAP_CONTENT.
+ */
+internal fun highlightOverlayExtent(
+    start: Int,
+    end: Int,
+): Int = (end - start).coerceAtLeast(1)
