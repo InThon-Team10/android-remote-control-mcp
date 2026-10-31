@@ -193,10 +193,10 @@ class CompactTreeFormatter
                 append("--- ")
                 append("window:${windowData.windowId} ")
                 append("type:${windowData.windowType} ")
-                append("pkg:${windowData.packageName ?: "unknown"} ")
-                append("title:${windowData.title ?: "unknown"} ")
+                append("pkg:${sanitizeText(windowData.packageName ?: "unknown", truncate = false)} ")
+                append("title:${sanitizeText(windowData.title ?: "unknown", truncate = false)} ")
                 if (windowData.activityName != null) {
-                    append("activity:${windowData.activityName} ")
+                    append("activity:${sanitizeText(windowData.activityName, truncate = false)} ")
                 }
                 append("layer:${windowData.layer} ")
                 append("focused:${windowData.focused}")

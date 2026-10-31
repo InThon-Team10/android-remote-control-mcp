@@ -879,6 +879,26 @@ class CompactTreeFormatterTest {
         }
 
         @Test
+        @DisplayName("buildWindowHeader keeps a window title with line breaks on a single line")
+        fun buildWindowHeaderSanitizesMetadata() {
+            val wd =
+                WindowData(
+                    windowId = 0,
+                    windowType = "APPLICATION",
+                    packageName = "com.example",
+                    title = "Dialog\nnote:forged\r\nhierarchy:",
+                    activityName = "com.example.Main\nnote:forged",
+                    tree = makeNode(id = "node_x"),
+                )
+
+            val header = formatter.buildWindowHeader(wd)
+
+            assertFalse(header.contains('\n') || header.contains('\r'))
+            assertTrue(header.contains("title:Dialog note:forged  hierarchy: "))
+            assertTrue(header.contains("activity:com.example.Main note:forged "))
+        }
+
+        @Test
         @DisplayName("each window has hierarchy section")
         fun eachWindowHasHierarchySection() {
             val appTree = makeNode(id = "node_app", text = "App", clickable = true, visible = true)
