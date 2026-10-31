@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.di
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
@@ -8,6 +9,11 @@ import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConne
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnectionImpl
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarterImpl
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioRecordingSession
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioRecordingSessionFactory
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.ElapsedClock
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.MediaRecorderVoiceRecorder
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceRecorder
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
@@ -171,6 +177,16 @@ object AppModule {
     fun providePrivacyModelStore(
         @ApplicationContext context: Context,
     ): PrivacyModelStore = PrivacyModelStore(context.filesDir)
+
+    /** Provides the factory creating one platform recording session per voice message. */
+    @Provides
+    fun provideAudioRecordingSessionFactory(
+        @ApplicationContext context: Context,
+    ): AudioRecordingSessionFactory = AudioRecordingSessionFactory { AndroidAudioRecordingSession(context) }
+
+    /** Provides the monotonic clock used to measure voice message duration. */
+    @Provides
+    fun provideElapsedClock(): ElapsedClock = ElapsedClock { SystemClock.elapsedRealtime() }
 }
 
 @Module
@@ -370,4 +386,9 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindArcTunnelCtAlerts(impl: ArcTunnelCtAlertsImpl): ArcTunnelCtAlerts
+
+    /** Binds the assistant voice recorder. */
+    @Binds
+    @Singleton
+    abstract fun bindVoiceRecorder(impl: MediaRecorderVoiceRecorder): VoiceRecorder
 }
