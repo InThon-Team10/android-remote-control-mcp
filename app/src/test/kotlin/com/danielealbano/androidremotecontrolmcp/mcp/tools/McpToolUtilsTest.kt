@@ -193,6 +193,14 @@ class McpToolUtilsTest {
         }
 
         @Test
+        @DisplayName("keeps full precision above 2^53")
+        fun keepsFullPrecisionAboveTwoPow53() {
+            val params = buildJsonObject { put("duration", 9007199254740993L) }
+            assertEquals(9007199254740993L, McpToolUtils.optionalLong(params, "duration", 300L))
+            assertEquals(9007199254740993L, McpToolUtils.requireLong(params, "duration"))
+        }
+
+        @Test
         @DisplayName("rejects fractional value")
         fun rejectsFractionalValue() {
             val params = buildJsonObject { put("duration", 1.5) }
