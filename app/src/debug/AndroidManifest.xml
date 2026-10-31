@@ -2,6 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
+        <receiver
+            android:name=".debug.GuidanceTestReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+
         <!-- E2E Configuration Receiver (test configuration injection via adb shell). -->
         <!-- Debug source set only, so it is absent from the release APK entirely. -->
         <!-- Also gated on DUMP: a signature/privileged platform permission held by the adb shell
