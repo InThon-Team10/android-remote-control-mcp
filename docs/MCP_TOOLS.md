@@ -2173,7 +2173,7 @@ Writes text content to a file. Creates the file if it doesn't exist, creates par
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
-| `path` | string | Yes | - | Relative path to the file within the storage location |
+| `path` | string | Yes | - | Relative path to the file within the storage location; must not end with `/` |
 | `content` | string | Yes | - | Text content to write (empty string creates an empty file) |
 
 **Example Request**:
@@ -2229,7 +2229,7 @@ Appends text content to an existing file. If the storage provider does not suppo
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
-| `path` | string | Yes | - | Relative path to the file within the storage location |
+| `path` | string | Yes | - | Relative path to the file within the storage location; must not end with `/` |
 | `content` | string | Yes | - | Text content to append |
 
 **Example Request**:
@@ -2284,7 +2284,7 @@ Performs literal string replacement in a text file. Uses advisory file locking w
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `location_id` | string | Yes | - | Storage location ID from `android_list_storage_locations` |
-| `path` | string | Yes | - | Relative path to the file within the storage location |
+| `path` | string | Yes | - | Relative path to the file within the storage location; must not end with `/` |
 | `old_string` | string | Yes | - | The literal string to search for |
 | `new_string` | string | Yes | - | The replacement string |
 | `replace_all` | boolean | No | `false` | If `true`, replaces all occurrences; if `false`, replaces only the first |
