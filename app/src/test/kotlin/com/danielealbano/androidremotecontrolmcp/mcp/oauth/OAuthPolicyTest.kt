@@ -35,6 +35,9 @@ class OAuthPolicyTest {
         assertFalse(OAuthPolicy.isAllowedRedirectUri("https://chatgpt.com@evil.com/connector/oauth/abc"))
         assertFalse(OAuthPolicy.isAllowedRedirectUri("https://chatgpt.com/evil/oauth/abc"))
         assertFalse(OAuthPolicy.isAllowedRedirectUri("http://chatgpt.com/connector/oauth/abc"))
+        assertFalse(OAuthPolicy.isAllowedRedirectUri("https://chatgpt.com/connector/oauth/../../evil"))
+        assertFalse(OAuthPolicy.isAllowedRedirectUri("https://chatgpt.com/connector/oauth/%2e%2e/%2E%2E/evil"))
+        assertFalse(OAuthPolicy.isAllowedRedirectUri("https://chatgpt.com/connector%2Foauth/abc"))
     }
 
     @Test

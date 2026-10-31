@@ -68,7 +68,8 @@ object OAuthPolicy {
             parsed != null &&
                 parsed.scheme == "https" &&
                 host == CHATGPT_REDIRECT_HOST &&
-                parsed.path?.startsWith(CHATGPT_REDIRECT_PATH_PREFIX) == true
+                parsed.normalize().rawPath?.startsWith(CHATGPT_REDIRECT_PATH_PREFIX) == true &&
+                !parsed.rawPath.contains("%2e", ignoreCase = true)
         val isLoopback = parsed != null && parsed.scheme == "http" && host in LOOPBACK_HOSTS
 
         return isChatGptConnectorCallback || isLoopback
