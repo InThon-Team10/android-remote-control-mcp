@@ -75,4 +75,16 @@ class SemanticVersionTest {
     fun `toCoreString drops prefix and suffixes`() {
         assertEquals("1.11.0", SemanticVersion.parse("v1.11.0-dev.3+abc")!!.toCoreString())
     }
+
+    @Test
+    fun `numeric pre-release identifiers beyond Int range compare numerically`() {
+        val smaller = SemanticVersion.parse("1.0.0-beta.99999999999")!!
+        val larger = SemanticVersion.parse("1.0.0-beta.100000000000")!!
+        assertTrue(smaller < larger)
+    }
+
+    @Test
+    fun `hyphen-leading identifier is alphanumeric not a negative number`() {
+        assertTrue(SemanticVersion.parse("1.0.0-alpha.1")!! < SemanticVersion.parse("1.0.0-alpha.-1")!!)
+    }
 }
