@@ -368,13 +368,21 @@ class MediaStoreFileOperationsImpl
                 val occurrences = countOccurrences(originalContent, oldString)
                 if (occurrences == 0) return@withContext FileReplaceResult(replacementCount = 0)
 
+                val replacementCount = if (replaceAll) occurrences else 1
+                requireReplacedSizeWithinLimit(
+                    queryFileSize(uri),
+                    replacementCount,
+                    oldString,
+                    newString,
+                    settingsRepository.getServerConfig(),
+                )
+
                 val modifiedContent =
                     if (replaceAll) {
                         originalContent.replace(oldString, newString)
                     } else {
                         originalContent.replaceFirst(oldString, newString)
                     }
-                val replacementCount = if (replaceAll) occurrences else 1
 
                 context.contentResolver.openOutputStream(uri, "wt")?.use {
                     it.write(modifiedContent.toByteArray(Charsets.UTF_8))

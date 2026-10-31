@@ -34,6 +34,10 @@ class LocalNetworkAddressTest {
             "fe80::1", "febf:ffff::1",
             // fc00::/7 (unique local)
             "fc00::1", "fdff:ffff::1",
+            // fec0::/10 (deprecated site-local)
+            "fec0::1", "feff:ffff::1",
+            // 192.0.0.0/24 (IETF protocol assignments, 464XLAT CLAT 192.0.0.4)
+            "192.0.0.0", "192.0.0.4", "192.0.0.255",
         ],
     )
     fun `local addresses are blocked`(literal: String) {
@@ -46,10 +50,10 @@ class LocalNetworkAddressTest {
             "1.1.1.1", "8.8.8.8",
             // Just outside the blocked IPv4 ranges
             "1.0.0.0", "9.255.255.255", "11.0.0.0", "126.255.255.255", "128.0.0.0",
-            "172.15.255.255", "172.32.0.0", "192.167.255.255", "192.169.0.0",
+            "172.15.255.255", "172.32.0.0", "192.0.1.0", "192.1.0.0", "192.167.255.255", "192.169.0.0",
             "169.253.255.255", "169.255.0.0", "100.63.255.255", "100.128.0.0",
             // Public IPv6 and just outside fe80::/10 and fc00::/7
-            "2001:4860:4860::8888", "fec0::1", "fe7f::1", "fbff::1", "fe00::1",
+            "2001:4860:4860::8888", "fe7f::1", "fbff::1", "fe00::1",
         ],
     )
     fun `public addresses are allowed`(literal: String) {

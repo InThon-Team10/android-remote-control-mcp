@@ -106,6 +106,20 @@ class MediaStoreDownloaderTest {
     }
 
     @Test
+    fun `downloadToPendingUri logs the URL without userinfo, query or fragment`() {
+        respond(FakeDownloadResponse(200, 0L))
+        every { mockContentResolver.openOutputStream(eq(insertUri), eq("wt")) } returns ByteArrayOutputStream()
+        val sensitiveUrl = URL("http://user:secret@example.com/file.bin?token=abc#frag")
+
+        runBlocking {
+            downloader.downloadToPendingUri(insertUri, sensitiveUrl, sensitiveUrl.toString(), ServerConfig(), "ctx")
+        }
+
+        verify { Log.i(any(), match { it.contains("http://example.com/file.bin") }) }
+        verify(exactly = 0) { Log.i(any(), match { it.contains("secret") || it.contains("token=abc") }) }
+    }
+
+    @Test
     fun `downloadToPendingUri passes the config to the http client`() {
         respond(FakeDownloadResponse(200, 0L))
         every { mockContentResolver.openOutputStream(eq(insertUri), eq("wt")) } returns ByteArrayOutputStream()

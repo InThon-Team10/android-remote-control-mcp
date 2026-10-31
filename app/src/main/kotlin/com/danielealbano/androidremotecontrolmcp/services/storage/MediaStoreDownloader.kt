@@ -33,7 +33,7 @@ internal class MediaStoreDownloader(
                 validateResponse(response, url, config)
                 val totalBytesWritten = streamToDestination(response, insertUri, config)
                 markDownloadComplete(insertUri)
-                Log.i(TAG, "Downloaded $totalBytesWritten bytes from $url to $logContext")
+                Log.i(TAG, downloadLogMessage(totalBytesWritten, parsedUrl, logContext))
                 totalBytesWritten
             }
         } catch (e: CancellationException) {
