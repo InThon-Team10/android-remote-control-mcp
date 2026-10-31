@@ -44,7 +44,10 @@ class EchoedValueEscapingTest {
         text: String,
         singleLine: Boolean = true,
     ) {
-        assertFalse(text.any { (it.isISOControl() && it != Char(10)) || it == Char(0x2028) || it == Char(0x2029) }, text)
+        assertFalse(
+            text.any { (it.isISOControl() && it != Char(10)) || it == Char(0x2028) || it == Char(0x2029) },
+            text,
+        )
         if (singleLine) assertFalse(text.contains(Char(10)), text)
         assertTrue(text.contains(escaped), text)
     }
