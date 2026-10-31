@@ -4,6 +4,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import com.danielealbano.androidremotecontrolmcp.services.guidance.ScreenPoint
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName
@@ -177,6 +178,13 @@ class ElderGuidanceGeometryTest {
             ElderGuidanceGeometry.swipeArea(10f to 100f, 52f to 20f, 160, 1080, 2340),
         )
         assertNull(ElderGuidanceGeometry.swipeArea(2000f to 3000f, 2100f to 3100f, 160, 1080, 2340))
+    }
+
+    @Test
+    fun `a swipe start point is kept on the screen`() {
+        assertEquals(ScreenPoint(540, 1755), ElderGuidanceGeometry.clampPoint(540.7f, 1755.2f, 1080, 2340))
+        assertEquals(ScreenPoint(1079, 2339), ElderGuidanceGeometry.clampPoint(1500f, 2340f, 1080, 2340))
+        assertEquals(ScreenPoint(0, 0), ElderGuidanceGeometry.clampPoint(0f, 0f, 1080, 2340))
     }
 
     @Test

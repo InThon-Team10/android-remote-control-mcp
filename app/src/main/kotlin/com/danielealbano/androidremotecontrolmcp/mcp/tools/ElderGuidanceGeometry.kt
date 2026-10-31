@@ -4,6 +4,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
+import com.danielealbano.androidremotecontrolmcp.services.guidance.ScreenPoint
 
 /** Screen geometry of the elder-guidance highlight: pure functions, in screen pixels. */
 internal object ElderGuidanceGeometry {
@@ -49,6 +50,17 @@ internal object ElderGuidanceGeometry {
                 bottom = maxOf(start.second, end.second).toInt() + margin,
             )
         return clamp(area, width, height)
+    }
+
+    /** The point ([x], [y]) limited to the screen of [width] x [height] pixels. */
+    fun clampPoint(
+        x: Float,
+        y: Float,
+        width: Int,
+        height: Int,
+    ): ScreenPoint {
+        val clampedX = x.toInt().coerceIn(0, maxOf(0, width - 1))
+        return ScreenPoint(clampedX, y.toInt().coerceIn(0, maxOf(0, height - 1)))
     }
 
     /** The direction the user's finger moves for a swipe of ([dx], [dy]); the larger axis wins, ties are vertical. */

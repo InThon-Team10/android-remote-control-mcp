@@ -90,6 +90,7 @@ class ElderToolGuidance internal constructor(
                     instruction = substitutor.substitute(instruction),
                     explanation = explanation.takeIf { it.isNotEmpty() }?.let(substitutor::substitute),
                     scrollDirection = step.scrollDirection,
+                    swipeStart = step.swipeStart,
                 ),
             )
         Log.i(TAG, "$toolName: $outcome")

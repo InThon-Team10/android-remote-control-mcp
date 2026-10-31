@@ -7,10 +7,17 @@ import kotlinx.coroutines.flow.StateFlow
 /** What the user is asked to do on the highlighted element. */
 enum class GuidanceKind { TAP, LONG_PRESS, DOUBLE_TAP, TYPE, SCROLL }
 
+/** A point on the screen, in pixels. */
+data class ScreenPoint(
+    val x: Int,
+    val y: Int,
+)
+
 /**
  * One guidance step shown to the user instead of acting on the device: [bounds] in screen pixels, a short
  * [instruction] (shown and spoken), an optional [explanation] of what the action will do (shown under the
- * instruction and spoken after it), and the [scrollDirection] the user should swipe for [GuidanceKind.SCROLL].
+ * instruction and spoken after it), the [scrollDirection] the user should swipe for [GuidanceKind.SCROLL], and for
+ * a swipe gesture its [swipeStart] on screen, where the finger goes down (null for scrolling a node).
  */
 data class GuidanceTarget(
     val bounds: BoundsData,
@@ -18,6 +25,7 @@ data class GuidanceTarget(
     val instruction: String,
     val explanation: String? = null,
     val scrollDirection: ScrollDirection? = null,
+    val swipeStart: ScreenPoint? = null,
 )
 
 /** Why a [GuidanceController.guide] wait ended. */

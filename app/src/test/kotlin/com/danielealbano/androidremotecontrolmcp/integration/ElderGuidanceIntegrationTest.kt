@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceKind
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceOutcome
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceState
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceTarget
+import com.danielealbano.androidremotecontrolmcp.services.guidance.ScreenPoint
 import com.danielealbano.androidremotecontrolmcp.services.guidance.UserActivity
 import io.mockk.Called
 import io.mockk.coEvery
@@ -479,6 +480,41 @@ class ElderGuidanceIntegrationTest {
                 val target = controller.targets.single()
                 assertEquals(GuidanceKind.SCROLL, target.kind)
                 assertEquals(ScrollDirection.DOWN, target.scrollDirection)
+                assertNull(target.swipeStart)
+            }
+        }
+
+    @Test
+    fun `swipe highlights its path with the start point and never swipes`() =
+        runTest {
+            val deps = depsWithScreen()
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result =
+                    client.callTool("android_swipe", mapOf("x1" to 1000, "y1" to 0, "x2" to 1000, "y2" to 1200))
+
+                assertNotEquals(true, result.isError)
+                val target = controller.targets.single()
+                assertEquals(GuidanceKind.SCROLL, target.kind)
+                assertEquals(ScrollDirection.DOWN, target.scrollDirection)
+                assertEquals(ScreenPoint(1000, 0), target.swipeStart)
+                // 48dp at 420 dpi = 126 px around the path, limited to the 1080 x 2400 screen.
+                assertEquals(BoundsData(874, 0, 1080, 1326), target.bounds)
+                coVerify(exactly = 0) { deps.actionExecutor.swipe(any(), any(), any(), any(), any()) }
+            }
+        }
+
+    @Test
+    fun `a swipe starting off screen carries its start point clamped to the screen`() =
+        runTest {
+            val deps = depsWithScreen()
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                client.callTool("android_swipe", mapOf("x1" to 1500, "y1" to 1800, "x2" to 540, "y2" to 1800))
+
+                val target = controller.targets.single()
+                assertEquals(ScrollDirection.LEFT, target.scrollDirection)
+                assertEquals(ScreenPoint(1079, 1800), target.swipeStart)
             }
         }
 

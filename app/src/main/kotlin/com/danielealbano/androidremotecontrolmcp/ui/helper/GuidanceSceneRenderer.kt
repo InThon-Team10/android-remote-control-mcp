@@ -61,8 +61,9 @@ internal class GuidanceSceneRenderer(
     }
 
     /**
-     * A swipe is shown by an arrow along its path and a caption only. Nothing blocks the screen, so a 1-pixel
-     * watcher window reports the user's touch (it receives ACTION_OUTSIDE for every touch elsewhere).
+     * A swipe is shown by an arrow and a caption only: for a swipe gesture the arrow begins just past where the finger
+     * goes down (never over that point), for scrolling a node it is centred on the node. Nothing blocks the screen, so
+     * a 1-pixel watcher window reports the user's touch (it receives ACTION_OUTSIDE for every touch elsewhere).
      */
     private fun showSwipeHint(
         target: GuidanceTarget,
@@ -75,9 +76,10 @@ internal class GuidanceSceneRenderer(
             return
         }
         val direction = target.scrollDirection ?: ScrollDirection.UP
-        val arrow =
-            swipeArrowRect(area, direction, display.dp(ARROW_THICKNESS_DP), display.dp(ARROW_LENGTH_DP), screen)
-        windows.add(ARROW_ID, GuidanceWindowSpec(arrow, touchable = false)) { SwipeArrow(direction) }
+        val pill = SwipePillSize(display.dp(ARROW_THICKNESS_DP), display.dp(ARROW_LENGTH_DP), display.dp(ARROW_GAP_DP))
+        swipeArrowRect(area, target.swipeStart, direction, pill, screen)?.let { arrow ->
+            windows.add(ARROW_ID, GuidanceWindowSpec(arrow, touchable = false)) { SwipeArrow(direction) }
+        }
         windows.add(WATCHER_ID, GuidanceWindowSpec(WATCHER_RECT, touchable = true, watchOutside = true)) {}
         detector.reset(setOf(WATCHER_ID))
         // The caption goes outside the whole swipe path (not just the small pill): a caption window under the
@@ -167,6 +169,7 @@ internal class GuidanceSceneRenderer(
         const val OUTLINE_THICKNESS_DP = 8
         const val ARROW_THICKNESS_DP = 56
         const val ARROW_LENGTH_DP = 128
+        const val ARROW_GAP_DP = 16
         val WATCHER_RECT = PxRect(0, 0, 1, 1)
     }
 }

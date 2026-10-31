@@ -13,6 +13,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenIn
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceKind
+import com.danielealbano.androidremotecontrolmcp.services.guidance.ScreenPoint
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 
@@ -22,6 +23,7 @@ internal sealed interface GuidanceStep {
         val bounds: BoundsData,
         val kind: GuidanceKind,
         val scrollDirection: ScrollDirection? = null,
+        val swipeStart: ScreenPoint? = null,
     ) : GuidanceStep
 
     data class Answer(
@@ -82,7 +84,10 @@ internal class ElderGuidanceTargets(
         return GuidanceStep.Show(bounds, kind)
     }
 
-    /** The swipe the user should make (e.g. up from the home screen to open the app list); nothing is swiped. */
+    /**
+     * The swipe the user should make (e.g. up from the home screen to open the app list), with its start point on
+     * screen so the hint shows where the finger goes down; nothing is swiped.
+     */
     private fun swipeStep(arguments: JsonObject?): GuidanceStep {
         val x1 = McpToolUtils.requireFloat(arguments, "x1")
         val y1 = McpToolUtils.requireFloat(arguments, "y1")
@@ -98,7 +103,12 @@ internal class ElderGuidanceTargets(
         val bounds =
             ElderGuidanceGeometry.swipeArea(x1 to y1, x2 to y2, screen.densityDpi, screen.width, screen.height)
                 ?: throw McpToolException.InvalidParams("The swipe ($x1, $y1) -> ($x2, $y2) is outside the screen")
-        return GuidanceStep.Show(bounds, GuidanceKind.SCROLL, ElderGuidanceGeometry.swipeDirection(x2 - x1, y2 - y1))
+        return GuidanceStep.Show(
+            bounds,
+            GuidanceKind.SCROLL,
+            ElderGuidanceGeometry.swipeDirection(x2 - x1, y2 - y1),
+            ElderGuidanceGeometry.clampPoint(x1, y1, screen.width, screen.height),
+        )
     }
 
     /**
