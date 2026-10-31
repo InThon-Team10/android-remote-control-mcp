@@ -7,8 +7,8 @@ import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfi
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.mcp.auth.McpAuthPlugin
-import com.danielealbano.androidremotecontrolmcp.mcp.contentTypeOrOctetStream
 import com.danielealbano.androidremotecontrolmcp.mcp.installMcpStatelessTransport
+import com.danielealbano.androidremotecontrolmcp.mcp.respondSharedBlob
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerSharingTools
@@ -31,7 +31,6 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
-import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
@@ -187,6 +186,25 @@ class SharingIntegrationTest {
                 val response = httpClient.get("/s/$token")
                 assertEquals(HttpStatusCode.OK, response.status)
                 assertEquals(ContentType.Application.OctetStream, response.contentType())
+                assertNull(response.headers["Content-Disposition"], "/s/ must not set Content-Disposition")
+                assertArrayEquals(bytes, response.readRawBytes())
+            }
+        }
+
+    @Test
+    @DisplayName("a served blob carries X-Content-Type-Options nosniff and keeps type, body and no Content-Disposition")
+    fun servedBlobCarriesNosniff() =
+        runTest {
+            val inbox = newInbox()
+            val linkService = newLinkService()
+            val bytes = "<html><script>alert(1)</script></html>".toByteArray()
+            val token = linkService.register(bytes, "text/html", "page.html")
+
+            runSharingApp(inbox, linkService) { _, httpClient ->
+                val response = httpClient.get("/s/$token")
+                assertEquals(HttpStatusCode.OK, response.status)
+                assertEquals("nosniff", response.headers["X-Content-Type-Options"])
+                assertEquals(ContentType.Text.Html, response.contentType()?.withoutParameters())
                 assertNull(response.headers["Content-Disposition"], "/s/ must not set Content-Disposition")
                 assertArrayEquals(bytes, response.readRawBytes())
             }
@@ -479,11 +497,7 @@ class SharingIntegrationTest {
                         if (entry == null) {
                             call.respond(HttpStatusCode.NotFound)
                         } else {
-                            call.respondBytes(
-                                entry.bytes,
-                                contentTypeOrOctetStream(entry.mimeType),
-                                HttpStatusCode.OK,
-                            )
+                            call.respondSharedBlob(entry)
                         }
                     }
                 }
