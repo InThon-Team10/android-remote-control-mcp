@@ -76,4 +76,20 @@ class ArcTunnelApiException(
     val retryable: Boolean,
     val retryAfterSec: Long,
     val status: Int,
-) : RuntimeException("tunnel service: $reason (status $status)")
+) : RuntimeException("tunnel service: $reason (status $status)") {
+    /**
+     * The server-requested wait in ms: 0 when [retryAfterSec] is not positive, otherwise capped at
+     * [ArcTunnelBackoff.MAX_MS] (the longest wait the tunnel client schedules); never overflows.
+     */
+    val retryAfterMs: Long
+        get() =
+            when {
+                retryAfterSec <= 0 -> 0L
+                retryAfterSec >= ArcTunnelBackoff.MAX_MS / MS_PER_S -> ArcTunnelBackoff.MAX_MS
+                else -> retryAfterSec * MS_PER_S
+            }
+
+    private companion object {
+        const val MS_PER_S = 1_000L
+    }
+}
