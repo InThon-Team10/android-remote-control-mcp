@@ -153,7 +153,7 @@ class E2EScrollToNodeTest {
 
     @Test
     @Order(4)
-    fun `tap_node by selector taps the single on-screen match`() =
+    fun `tap_node by selector highlights the single on-screen match`() =
         runBlocking {
             launchListAndFindTarget()
             val rowOneId = findRow("Row 1")!!.getValue("node_id").jsonPrimitive.content
@@ -165,8 +165,7 @@ class E2EScrollToNodeTest {
                 )
 
             assertNotEquals(true, result.isError, textOf(result))
-            assertTrue(textOf(result).contains("Tap executed"), textOf(result))
-            assertTrue(textOf(result).contains("'$rowOneId'"), "the tap must hit Row 1 ($rowOneId): ${textOf(result)}")
+            assertTrue(textOf(result).contains("Highlighted node '$rowOneId'"), textOf(result))
         }
 
     @Test

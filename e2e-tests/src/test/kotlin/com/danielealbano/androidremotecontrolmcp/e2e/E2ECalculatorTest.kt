@@ -4,7 +4,8 @@ import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -133,28 +134,28 @@ class E2ECalculatorTest {
                 "Screen state should NOT contain old single-char flag format",
             )
 
-            // Step 4: Find and click "7" button
+            // Step 4: Find and tap "7" button
             val button7 = findNodeWithRetry("text", "7")
             assertNotNull(button7, "Could not find '7' button in Calculator")
-            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button7!!))
+            tapCenter(button7!!)
             Thread.sleep(500)
 
-            // Step 5: Find and click "+" button
+            // Step 5: Find and tap "+" button
             val buttonPlus = findNodeWithRetry("text", "+")
             assertNotNull(buttonPlus, "Could not find '+' button in Calculator")
-            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonPlus!!))
+            tapCenter(buttonPlus!!)
             Thread.sleep(500)
 
-            // Step 6: Find and click "3" button
+            // Step 6: Find and tap "3" button
             val button3 = findNodeWithRetry("text", "3")
             assertNotNull(button3, "Could not find '3' button in Calculator")
-            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to button3!!))
+            tapCenter(button3!!)
             Thread.sleep(500)
 
-            // Step 7: Find and click "=" button
+            // Step 7: Find and tap "=" button
             val buttonEquals = findNodeWithRetry("text", "=")
             assertNotNull(buttonEquals, "Could not find '=' button in Calculator")
-            mcpClient.callTool("${TOOL_PREFIX}click_node", mapOf("node_id" to buttonEquals!!))
+            tapCenter(buttonEquals!!)
             Thread.sleep(1_000)
 
             // Step 8: Wait for UI to settle
@@ -254,9 +255,19 @@ class E2ECalculatorTest {
         return null
     }
 
+    /** click_node/tap_node only highlight (elder guidance), so the test presses with a coordinate tap. */
+    private suspend fun tapCenter(node: JsonObject) {
+        val bounds = node.getValue("bounds").jsonObject
+
+        fun edge(name: String) = bounds.getValue(name).jsonPrimitive.int
+        val x = (edge("left") + edge("right")) / 2
+        val y = (edge("top") + edge("bottom")) / 2
+        mcpClient.callTool("${TOOL_PREFIX}tap", mapOf("x" to x, "y" to y))
+    }
+
     /**
      * Find a node by criteria, retrying up to NODE_WAIT_TIMEOUT_MS.
-     * Returns the node_id of the first match, or null if not found.
+     * Returns the first matching node (JSON object), or null if not found.
      *
      * The find_nodes tool returns a [CallToolResult] where the first content
      * item is a [TextContent] containing a JSON-serialized string with the
@@ -268,7 +279,7 @@ class E2ECalculatorTest {
     private suspend fun findNodeWithRetry(
         by: String,
         value: String,
-    ): String? {
+    ): JsonObject? {
         val startTime = System.currentTimeMillis()
 
         while (System.currentTimeMillis() - startTime < NODE_WAIT_TIMEOUT_MS) {
@@ -285,7 +296,7 @@ class E2ECalculatorTest {
                     val innerJson = Json.parseToJsonElement(stripUntrustedWarning(textContent)).jsonObject
                     val nodes = innerJson["nodes"]?.jsonArray
                     if (nodes != null && nodes.isNotEmpty()) {
-                        return nodes[0].jsonObject["node_id"]?.jsonPrimitive?.contentOrNull
+                        return nodes[0].jsonObject
                     }
                 }
             } catch (_: Exception) {

@@ -53,6 +53,8 @@ class McpAccessibilityService : AccessibilityService() {
 
     private var toolCallIndicatorView: View? = null
 
+    private var highlightView: View? = null
+
     /** One pacer per service connection: the platform's interval is tracked per accessibility service connection. */
     private val screenshotPacer = ScreenshotPacer(SystemClock::uptimeMillis)
 
@@ -86,6 +88,7 @@ class McpAccessibilityService : AccessibilityService() {
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                removeHighlight()
                 event.packageName?.toString()?.let { packageName ->
                     currentPackageName = packageName
                 }
@@ -142,6 +145,7 @@ class McpAccessibilityService : AccessibilityService() {
         currentActivityName = null
         inputMethodInstance = null
         removeToolCallIndicator()
+        removeHighlight()
         instance = null
 
         super.onDestroy()
@@ -268,6 +272,34 @@ class McpAccessibilityService : AccessibilityService() {
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         runCatching { windowManager.removeView(view) }
             .onFailure { Log.w(TAG, "Could not remove MCP tool-call indicator", it) }
+    }
+
+    private fun showHighlightInternal(bounds: BoundsData) {
+        removeHighlight()
+        val view =
+            View(this).apply {
+                background = GradientDrawable().apply { setStroke(HIGHLIGHT_STROKE_DP.dpToPx(), Color.RED) }
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+        val params =
+            createToolCallIndicatorLayoutParams().apply {
+                width = bounds.right - bounds.left
+                height = bounds.bottom - bounds.top
+                gravity = Gravity.TOP or Gravity.START
+                x = bounds.left
+                y = bounds.top
+            }
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        runCatching { windowManager.addView(view, params) }
+            .onSuccess { highlightView = view }
+            .onFailure { Log.w(TAG, "Could not show node highlight", it) }
+    }
+
+    private fun removeHighlight() {
+        val view = highlightView ?: return
+        highlightView = null
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        runCatching { windowManager.removeView(view) }
     }
 
     private fun createToolCallIndicatorView(): TextView {
@@ -408,6 +440,7 @@ class McpAccessibilityService : AccessibilityService() {
         private const val TOOL_INDICATOR_TOP_MARGIN_DP = 12
         private const val TOOL_INDICATOR_TEXT_SIZE_SP = 13f
         private const val TOOL_INDICATOR_BACKGROUND_COLOR = 0xE6212121.toInt()
+        private const val HIGHLIGHT_STROKE_DP = 4
 
         /**
          * Length of the QUIET GAP (no further window-structure events) that must elapse before the
@@ -437,6 +470,12 @@ class McpAccessibilityService : AccessibilityService() {
             Handler(Looper.getMainLooper()).post {
                 instance?.showToolCallIndicatorInternal(toolName)
             }
+        }
+
+        /** Outlines [bounds] (screen pixels) until the next window-state change; replaces any previous outline. */
+        fun showHighlight(bounds: BoundsData) {
+            if (instance == null) return
+            Handler(Looper.getMainLooper()).post { instance?.showHighlightInternal(bounds) }
         }
 
         fun hideToolCallIndicator() {

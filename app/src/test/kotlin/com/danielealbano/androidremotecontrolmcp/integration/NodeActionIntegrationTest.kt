@@ -313,9 +313,7 @@ class NodeActionIntegrationTest {
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
-            coEvery {
-                deps.actionExecutor.clickNode("node_xyz", any<List<WindowData>>())
-            } returns Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
+            every { deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_xyz") } returns null
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -330,14 +328,13 @@ class NodeActionIntegrationTest {
         }
 
     @Test
-    fun `tap_node with valid node_id taps within bounds and returns success`() =
+    fun `tap_node with valid node_id highlights the node and does not tap`() =
         runTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             every {
                 deps.elementFinder.findNodeById(any<List<WindowData>>(), "node_btn")
             } returns sampleTree.children[0]
-            coEvery { deps.actionExecutor.tap(any(), any()) } returns Result.success(Unit)
 
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
@@ -347,9 +344,9 @@ class NodeActionIntegrationTest {
                     )
                 assertNotEquals(true, result.isError)
                 val text = (result.content[0] as TextContent).text
-                assertTrue(text.contains("Tap executed"))
-                assertTrue(text.contains("node_btn"))
+                assertTrue(text.contains("Highlighted node 'node_btn'"), text)
             }
+            coVerify(exactly = 0) { deps.actionExecutor.tap(any(), any()) }
         }
 
     @Test

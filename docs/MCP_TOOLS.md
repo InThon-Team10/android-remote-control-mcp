@@ -1163,7 +1163,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_click_node`
 
-Click the specified accessibility node, by node ID or by a selector (see [Targeting a node](#targeting-a-node)).
+Highlights the specified accessibility node with a red rectangle for the user to tap, by node ID or by a selector (see [Targeting a node](#targeting-a-node)). It does **not** click: the app guides the user instead of acting. The rectangle is touch-through and disappears on the next screen change (or when another node is highlighted).
 
 **Input Schema**:
 ```json
@@ -1179,7 +1179,7 @@ Click the specified accessibility node, by node ID or by a selector (see [Target
 }
 ```
 
-**Output**: `"Click performed on node '<node_id>'"`
+**Output**: `"Highlighted node '<node_id>' for the user to tap"`
 
 **Example**:
 ```bash
@@ -1197,7 +1197,6 @@ curl -X POST http://localhost:8080/mcp \
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches (untrusted candidate list, see [Targeting a node](#targeting-a-node))
-- **Action failed**: Node is not clickable or click action failed
 
 ---
 
@@ -1243,7 +1242,7 @@ curl -X POST http://localhost:8080/mcp \
 
 ### `android_tap_node`
 
-Performs a gesture-based tap at a random point within the bounds of the node identified by node_id or by a selector (see [Targeting a node](#targeting-a-node)). Unlike `click_node` (which uses the accessibility ACTION_CLICK), this performs a coordinate-based touch gesture. The tap point is randomized within the node bounds, inset by a configurable percentage (default 5%) from each edge to avoid hitting borders.
+Highlights the node identified by node_id or by a selector (see [Targeting a node](#targeting-a-node)) for the user to tap, exactly like `android_click_node`. It does **not** tap.
 
 **Input Schema**:
 ```json
@@ -1253,14 +1252,13 @@ Performs a gesture-based tap at a random point within the bounds of the node ide
     "node_id": { "type": "string", "description": "Node ID from android_get_screen_state or android_find_nodes. Use either this or a selector (by + value)." },
     "by": { "type": "string", "enum": ["text", "content_desc", "resource_id", "class_name"], "description": "Selector criteria (with value), instead of node_id: the target is the single on-screen node that matches; more than one match is an error listing the candidates." },
     "value": { "type": "string", "description": "Selector value (with by)" },
-    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" },
-    "inset_percentage": { "type": "number", "default": 5.0, "description": "Percentage to inset from each edge of the node bounds (0.0-45.0). Default 5.0" }
+    "exact_match": { "type": "boolean", "default": false, "description": "Selector: if true, match exactly. If false, match contains (case-insensitive)" }
   },
   "required": []
 }
 ```
 
-**Output**: `"Tap executed at (<x>, <y>) within node '<node_id>'"`
+**Output**: `"Highlighted node '<node_id>' for the user to tap"`
 
 **Example**:
 ```bash
@@ -1274,11 +1272,10 @@ curl -X POST http://localhost:8080/mcp \
 ```
 
 **Error Cases** (returned as `CallToolResult(isError = true)`):
-- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, an empty `node_id`, `inset_percentage` out of range (0.0-45.0)
+- **Invalid params**: Neither `node_id` nor a selector, both, an incomplete or invalid selector, or an empty `node_id`
 - **Permission denied**: Accessibility service not enabled
 - **Node not found**: Node not found in accessibility tree, or no on-screen node matches the selector
 - **Ambiguous selector**: More than one on-screen node matches
-- **Action failed**: Tap gesture failed
 
 ---
 

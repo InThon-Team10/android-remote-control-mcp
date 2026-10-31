@@ -237,9 +237,9 @@ The MCP server exposes 58 tools across 14 categories. For full JSON-RPC schemas,
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|
 | `android_find_nodes` | Find UI nodes by criteria | `by` (string: text/content_desc/resource_id/class_name), `value` (string) | `exact_match` (boolean, default false), `visible_only` (boolean, default false) |
-| `android_click_node` | Click an accessibility node | Target | — |
+| `android_click_node` | Highlight a node with a rectangle for the user to tap (does not click) | Target | — |
 | `android_long_click_node` | Long-click an accessibility node | Target | — |
-| `android_tap_node` | Gesture-based tap at a random point within node bounds (unlike `android_click_node`, which uses ACTION_CLICK) | Target | `inset_percentage` (number: 0.0-45.0, default 5.0) |
+| `android_tap_node` | Same as `android_click_node`: highlight for the user to tap (does not tap) | Target | — |
 | `android_scroll_to_node` | Scroll the nearest scrollable ancestor in the given direction until the node is visible (up to 5 scrolls, stops early when it does not scroll further), re-finding it after each scroll; returns its current ID | Target, `direction` (string: up/down/left/right) | — |
 | `android_scroll_node` | Scroll a scrollable node once in a direction | Target, `direction` (string: up/down/left/right) | — |
 

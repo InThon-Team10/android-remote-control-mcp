@@ -14,6 +14,7 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsDa
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.FindBy
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.testutil.PrivacyToolTestDoubles
@@ -21,8 +22,12 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.runs
 import io.mockk.unmockkAll
+import io.mockk.verify
 import io.mockk.verifyOrder
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
@@ -306,49 +311,42 @@ class NodeActionToolsTest {
         private val tool =
             ClickNodeTool(
                 mockTreeParser,
-                mockActionExecutor,
+                mockElementFinder,
                 mockAccessibilityServiceProvider,
                 mockNodeCache,
                 targetResolver,
             )
 
         @Test
-        fun `clicks node successfully`() =
+        fun `highlights the node bounds instead of acting`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_abc", sampleWindows) } returns Result.success(Unit)
-                val params = buildJsonObject { put("node_id", "node_abc") }
+                spyHighlight()
+                val node = sampleTree.children[0]
+                every { mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc")) } returns node
 
-                val result = tool.execute(params)
-                val text = extractTextContent(result)
-                assertTrue(text.contains("Click performed"))
+                val text = extractTextContent(tool.execute(buildJsonObject { put("node_id", "node_abc") }))
+
+                assertTrue(text.contains("Highlighted node 'node_abc'"), text)
+                verify { McpAccessibilityService.showHighlight(node.bounds) }
+                coVerify(exactly = 0) { mockActionExecutor.clickNode(any(), any()) }
             }
 
         @Test
-        fun `throws error when node not found`() =
+        fun `throws node not found when the node is gone`() =
             runTest {
-                coEvery { mockActionExecutor.clickNode("node_xyz", sampleWindows) } returns
-                    Result.failure(NoSuchElementException("Node 'node_xyz' not found"))
-                val params = buildJsonObject { put("node_id", "node_xyz") }
+                spyHighlight()
+                every { mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_xyz")) } returns null
 
-                assertThrows<McpToolException.NodeNotFound> { tool.execute(params) }
-            }
-
-        @Test
-        fun `throws error when node not clickable`() =
-            runTest {
-                coEvery { mockActionExecutor.clickNode("node_abc", sampleWindows) } returns
-                    Result.failure(IllegalStateException("Node 'node_abc' is not clickable"))
-                val params = buildJsonObject { put("node_id", "node_abc") }
-
-                assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
+                assertThrows<McpToolException.NodeNotFound> {
+                    tool.execute(buildJsonObject { put("node_id", "node_xyz") })
+                }
+                verify(exactly = 0) { McpAccessibilityService.showHighlight(any()) }
             }
 
         @Test
         fun `throws error for missing node_id`() =
             runTest {
-                val params = buildJsonObject {}
-
-                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+                assertThrows<McpToolException.InvalidParams> { tool.execute(buildJsonObject {}) }
             }
     }
 
@@ -383,246 +381,41 @@ class NodeActionToolsTest {
             TapNodeTool(
                 mockTreeParser,
                 mockElementFinder,
-                mockActionExecutor,
                 mockAccessibilityServiceProvider,
                 mockNodeCache,
                 targetResolver,
             )
 
         @Test
-        fun `taps node successfully with default inset`() =
+        fun `highlights the node bounds instead of acting`() =
             runTest {
-                // Arrange
-                val node = sampleTree.children[0] // bounds = BoundsData(50, 800, 250, 1000)
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc"))
-                } returns node
-                coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
-                val params = buildJsonObject { put("node_id", "node_abc") }
-
-                // Act
-                val result = tool.execute(params)
-                val text = extractTextContent(result)
-
-                // Assert
-                assertTrue(text.contains("Tap executed"))
-                assertTrue(text.contains("node_abc"))
-            }
-
-        @Test
-        fun `taps small node at top-left corner`() =
-            runTest {
-                // Arrange — small element: width=3, height=3 (both < 5)
-                val smallNode =
-                    AccessibilityNodeData(
-                        id = "node_small",
-                        className = "android.widget.ImageView",
-                        bounds = BoundsData(100, 200, 103, 203),
-                        visible = true,
-                    )
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_small"))
-                } returns smallNode
-                coEvery { mockActionExecutor.tap(100f, 200f) } returns Result.success(Unit)
-                val params = buildJsonObject { put("node_id", "node_small") }
-
-                // Act
-                val result = tool.execute(params)
-                val text = extractTextContent(result)
-
-                // Assert
-                assertTrue(text.contains("Tap executed at (100, 200)"))
-                assertTrue(text.contains("node_small"))
-            }
-
-        @Test
-        fun `uses custom inset_percentage`() =
-            runTest {
-                // Arrange — bounds (50,800,250,1000), width=200, height=200
-                // inset_percentage=20 → insetFraction=0.2 → inset=40px each side
-                // insetLeft=90, insetRight=210, insetTop=840, insetBottom=960
+                spyHighlight()
                 val node = sampleTree.children[0]
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc"))
-                } returns node
-                coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_abc")
-                        put("inset_percentage", 20.0)
-                    }
+                every { mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc")) } returns node
 
-                // Act
-                val result = tool.execute(params)
-                val text = extractTextContent(result)
+                val text = extractTextContent(tool.execute(buildJsonObject { put("node_id", "node_abc") }))
 
-                // Assert
-                assertTrue(text.contains("Tap executed"))
-                assertTrue(text.contains("node_abc"))
+                assertTrue(text.contains("Highlighted node 'node_abc'"), text)
+                verify { McpAccessibilityService.showHighlight(node.bounds) }
+                coVerify(exactly = 0) { mockActionExecutor.tap(any(), any()) }
+            }
+
+        @Test
+        fun `throws node not found when the node is gone`() =
+            runTest {
+                spyHighlight()
+                every { mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_xyz")) } returns null
+
+                assertThrows<McpToolException.NodeNotFound> {
+                    tool.execute(buildJsonObject { put("node_id", "node_xyz") })
+                }
+                verify(exactly = 0) { McpAccessibilityService.showHighlight(any()) }
             }
 
         @Test
         fun `throws error for missing node_id`() =
             runTest {
-                val params = buildJsonObject {}
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
-                assertTrue(exception.message!!.contains("Missing required parameter 'node_id'"))
-            }
-
-        @Test
-        fun `throws error for empty node_id`() =
-            runTest {
-                val params = buildJsonObject { put("node_id", "") }
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
-                assertTrue(exception.message!!.contains("non-empty"))
-            }
-
-        @Test
-        fun `throws error when node not found`() =
-            runTest {
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_xyz"))
-                } returns null
-                val params = buildJsonObject { put("node_id", "node_xyz") }
-
-                val exception = assertThrows<McpToolException.NodeNotFound> { tool.execute(params) }
-                assertTrue(exception.message!!.contains("node_xyz"))
-            }
-
-        @Test
-        fun `throws error for inset_percentage below minimum`() =
-            runTest {
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_abc")
-                        put("inset_percentage", -1.0)
-                    }
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
-                assertTrue(exception.message!!.contains("inset_percentage"))
-            }
-
-        @Test
-        fun `throws error for inset_percentage above maximum`() =
-            runTest {
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_abc")
-                        put("inset_percentage", 50.0)
-                    }
-
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
-                assertTrue(exception.message!!.contains("inset_percentage"))
-            }
-
-        @Test
-        fun `returns error when tap action fails`() =
-            runTest {
-                // Arrange
-                val node = sampleTree.children[0]
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc"))
-                } returns node
-                coEvery { mockActionExecutor.tap(any(), any()) } returns
-                    Result.failure(RuntimeException("Gesture dispatch failed"))
-                val params = buildJsonObject { put("node_id", "node_abc") }
-
-                // Act & Assert
-                assertThrows<McpToolException.ActionFailed> { tool.execute(params) }
-            }
-
-        @Test
-        fun `randomFloatInRange returns min when min equals max`() {
-            // min == max → returns min
-            assertEquals(10f, tool.randomFloatInRange(10f, 10f))
-            // min > max → returns min
-            assertEquals(15f, tool.randomFloatInRange(15f, 10f))
-        }
-
-        @Test
-        fun `throws error for null arguments`() =
-            runTest {
-                val exception = assertThrows<McpToolException.InvalidParams> { tool.execute(null) }
-                assertTrue(exception.message!!.contains("Missing required parameter 'node_id'"))
-            }
-
-        @Test
-        fun `accepts inset_percentage at minimum boundary 0`() =
-            runTest {
-                // Arrange — inset_percentage=0.0 means full bounds (no inset)
-                val node = sampleTree.children[0]
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc"))
-                } returns node
-                coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_abc")
-                        put("inset_percentage", 0.0)
-                    }
-
-                // Act
-                val result = tool.execute(params)
-
-                // Assert — no exception, success
-                assertTrue(extractTextContent(result).contains("Tap executed"))
-            }
-
-        @Test
-        fun `accepts inset_percentage at maximum boundary 45`() =
-            runTest {
-                // Arrange — inset_percentage=45.0, very narrow center strip
-                val node = sampleTree.children[0]
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_abc"))
-                } returns node
-                coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_abc")
-                        put("inset_percentage", 45.0)
-                    }
-
-                // Act
-                val result = tool.execute(params)
-
-                // Assert — no exception, success
-                assertTrue(extractTextContent(result).contains("Tap executed"))
-            }
-
-        @Test
-        fun `high inset on small-but-not-tiny node collapses bounds gracefully`() =
-            runTest {
-                // Arrange — element width=10, height=10 (above threshold of 5)
-                // inset_percentage=45.0 → insetFraction=0.45, inset=4.5px each side
-                // insetLeft=104.5, insetRight=105.5, insetTop=204.5, insetBottom=205.5
-                // But actually: width=10, 45% of 10 = 4.5 from each side → left+4.5=104.5, right-4.5=105.5
-                // The bounds don't fully collapse here, but let's verify it works
-                val smallishNode =
-                    AccessibilityNodeData(
-                        id = "node_smallish",
-                        className = "android.widget.ImageView",
-                        bounds = BoundsData(100, 200, 110, 210),
-                        visible = true,
-                    )
-                every {
-                    mockElementFinder.findNodeById(any<List<WindowData>>(), eq("node_smallish"))
-                } returns smallishNode
-                coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
-                val params =
-                    buildJsonObject {
-                        put("node_id", "node_smallish")
-                        put("inset_percentage", 45.0)
-                    }
-
-                // Act
-                val result = tool.execute(params)
-
-                // Assert — no exception, graceful handling
-                assertTrue(extractTextContent(result).contains("Tap executed"))
-                assertTrue(extractTextContent(result).contains("node_smallish"))
+                assertThrows<McpToolException.InvalidParams> { tool.execute(buildJsonObject {}) }
             }
     }
 
@@ -813,17 +606,17 @@ class NodeActionToolsTest {
         private val clickTool =
             ClickNodeTool(
                 mockTreeParser,
-                mockActionExecutor,
+                realFinder,
                 mockAccessibilityServiceProvider,
                 mockNodeCache,
                 realResolver,
             )
 
         @Test
-        fun `click_node by selector clicks the single on-screen match`() =
+        fun `click_node by selector highlights the single on-screen match`() =
             runTest {
+                spyHighlight()
                 treesInOrder(tree)
-                coEvery { mockActionExecutor.clickNode("node_ok_on", windowsOf(tree)) } returns Result.success(Unit)
 
                 val text = extractTextContent(clickTool.execute(selectorParams("OK")))
 
@@ -831,8 +624,9 @@ class NodeActionToolsTest {
             }
 
         @Test
-        fun `click_node by selector with two on-screen matches returns an untrusted error and clicks nothing`() =
+        fun `click_node by selector with two on-screen matches returns an untrusted error and highlights nothing`() =
             runTest {
+                spyHighlight()
                 treesInOrder(tree)
 
                 val result = clickTool.execute(selectorParams("Save"))
@@ -841,12 +635,13 @@ class NodeActionToolsTest {
                 assertEquals(true, result.isError)
                 assertEquals(McpToolUtils.UNTRUSTED_CONTENT_WARNING, text.lines().first())
                 assertTrue(text.contains("node_save_1") && text.contains("node_save_2"), text)
-                coVerify(exactly = 0) { mockActionExecutor.clickNode(any(), any()) }
+                verify(exactly = 0) { McpAccessibilityService.showHighlight(any()) }
             }
 
         @Test
         fun `long_click_node, tap_node and scroll_node with two on-screen matches return an untrusted error`() =
             runTest {
+                spyHighlight()
                 treesInOrder(tree)
                 val longClick =
                     LongClickNodeTool(
@@ -860,7 +655,6 @@ class NodeActionToolsTest {
                     TapNodeTool(
                         mockTreeParser,
                         realFinder,
-                        mockActionExecutor,
                         mockAccessibilityServiceProvider,
                         mockNodeCache,
                         realResolver,
@@ -894,7 +688,7 @@ class NodeActionToolsTest {
                     assertTrue(text.contains("node_save_1") && text.contains("node_save_2"), text)
                 }
                 coVerify(exactly = 0) { mockActionExecutor.longClickNode(any(), any()) }
-                coVerify(exactly = 0) { mockActionExecutor.tap(any(), any()) }
+                verify(exactly = 0) { McpAccessibilityService.showHighlight(any()) }
                 coVerify(exactly = 0) { mockActionExecutor.scrollNode(any(), any(), any()) }
             }
 
@@ -924,16 +718,15 @@ class NodeActionToolsTest {
             }
 
         @Test
-        fun `tap_node by selector taps inside the matched node`() =
+        fun `tap_node by selector highlights the matched node`() =
             runTest {
+                spyHighlight()
                 val target = leaf("node_ok_on", "OK", visible = true, bounds = BoundsData(100, 200, 300, 400))
                 treesInOrder(screenWith(target))
-                coEvery { mockActionExecutor.tap(any(), any()) } returns Result.success(Unit)
                 val tool =
                     TapNodeTool(
                         mockTreeParser,
                         realFinder,
-                        mockActionExecutor,
                         mockAccessibilityServiceProvider,
                         mockNodeCache,
                         realResolver,
@@ -941,8 +734,8 @@ class NodeActionToolsTest {
 
                 val text = extractTextContent(tool.execute(selectorParams("OK")))
 
-                assertTrue(text.contains("within node 'node_ok_on'"), text)
-                coVerify { mockActionExecutor.tap(match { it in 100f..300f }, match { it in 200f..400f }) }
+                assertTrue(text.contains("Highlighted node 'node_ok_on'"), text)
+                verify { McpAccessibilityService.showHighlight(BoundsData(100, 200, 300, 400)) }
             }
 
         @Test
@@ -1508,4 +1301,10 @@ class NodeActionToolsTest {
                 }
             }
     }
+}
+
+/** Records highlight requests instead of drawing (no accessibility service on the JVM); reset by unmockkAll. */
+private fun spyHighlight() {
+    mockkObject(McpAccessibilityService.Companion)
+    every { McpAccessibilityService.showHighlight(any()) } just runs
 }

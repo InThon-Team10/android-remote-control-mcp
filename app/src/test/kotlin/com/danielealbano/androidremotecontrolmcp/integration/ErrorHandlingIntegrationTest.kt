@@ -81,7 +81,7 @@ class ErrorHandlingIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("nonexistent", any<List<WindowData>>())
+                deps.actionExecutor.longClickNode("nonexistent", any<List<WindowData>>())
             } returns
                 Result.failure(
                     NoSuchElementException("Node 'nonexistent' not found"),
@@ -90,7 +90,7 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_click_node",
+                        name = "android_long_click_node",
                         arguments = mapOf("node_id" to "nonexistent"),
                     )
                 assertEquals(true, result.isError)
@@ -105,7 +105,7 @@ class ErrorHandlingIntegrationTest {
             val deps = McpIntegrationTestHelper.createMockDependencies()
             McpIntegrationTestHelper.setupMultiWindowMock(deps, sampleTree, sampleScreenInfo)
             coEvery {
-                deps.actionExecutor.clickNode("node_root", any<List<WindowData>>())
+                deps.actionExecutor.longClickNode("node_root", any<List<WindowData>>())
             } returns
                 Result.failure(
                     IllegalStateException("Node 'node_root' is not clickable"),
@@ -114,7 +114,7 @@ class ErrorHandlingIntegrationTest {
             McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
                 val result =
                     client.callTool(
-                        name = "android_click_node",
+                        name = "android_long_click_node",
                         arguments = mapOf("node_id" to "node_root"),
                     )
                 assertEquals(true, result.isError)
