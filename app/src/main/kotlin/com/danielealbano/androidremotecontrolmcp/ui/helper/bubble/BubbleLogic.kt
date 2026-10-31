@@ -11,6 +11,22 @@ import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 internal fun bubblePrerequisitesMet(config: AssistantConfig): Boolean =
     config.enabled && config.privacyNoticeAccepted && config.apiKeyConfigured
 
+/** The request may be sent only with a non-blank draft and while no run is in progress. */
+internal fun sendEnabled(
+    draft: String,
+    running: Boolean,
+): Boolean = !running && draft.isNotBlank()
+
+/**
+ * A helper window is visible and touchable only when it is shown, not hidden for a screenshot ([touchThrough]) and
+ * not [suppressed] by a full-screen practice. The two hiding reasons are independent so one cannot undo the other.
+ */
+internal fun windowInteractive(
+    shown: Boolean,
+    touchThrough: Boolean,
+    suppressed: Boolean,
+): Boolean = shown && !touchThrough && !suppressed
+
 /** What the panel shows below the request input. */
 internal sealed interface PanelMessage {
     data object None : PanelMessage

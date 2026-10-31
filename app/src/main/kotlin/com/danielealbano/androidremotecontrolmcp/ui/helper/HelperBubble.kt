@@ -11,4 +11,10 @@ interface HelperBubble {
 
     /** Expands the bubble's request input (no-op while the bubble is not ON). */
     fun openInput()
+
+    /**
+     * Hides the bubble and its panel while a full-screen screen (the practice) owns the display. Idempotent, reset
+     * when the bubble detaches; the screen releases it when it leaves the foreground.
+     */
+    fun setSuppressed(suppressed: Boolean)
 }

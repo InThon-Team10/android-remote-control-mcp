@@ -23,6 +23,22 @@ class BubbleLogicTest {
     }
 
     @Test
+    fun `send needs a non blank draft and no run`() {
+        assertTrue(sendEnabled("hi", running = false))
+        assertFalse(sendEnabled("  ", running = false))
+        assertFalse(sendEnabled("", running = false))
+        assertFalse(sendEnabled("hi", running = true))
+    }
+
+    @Test
+    fun `a window is interactive only when shown and neither touch through nor suppressed`() {
+        assertTrue(windowInteractive(shown = true, touchThrough = false, suppressed = false))
+        assertFalse(windowInteractive(shown = false, touchThrough = false, suppressed = false))
+        assertFalse(windowInteractive(shown = true, touchThrough = true, suppressed = false))
+        assertFalse(windowInteractive(shown = true, touchThrough = false, suppressed = true))
+    }
+
+    @Test
     fun `latest assistant text after the last user request is shown`() {
         val items =
             listOf(

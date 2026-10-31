@@ -169,6 +169,59 @@ class HelperBubbleOverlayHostTest {
         }
 
     @Test
+    fun `suppression hides every window, closes the panel and survives the screenshot hider`() =
+        runTest {
+            val host = host()
+            host.attach(service)
+            advanceUntilIdle()
+            host.openInput()
+            advanceUntilIdle()
+
+            host.setSuppressed(true)
+            host.setSuppressed(true)
+            advanceUntilIdle()
+            host.overlayHider.hiddenDuring { }
+
+            verify(exactly = 1) { controller.setSuppressed(true) }
+            verify { controller.setPanelOpen(false) }
+            verify(exactly = 0) { controller.setSuppressed(false) }
+            host.openInput()
+            advanceUntilIdle()
+            verify(exactly = 1) { controller.setPanelOpen(true) }
+        }
+
+    @Test
+    fun `suppression applies to a window added later`() =
+        runTest {
+            config.value = ready.copy(apiKeyConfigured = false)
+            val host = host()
+            host.attach(service)
+            advanceUntilIdle()
+            host.setSuppressed(true)
+
+            config.value = ready
+            advanceUntilIdle()
+
+            verify { controller.setSuppressed(true) }
+        }
+
+    @Test
+    fun `detach clears suppression`() =
+        runTest {
+            val host = host()
+            host.attach(service)
+            advanceUntilIdle()
+            host.setSuppressed(true)
+            host.detach()
+
+            host.attach(service)
+            advanceUntilIdle()
+
+            verify(exactly = 1) { controller.setSuppressed(true) }
+            verify(exactly = 0) { controller.setSuppressed(false) }
+        }
+
+    @Test
     fun `guidance collapses the panel and hides the bubble, then restores`() =
         runTest {
             val host = host()

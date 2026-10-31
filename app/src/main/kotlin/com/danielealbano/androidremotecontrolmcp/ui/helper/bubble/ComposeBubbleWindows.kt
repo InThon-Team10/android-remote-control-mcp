@@ -28,6 +28,21 @@ private class HostedWindow(
     val owner: OverlayLifecycleOwner,
 )
 
+private fun updateWindow(
+    windowManager: WindowManager,
+    window: HostedWindow,
+    params: WindowManager.LayoutParams,
+    interactive: Boolean,
+) {
+    window.view.visibility = if (interactive) View.VISIBLE else View.INVISIBLE
+    if (!interactive) params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+    try {
+        windowManager.updateViewLayout(window.view, params)
+    } catch (error: IllegalArgumentException) {
+        Logger.w("MCP:HelperBubble", "Could not update a helper window: ${error.javaClass.simpleName}")
+    }
+}
+
 /** [BubbleWindowController] backed by two accessibility-overlay windows, each hosting a ComposeView. */
 internal class ComposeBubbleWindows(
     private val service: AccessibilityService,
@@ -41,6 +56,7 @@ internal class ComposeBubbleWindows(
     private var panel: HostedWindow? = null
     private var bubbleVisible = true
     private var touchThrough = false
+    private var suppressed = false
     private val drag =
         BubbleDragTracker(
             params,
@@ -86,6 +102,11 @@ internal class ComposeBubbleWindows(
         refresh()
     }
 
+    override fun setSuppressed(suppressed: Boolean) {
+        this.suppressed = suppressed
+        refresh()
+    }
+
     override fun focusInput() {
         focusTick.value += 1
     }
@@ -103,23 +124,10 @@ internal class ComposeBubbleWindows(
     }
 
     private fun refresh() {
-        bubble?.let { update(it, params.bubble(drag.offset), shown = bubbleVisible && panel == null) }
-        panel?.let { update(it, params.panel(), shown = bubbleVisible) }
-    }
-
-    private fun update(
-        window: HostedWindow,
-        params: WindowManager.LayoutParams,
-        shown: Boolean,
-    ) {
-        val interactive = shown && !touchThrough
-        window.view.visibility = if (interactive) View.VISIBLE else View.INVISIBLE
-        if (!interactive) params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        try {
-            windowManager.updateViewLayout(window.view, params)
-        } catch (error: IllegalArgumentException) {
-            Logger.w(TAG, "Could not update a helper window: ${error.javaClass.simpleName}")
-        }
+        val bubbleOn = windowInteractive(bubbleVisible && panel == null, touchThrough, suppressed)
+        val panelOn = windowInteractive(bubbleVisible, touchThrough, suppressed)
+        bubble?.let { updateWindow(windowManager, it, params.bubble(drag.offset), bubbleOn) }
+        panel?.let { updateWindow(windowManager, it, params.panel(), panelOn) }
     }
 
     private fun addWindow(

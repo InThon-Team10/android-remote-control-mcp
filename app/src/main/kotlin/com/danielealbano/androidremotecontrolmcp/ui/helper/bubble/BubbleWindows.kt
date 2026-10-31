@@ -16,6 +16,12 @@ internal interface BubbleWindowController {
     /** Makes every window invisible and touch-through, or restores it. Applies to windows added later too. */
     fun setTouchThrough(enabled: Boolean)
 
+    /**
+     * Hides every window (invisible, touch-through) while a full-screen screen owns the display. Independent of
+     * [setTouchThrough]: the screenshot hider's release never un-hides a suppressed bubble. Applies to later windows.
+     */
+    fun setSuppressed(suppressed: Boolean)
+
     /** Moves keyboard focus to the request input of the open panel. */
     fun focusInput()
 

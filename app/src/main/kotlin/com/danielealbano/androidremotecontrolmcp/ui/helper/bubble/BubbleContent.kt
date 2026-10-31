@@ -58,6 +58,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
@@ -82,22 +83,18 @@ internal fun BubbleCharacterWindow(
     val moveUp = stringResource(R.string.bubble_move_up)
     val moveDown = stringResource(R.string.bubble_move_down)
     val step = with(LocalDensity.current) { BUBBLE_MOVE_STEP.toPx() }
-    Surface(
+    val label = stringResource(if (running == SessionState.Idle) R.string.bubble_label else R.string.bubble_label_busy)
+    HelpButtonFace(
+        label = label,
         onClick = actions::onToggleBubble,
-        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 12.dp, bottomEnd = 12.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        shadowElevation = 6.dp,
         modifier =
             Modifier
-                .padding(6.dp)
-                .size(width = 64.dp, height = 80.dp)
                 .pointerInput(Unit) {
                     detectVerticalDragGestures(onDragEnd = { dragEnd() }, onDragCancel = { dragEnd() }) { change, y ->
                         change.consume()
                         drag(y)
                     }
                 }.semantics {
-                    role = Role.Button
                     // TalkBack users cannot drag: the same move is offered as two actions.
                     customActions =
                         listOf(
@@ -105,23 +102,7 @@ internal fun BubbleCharacterWindow(
                             CustomAccessibilityAction(moveDown) { moveBy(step, drag, dragEnd) },
                         )
                 },
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                Icon(
-                    imageVector = Icons.Rounded.SentimentSatisfiedAlt,
-                    contentDescription = stringResource(R.string.bubble_open),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(4.dp).size(36.dp),
-                )
-            }
-            val label = if (running == SessionState.Idle) R.string.bubble_label else R.string.bubble_label_busy
-            Text(
-                text = stringResource(label),
-                style = MaterialTheme.typography.labelLarge,
-            )
-        }
-    }
+    )
 }
 
 @Composable
@@ -140,33 +121,56 @@ internal fun BubblePanelWindow(
         shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            PanelHeader(actions)
-            Column(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
-                PanelMessageView(message, session, actions)
-            }
-            if (session != SessionState.Idle) RunningIndicator()
-            RequestRow(state, actions, focusTick, session == SessionState.Idle)
-            PanelButtons(actions, session != SessionState.Idle)
-        }
+        PanelInput(state, actions, focusTick, message, session)
     }
 }
 
 @Composable
-private fun PanelHeader(actions: BubbleActions) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = stringResource(R.string.bubble_title),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = actions::onClosePanel, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Rounded.Close, stringResource(R.string.bubble_close))
+private fun PanelInput(
+    state: BubbleUiState,
+    actions: BubbleActions,
+    focusTick: StateFlow<Int>,
+    message: PanelMessage,
+    session: SessionState,
+) {
+    var text by remember { mutableStateOf("") }
+    val voiceEnabled by state.voiceEnabled.collectAsState()
+    val listening by state.listening.collectAsState()
+    val tick by focusTick.collectAsState()
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val running = session != SessionState.Idle
+    val micVisual =
+        when {
+            !voiceEnabled -> MicVisual.HIDDEN
+            listening -> MicVisual.LISTENING
+            else -> MicVisual.IDLE
         }
+    LaunchedEffect(tick) {
+        focus.requestFocus()
+        keyboard?.show()
     }
+    HelperRequestInput(
+        ui = RequestInputUi(text, false, micVisual, null, sendEnabled(text, running), focus),
+        actions =
+            RequestInputActions(
+                onTextChange = { text = it },
+                onMic = actions::onToggleMic,
+                onSend = {
+                    if (sendEnabled(text, running)) {
+                        actions.onSend(text.trim())
+                        text = ""
+                    }
+                },
+                onClose = actions::onClosePanel,
+            ),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        above = {
+            PanelMessageView(message, session, actions)
+            if (running) RunningIndicator()
+        },
+        below = { PanelButtons(actions, running) },
+    )
 }
 
 @Composable
@@ -196,7 +200,7 @@ private fun SpeechBubble(
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 26.sp),
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier.padding(16.dp),
         )
@@ -238,62 +242,15 @@ private fun RunningIndicator() {
 }
 
 @Composable
-private fun RequestRow(
-    state: BubbleUiState,
-    actions: BubbleActions,
-    focusTick: StateFlow<Int>,
-    idle: Boolean,
-) {
-    var text by remember { mutableStateOf("") }
-    val voiceEnabled by state.voiceEnabled.collectAsState()
-    val listening by state.listening.collectAsState()
-    val tick by focusTick.collectAsState()
-    val focus = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
-    val send = {
-        if (idle && text.isNotBlank()) {
-            actions.onSend(text.trim())
-            text = ""
-        }
-    }
-    LaunchedEffect(tick) {
-        focus.requestFocus()
-        keyboard?.show()
-    }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            placeholder = { Text(stringResource(R.string.bubble_input_hint)) },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { send() }),
-            modifier = Modifier.weight(1f).focusRequester(focus),
-        )
-        IconButton(onClick = send, enabled = idle && text.isNotBlank(), modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Rounded.Send, stringResource(R.string.bubble_send))
-        }
-        if (voiceEnabled) {
-            val micLabel = if (listening) R.string.bubble_mic_stop else R.string.bubble_mic_start
-            IconButton(onClick = actions::onToggleMic, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    imageVector = if (listening) Icons.Rounded.MicOff else Icons.Rounded.Mic,
-                    contentDescription = stringResource(micLabel),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun PanelButtons(
     actions: BubbleActions,
     running: Boolean,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        TextButton(onClick = actions::onStop, enabled = running, modifier = Modifier.heightIn(min = 48.dp)) {
+        TextButton(onClick = actions::onStop, enabled = running, modifier = Modifier.heightIn(min = 56.dp)) {
             Text(stringResource(R.string.bubble_stop))
         }
-        TextButton(onClick = actions::onNewChat, modifier = Modifier.heightIn(min = 48.dp)) {
+        TextButton(onClick = actions::onNewChat, modifier = Modifier.heightIn(min = 56.dp)) {
             Text(stringResource(R.string.bubble_new_chat))
         }
     }

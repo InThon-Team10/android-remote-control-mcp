@@ -81,6 +81,7 @@ class HelperBubbleOverlayHost internal constructor(
         BubbleActionsImpl(session, liveVoice, serverStarter, panelRequested, { scope }, { service }, positions)
 
     private var bubblePosition: Int? = null
+    private var suppressed = false
 
     override val status: StateFlow<HelperBubbleStatus> = _status.asStateFlow()
 
@@ -125,14 +126,23 @@ class HelperBubbleOverlayHost internal constructor(
         windows?.removeAll()
         windows = null
         service = null
+        suppressed = false
         panelRequested.value = false
         session.setChatVisible(false)
         speaker.stop()
         _status.value = HelperBubbleStatus.OFF
     }
 
+    override fun setSuppressed(suppressed: Boolean) {
+        if (this.suppressed == suppressed) return
+        this.suppressed = suppressed
+        // A hidden focusable panel must never keep keyboard focus, so suppression also closes it.
+        if (suppressed) panelRequested.value = false
+        windows?.setSuppressed(suppressed)
+    }
+
     override fun openInput() {
-        if (_status.value != HelperBubbleStatus.ON) return
+        if (_status.value != HelperBubbleStatus.ON || suppressed) return
         panelRequested.value = true
         scope?.launch { windows?.focusInput() }
     }
@@ -153,6 +163,7 @@ class HelperBubbleOverlayHost internal constructor(
         val created = windowsFactory.create(service, uiState, actions)
         try {
             created.setBubblePosition(bubblePosition)
+            if (suppressed) created.setSuppressed(true)
             created.showBubble()
             windows = created
             _status.value = HelperBubbleStatus.ON
