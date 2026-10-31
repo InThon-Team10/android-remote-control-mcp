@@ -1,415 +1,324 @@
-@file:Suppress("FunctionNaming")
+@file:Suppress("FunctionNaming", "MagicNumber", "LongMethod", "LongParameterList")
 
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 
 @Composable
 fun HelperEntryScreen(
     model: HelperEntryModel,
     onModelChange: (HelperEntryModel) -> Unit,
-    draft: String,
-    onDraftChange: (String) -> Unit,
+    visible: Boolean,
+    connected: Boolean,
+    permissionError: Boolean,
+    onEnable: () -> Unit,
+    onPermission: () -> Unit,
+    onAsk: () -> Unit,
+    onHide: () -> Unit,
+    onSettings: () -> Unit,
     onOpenPlayground: () -> Unit,
 ) {
-    Surface(Modifier.fillMaxSize()) {
-        Column(Modifier.safeDrawingPadding().imePadding()) {
-            EntryHeader(model, onModelChange)
-            key(model.page) {
-                Column(
-                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    EntryNotice()
-                    EntryContent(model, onModelChange, onOpenPlayground)
-                    if (model.page == HelperEntryPage.REQUEST) RequestBody(draft, onDraftChange)
+    val scrollState = key(model.page, model.step) { rememberScrollState() }
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+            Row(
+                Modifier
+                    .widthIn(max = 560.dp)
+                    .fillMaxWidth()
+                    .align(Alignment.CenterHorizontally)
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.helper_onboard_brand),
+                    textAlign = if (model.page == HelperEntryPage.HOME) TextAlign.Center else TextAlign.Start,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (model.page != HelperEntryPage.HOME) {
+                    TextButton(
+                        onClick = { onModelChange(model.copy(page = HelperEntryPage.HOME)) },
+                        modifier = Modifier.heightIn(min = 56.dp),
+                    ) {
+                        Text(stringResource(R.string.helper_onboard_skip), fontSize = 18.sp)
+                    }
                 }
             }
-            EntryFooter(model, onModelChange)
-        }
-    }
-}
-
-@Composable
-private fun EntryHeader(
-    model: HelperEntryModel,
-    change: (HelperEntryModel) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (model.page != HelperEntryPage.WELCOME && model.page != HelperEntryPage.HOME) {
-            EntryLink(R.string.entry_back) { change(model.back()) }
-        }
-        Text(
-            stringResource(R.string.entry_name),
-            Modifier.weight(1f).padding(8.dp),
-            style = MaterialTheme.typography.titleLarge,
-        )
-        if (model.page == HelperEntryPage.HOME) {
-            EntryLink(R.string.entry_settings) { change(model.copy(page = HelperEntryPage.SETTINGS)) }
-        }
-    }
-}
-
-@Composable
-private fun EntryNotice() {
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            EntryText(R.string.entry_notice)
-            Text(stringResource(R.string.entry_notice_detail), style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
-
-@Composable
-private fun EntryContent(
-    model: HelperEntryModel,
-    change: (HelperEntryModel) -> Unit,
-    onOpenPlayground: () -> Unit,
-) {
-    when (model.page) {
-        HelperEntryPage.WELCOME -> {
-            WelcomeBody { change(model.help()) }
-        }
-
-        HelperEntryPage.SETUP -> {
-            SetupBody(model.permission) { change(model.copy(page = HelperEntryPage.HOME)) }
-        }
-
-        HelperEntryPage.PERMISSION -> {
-            PermissionBody { change(model.permissionResult(false)) }
-        }
-
-        HelperEntryPage.HOME -> {
-            HomeBody(model, change)
-        }
-
-        HelperEntryPage.HELP -> {
-            EntryTitle(R.string.entry_how_title)
-            UsageExample()
-            HowToUse()
-            EntryText(R.string.entry_help_return)
-        }
-
-        HelperEntryPage.SETTINGS -> {
-            ReviewBody(model, change, onOpenPlayground)
-        }
-
-        HelperEntryPage.REQUEST -> {
-            EntryTitle(R.string.entry_request_title)
-        }
-    }
-}
-
-@Composable
-private fun WelcomeBody(help: () -> Unit) {
-    EntryTitle(R.string.entry_welcome_title)
-    EntryText(R.string.entry_welcome_body)
-    UsageExample()
-    EntryText(R.string.entry_bubble_explanation)
-    EntryLink(R.string.entry_help, help)
-}
-
-@Composable
-private fun UsageExample() {
-    EntryCard {
-        EntryText(R.string.entry_example)
-        Surface(
-            color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-        ) {
-            Text(
-                stringResource(R.string.entry_search),
-                Modifier.fillMaxWidth().padding(16.dp),
-                style = MaterialTheme.typography.titleLarge,
-            )
-        }
-        Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(16.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) { EntryText(R.string.entry_caption) }
-        }
-        Surface(
-            modifier = Modifier.align(Alignment.End),
-            color = MaterialTheme.colorScheme.primary,
-            shape = RoundedCornerShape(28.dp),
-        ) {
-            Text(
-                stringResource(R.string.entry_name),
-                Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SetupBody(
-    ready: Boolean,
-    later: () -> Unit,
-) {
-    EntryTitle(if (ready) R.string.entry_ready_title else R.string.entry_setup_title)
-    EntryText(if (ready) R.string.entry_ready_body else R.string.entry_setup_body)
-    if (!ready) {
-        EntryCard {
-            EntryText(R.string.entry_setup_steps_title)
-            EntryText(R.string.entry_setup_steps)
-        }
-        EntryText(R.string.entry_permission_scope)
-    }
-    EntryLink(R.string.entry_later, later)
-}
-
-@Composable
-private fun PermissionBody(deny: () -> Unit) {
-    EntryTitle(R.string.entry_permission_title)
-    EntryText(R.string.entry_permission_body)
-    EntryLink(R.string.entry_deny, deny)
-}
-
-@Composable
-private fun HomeBody(
-    model: HelperEntryModel,
-    change: (HelperEntryModel) -> Unit,
-) {
-    EntryTitle(R.string.entry_home_title)
-    EntryCard {
-        Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
-            Text(stringResource(statusTitle(model)), style = MaterialTheme.typography.titleLarge)
-            EntryText(statusBody(model))
-        }
-        if (model.bubble == HelperEntryBubble.ON) {
-            EntryLink(R.string.entry_stop) { change(model.stop()) }
-        }
-    }
-    EntryText(R.string.entry_how_title)
-    HowToUse()
-    EntryLink(R.string.entry_help) { change(model.help()) }
-}
-
-@Composable
-private fun HowToUse() {
-    listOf(R.string.entry_how_1, R.string.entry_how_2, R.string.entry_how_3).forEachIndexed { index, text ->
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.semantics(mergeDescendants = true) {}) {
-            Text("${index + 1}.", style = MaterialTheme.typography.titleLarge)
-            EntryText(text)
-        }
-    }
-}
-
-@Composable
-private fun ReviewBody(
-    model: HelperEntryModel,
-    change: (HelperEntryModel) -> Unit,
-    onOpenPlayground: () -> Unit,
-) {
-    EntryTitle(R.string.entry_review_title)
-    EntryText(R.string.entry_review_body)
-    ReviewSwitch(R.string.entry_permission_toggle, model.permission) {
-        change(if (it) model.copy(permission = true) else model.revoke())
-    }
-    ReviewSwitch(R.string.entry_failure_toggle, model.failNextStart) {
-        change(model.copy(failNextStart = it, bubble = HelperEntryBubble.OFF))
-    }
-    EntryLink(R.string.entry_reset) { change(HelperEntryModel()) }
-    EntryLink(R.string.entry_legacy, onOpenPlayground)
-}
-
-@Composable
-private fun ReviewSwitch(
-    @StringRes label: Int,
-    checked: Boolean,
-    change: (Boolean) -> Unit,
-) {
-    val name = stringResource(label)
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(name, Modifier.weight(1f).clearAndSetSemantics {}, fontSize = 18.sp, lineHeight = 26.sp)
-        Switch(checked, change, Modifier.semantics { contentDescription = name })
-    }
-}
-
-@Composable
-private fun RequestBody(
-    draft: String,
-    change: (String) -> Unit,
-) {
-    var submitted by rememberSaveable { mutableStateOf(false) }
-    OutlinedTextField(
-        value = draft,
-        onValueChange = {
-            change(it)
-            submitted = false
-        },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(stringResource(R.string.entry_request_label)) },
-        placeholder = { Text(stringResource(R.string.entry_request_hint)) },
-        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 26.sp),
-        minLines = 3,
-    )
-    EntryText(R.string.entry_request_unavailable)
-    Button(onClick = { submitted = true }, enabled = draft.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-        EntryText(R.string.entry_submit)
-    }
-    if (submitted) {
-        Text(
-            stringResource(R.string.entry_request_unavailable),
-            Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            fontSize = 18.sp,
-            lineHeight = 26.sp,
-        )
-    }
-}
-
-@Composable
-private fun EntryFooter(
-    model: HelperEntryModel,
-    change: (HelperEntryModel) -> Unit,
-) {
-    Button(
-        onClick = {
-            change(
+            if (model.page == HelperEntryPage.PRACTICE) {
+                Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                        Text(stringResource(R.string.helper_onboard_practice_notice), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.helper_onboard_practice_safety), fontSize = 18.sp)
+                    }
+                }
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .widthIn(max = 560.dp)
+                    .fillMaxWidth()
+                    .align(Alignment.CenterHorizontally)
+                    .verticalScroll(scrollState)
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
                 when (model.page) {
-                    HelperEntryPage.PERMISSION -> model.permissionResult(true)
-                    HelperEntryPage.HELP, HelperEntryPage.SETTINGS, HelperEntryPage.REQUEST -> model.back()
-                    else -> model.primary()
-                },
-            )
-        },
-        enabled = model.bubble != HelperEntryBubble.STARTING,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).heightIn(min = 56.dp),
-    ) {
-        EntryText(primaryLabel(model))
+                    HelperEntryPage.WELCOME -> {
+                        Mascot()
+                        EntryTitle(stringResource(R.string.helper_onboard_welcome_title))
+                        EntryBody(stringResource(R.string.helper_onboard_welcome_body))
+                        EntryTitle(stringResource(R.string.helper_onboard_welcome_invite), small = true)
+                        EntryBody(stringResource(R.string.helper_onboard_welcome_safety))
+                        EntryAction(stringResource(R.string.helper_onboard_start_practice)) { onModelChange(model.practice()) }
+                    }
+
+                    HelperEntryPage.PRACTICE -> {
+                        PracticePhone(model) { onModelChange(model.advance()) }
+                    }
+
+                    HelperEntryPage.INVITE -> {
+                        Mascot()
+                        EntryTitle(stringResource(R.string.helper_onboard_invite_title))
+                        EntryBody(stringResource(R.string.helper_onboard_invite_body))
+                        EntryAction(stringResource(R.string.helper_onboard_enable_yes), onEnable)
+                        EntryLink(stringResource(R.string.helper_onboard_replay)) { onModelChange(model.practice()) }
+                    }
+
+                    HelperEntryPage.PERMISSION -> {
+                        EntryTitle(stringResource(R.string.helper_onboard_permission_title))
+                        EntryBody(stringResource(R.string.helper_onboard_permission_steps))
+                        EntryBody(stringResource(R.string.helper_onboard_permission_choice))
+                        if (connected) {
+                            EntryBody(stringResource(R.string.helper_onboard_permission_ready))
+                            EntryAction(stringResource(R.string.helper_onboard_enable), onEnable)
+                        } else {
+                            if (permissionError) EntryBody(stringResource(R.string.helper_onboard_permission_error))
+                            EntryAction(stringResource(R.string.helper_onboard_open_settings), onPermission)
+                        }
+                        EntryLink(stringResource(R.string.helper_onboard_defer)) { onModelChange(model.copy(page = HelperEntryPage.HOME)) }
+                    }
+
+                    HelperEntryPage.HOME -> {
+                        HelperHomeStatus(visible = visible)
+                        Text(
+                            if (visible) {
+                                stringResource(
+                                    R.string.helper_onboard_home_on_body,
+                                )
+                            } else {
+                                stringResource(R.string.helper_onboard_home_off_body)
+                            },
+                            fontSize = 18.sp,
+                            lineHeight = 28.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.widthIn(max = 260.dp).fillMaxWidth().align(Alignment.CenterHorizontally),
+                        )
+                        EntryAction(
+                            if (visible) {
+                                stringResource(
+                                    R.string.helper_onboard_ask,
+                                )
+                            } else {
+                                stringResource(R.string.helper_onboard_enable_home)
+                            },
+                            if (visible) onAsk else onEnable,
+                        )
+                        if (visible) EntryLink(stringResource(R.string.helper_onboard_pause), onHide)
+                        HorizontalDivider()
+                        EntryLink(stringResource(R.string.helper_onboard_practice_again)) { onModelChange(model.practice()) }
+                        EntryLink(stringResource(R.string.helper_onboard_ai_settings), onSettings)
+                        EntryLink(stringResource(R.string.helper_onboard_developer_tools), onOpenPlayground)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
     }
 }
 
-@StringRes
-private fun primaryLabel(model: HelperEntryModel): Int =
-    when (model.page) {
-        HelperEntryPage.WELCOME -> R.string.entry_setup_start
-        HelperEntryPage.PERMISSION -> R.string.entry_grant
-        HelperEntryPage.HELP -> R.string.entry_return
-        HelperEntryPage.SETTINGS -> R.string.entry_home
-        HelperEntryPage.REQUEST -> R.string.entry_return_bubble
-        HelperEntryPage.SETUP -> if (model.permission) R.string.entry_start else R.string.entry_open_settings
-        HelperEntryPage.HOME -> homeAction(model)
+@Composable
+private fun Mascot() {
+    Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+        Image(painterResource(R.drawable.helper_phone_mascot), contentDescription = null, modifier = Modifier.size(156.dp))
     }
-
-@StringRes
-private fun homeAction(model: HelperEntryModel): Int =
-    when {
-        !model.permission -> R.string.entry_continue_setup
-        model.bubble == HelperEntryBubble.ON -> R.string.entry_open
-        model.bubble == HelperEntryBubble.STARTING -> R.string.entry_starting
-        model.bubble == HelperEntryBubble.FAILED -> R.string.entry_retry
-        else -> R.string.entry_start
-    }
-
-@StringRes
-private fun statusTitle(model: HelperEntryModel): Int =
-    when {
-        !model.permission -> R.string.entry_status_missing
-        model.bubble == HelperEntryBubble.ON -> R.string.entry_status_on
-        model.bubble == HelperEntryBubble.STARTING -> R.string.entry_status_starting
-        model.bubble == HelperEntryBubble.FAILED -> R.string.entry_status_failed
-        else -> R.string.entry_status_off
-    }
-
-@StringRes
-private fun statusBody(model: HelperEntryModel): Int =
-    when {
-        !model.permission -> R.string.entry_body_missing
-        model.bubble == HelperEntryBubble.ON -> R.string.entry_body_on
-        model.bubble == HelperEntryBubble.STARTING -> R.string.entry_body_starting
-        model.bubble == HelperEntryBubble.FAILED -> R.string.entry_body_failed
-        else -> R.string.entry_body_off
-    }
+}
 
 @Composable
 private fun EntryTitle(
-    @StringRes text: Int,
+    text: String,
+    small: Boolean = false,
 ) {
-    Text(stringResource(text), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+    Text(
+        text,
+        fontSize = if (small) 24.sp else 32.sp,
+        lineHeight = if (small) 34.sp else 42.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.semantics { heading() },
+    )
 }
 
 @Composable
-private fun EntryText(
-    @StringRes text: Int,
+private fun EntryBody(text: String) {
+    Text(text, fontSize = 18.sp, lineHeight = 28.sp)
+}
+
+@Composable
+private fun EntryAction(
+    text: String,
+    onClick: () -> Unit,
 ) {
-    Text(stringResource(text), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 26.sp))
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), contentPadding = PaddingValues(16.dp)) {
+        Text(text, fontSize = 18.sp, lineHeight = 26.sp)
+    }
 }
 
 @Composable
 private fun EntryLink(
-    @StringRes text: Int,
+    text: String,
     onClick: () -> Unit,
 ) {
-    TextButton(
-        onClick,
-        Modifier.heightIn(min = 56.dp),
-        colors = ButtonDefaults.textButtonColors(contentColor = LocalContentColor.current),
-    ) { EntryText(text) }
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text(text, fontSize = 18.sp) }
 }
 
 @Composable
-private fun EntryCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(24.dp)) {
-        Column(
-            Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            content = content,
-        )
-    }
-}
+private fun PracticePhone(
+    model: HelperEntryModel,
+    onNext: () -> Unit,
+) {
+    val step = model.step
+    EntryTitle(
+        when (step) {
+            HelperPracticeStep.OPEN -> stringResource(R.string.helper_onboard_practice_open_title)
+            HelperPracticeStep.ASK -> stringResource(R.string.helper_onboard_practice_ask_title)
+            HelperPracticeStep.FOLLOW -> stringResource(R.string.helper_onboard_practice_follow_title)
+            HelperPracticeStep.DONE -> stringResource(R.string.helper_onboard_practice_done_title)
+        },
+        small = true,
+    )
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("9:41", fontSize = 18.sp, modifier = Modifier.clearAndSetSemantics {})
+                Box(Modifier.size(width = 64.dp, height = 8.dp).background(MaterialTheme.colorScheme.onSurface, RoundedCornerShape(8.dp)))
+            }
+            Text(stringResource(R.string.helper_onboard_gallery_title), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            HorizontalDivider()
+            when (step) {
+                HelperPracticeStep.OPEN -> {
+                    EntryBody(stringResource(R.string.helper_onboard_gallery_task))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        listOf(
+                            stringResource(R.string.helper_onboard_album_travel),
+                            stringResource(R.string.helper_onboard_album_daily),
+                        ).forEach { label ->
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 96.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        RoundedCornerShape(12.dp),
+                                    ).padding(16.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(label, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            }
+                        }
+                    }
+                    Button(onClick = onNext, modifier = Modifier.align(Alignment.End).heightIn(min = 64.dp)) {
+                        Image(painterResource(R.drawable.helper_phone_mascot), null, Modifier.size(40.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.helper_onboard_help_button), fontSize = 18.sp)
+                    }
+                }
 
-@Preview(name = "첫 실행", locale = "ko", widthDp = 360, heightDp = 800)
-@Preview(name = "큰 글씨", locale = "ko", widthDp = 320, heightDp = 640, fontScale = 2f)
-@Composable
-private fun EntryWelcomePreview() {
-    AndroidRemoteControlMcpTheme(dynamicColor = false) {
-        HelperEntryScreen(HelperEntryModel(), {}, "", {}, {})
+                HelperPracticeStep.ASK -> {
+                    EntryBody(stringResource(R.string.helper_onboard_question_intro))
+                    Text(
+                        stringResource(R.string.helper_onboard_sample_question),
+                        fontSize = 22.sp,
+                        lineHeight = 32.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    EntryAction(stringResource(R.string.helper_onboard_ask_sample), onNext)
+                    EntryBody(stringResource(R.string.helper_onboard_request_is_fake))
+                }
+
+                HelperPracticeStep.FOLLOW -> {
+                    EntryBody(stringResource(R.string.helper_onboard_target_hint))
+                    OutlinedButton(
+                        onClick = onNext,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                    ) { Text(stringResource(R.string.helper_onboard_search_photos), fontSize = 20.sp) }
+                    EntryBody(stringResource(R.string.helper_onboard_user_control))
+                }
+
+                HelperPracticeStep.DONE -> {
+                    Text(
+                        stringResource(R.string.helper_onboard_practice_success),
+                        fontSize = 22.sp,
+                        lineHeight = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    EntryBody(stringResource(R.string.helper_onboard_practice_recap))
+                    EntryBody(stringResource(R.string.helper_onboard_result_is_fake))
+                    EntryAction(stringResource(R.string.helper_onboard_finish_practice), onNext)
+                }
+            }
+            Box(
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 12.dp)
+                    .size(width = 88.dp, height = 4.dp)
+                    .background(MaterialTheme.colorScheme.onSurface, RoundedCornerShape(4.dp)),
+            )
+        }
     }
 }

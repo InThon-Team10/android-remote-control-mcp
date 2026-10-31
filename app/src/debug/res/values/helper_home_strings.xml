@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="helper_home_active_title">콕콕이가 켜져 있어요</string>
+    <string name="helper_home_inactive_title">콕콕이가 꺼져 있어요</string>
+</resources>

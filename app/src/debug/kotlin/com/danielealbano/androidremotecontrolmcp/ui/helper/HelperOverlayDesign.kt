@@ -2,25 +2,24 @@
 
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -30,34 +29,26 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.OpenWith
 import androidx.compose.material.icons.rounded.PowerSettingsNew
-import androidx.compose.material.icons.rounded.SentimentSatisfiedAlt
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
@@ -67,10 +58,10 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -81,6 +72,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 import com.danielealbano.androidremotecontrolmcp.ui.theme.LightColorScheme
@@ -123,14 +115,7 @@ internal fun HelperEdgeCharacter(onExpand: () -> Unit) {
 
 @Composable
 private fun CharacterFace() {
-    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-        Icon(
-            imageVector = Icons.Rounded.SentimentSatisfiedAlt,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(4.dp).size(36.dp),
-        )
-    }
+    Image(painterResource(R.drawable.helper_phone_mascot), contentDescription = null, modifier = Modifier.size(44.dp))
 }
 
 @Composable
@@ -140,156 +125,138 @@ internal fun HelperOverlaySpeech(
     onCollapse: () -> Unit,
     maxHeightDp: Int,
     guiding: Boolean = false,
-    onGuide: () -> Unit = {},
     onTest: () -> Unit = {},
     onSubmit: () -> Unit = {},
     busy: Boolean = false,
     message: String? = null,
-    variant: GuideVariant = helperGuideVariant,
-    onSettings: () -> Unit = {},
+    isListening: Boolean = false,
+    isRecognizing: Boolean = false,
+    voiceStatus: String? = null,
+    onVoiceToggle: () -> Unit = {},
 ) {
-    var voicePreview by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val submitTest = {
-        focus.clearFocus()
-        keyboard?.hide()
-        if (isConsequenceTestRequest(request)) onTest() else onSubmit()
-    }
-
-    Column(
-        modifier =
-            Modifier
-                .padding(horizontal = 12.dp)
-                .heightIn(max = maxHeightDp.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilledIconButton(
-            onClick = {
-                focus.clearFocus()
-                keyboard?.hide()
-                onCollapse()
+    val voiceLabel =
+        stringResource(
+            when {
+                isListening -> R.string.helper_overlay_voice_stop
+                isRecognizing -> R.string.helper_overlay_voice_processing
+                else -> R.string.helper_overlay_speak
             },
-            modifier = Modifier.size(56.dp).align(Alignment.End),
-        ) {
-            Icon(Icons.Rounded.Close, stringResource(R.string.helper_overlay_collapse))
+        )
+    Column(
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp).heightIn(max = maxHeightDp.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        // A fixed return action stays separate from the scrolling input controls.
+        Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.CenterEnd) {
+            FilledIconButton(
+                onClick = {
+                    focus.clearFocus()
+                    keyboard?.hide()
+                    onCollapse()
+                },
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(Icons.Rounded.Close, stringResource(R.string.helper_overlay_collapse))
+            }
         }
         Column(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(if (variant == GuideVariant.A) R.string.helper_branch_a else R.string.helper_branch_b),
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            TextButton(onClick = onSettings, enabled = !busy) { Text("AI 연결 설정", color = Color.White) }
-            Text(
-                "질문과 현재 화면의 텍스트·버튼 정보를 Google Gemini로 보내요.",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            message?.let { Text(it, color = Color.White, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+            message?.let {
+                Text(
+                    it,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 26.sp),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
             if (guiding) {
                 Text(
                     stringResource(R.string.helper_overlay_search_instruction),
                     color = Color.White,
                     style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
-            if (voicePreview) {
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.fillMaxWidth(),
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextField(
+                    value = request,
+                    enabled = !busy,
+                    readOnly = isRecognizing || isListening,
+                    onValueChange = onRequestChange,
+                    placeholder = { Text(stringResource(R.string.helper_overlay_input_hint)) },
+                    textStyle = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 26.sp),
+                    singleLine = false,
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        TextFieldDefaults.colors(
+                            focusedContainerColor = LightColorScheme.surface,
+                            unfocusedContainerColor = LightColorScheme.surface,
+                            disabledContainerColor = LightColorScheme.surface,
+                            focusedTextColor = LightColorScheme.onSurface,
+                            unfocusedTextColor = LightColorScheme.onSurface,
+                            disabledTextColor = LightColorScheme.onSurface,
+                            focusedPlaceholderColor = LightColorScheme.onSurfaceVariant,
+                            unfocusedPlaceholderColor = LightColorScheme.onSurfaceVariant,
+                            disabledPlaceholderColor = LightColorScheme.onSurfaceVariant,
+                            cursorColor = LightColorScheme.primary,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                        ),
+                    modifier = Modifier.weight(1f).heightIn(min = 64.dp).fillMaxHeight(),
+                )
+                FilledIconButton(
+                    onClick = {
+                        focus.clearFocus()
+                        keyboard?.hide()
+                        onVoiceToggle()
+                    },
+                    enabled = !busy && (!isRecognizing || isListening),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.width(64.dp).heightIn(min = 64.dp).fillMaxHeight(),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.Mic,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp),
-                        )
-                        Text(stringResource(R.string.helper_overlay_voice_title), style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            stringResource(R.string.helper_overlay_voice_preview),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                        )
-                        TextButton(onClick = {
-                            voicePreview = false
-                            onGuide()
-                        }) {
-                            Text(stringResource(R.string.helper_overlay_search_demo))
-                        }
-                        TextButton(onClick = { voicePreview = false }) {
-                            Text(stringResource(R.string.helper_overlay_voice_close))
-                        }
-                    }
+                    Icon(
+                        if (isListening) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                        contentDescription = voiceLabel,
+                        modifier = Modifier.size(28.dp),
+                    )
                 }
             }
-            Column {
-                Column(modifier = Modifier.padding(start = 12.dp, end = 8.dp, bottom = 8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            stringResource(R.string.helper_overlay_ready),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            modifier = Modifier.weight(1f).padding(start = 8.dp),
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        TextField(
-                            value = request,
-                            enabled = !busy,
-                            onValueChange = onRequestChange,
-                            placeholder = { Text(stringResource(R.string.helper_overlay_input_hint)) },
-                            singleLine = false,
-                            maxLines = 5,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                            shape = RoundedCornerShape(24.dp),
-                            colors =
-                                TextFieldDefaults.colors(
-                                    focusedContainerColor = LightColorScheme.surface,
-                                    unfocusedContainerColor = LightColorScheme.surface,
-                                    focusedTextColor = LightColorScheme.onSurface,
-                                    unfocusedTextColor = LightColorScheme.onSurface,
-                                    focusedPlaceholderColor = LightColorScheme.onSurfaceVariant,
-                                    unfocusedPlaceholderColor = LightColorScheme.onSurfaceVariant,
-                                    cursorColor = LightColorScheme.primary,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                ),
-                            modifier = Modifier.weight(1f),
-                        )
-                        FilledIconButton(
-                            onClick = {
-                                focus.clearFocus()
-                                keyboard?.hide()
-                                voicePreview = !voicePreview
-                            },
-                            modifier = Modifier.size(56.dp),
-                        ) {
-                            Icon(Icons.Rounded.Mic, stringResource(R.string.helper_overlay_speak), Modifier.size(28.dp))
-                        }
-                    }
-                }
+            voiceStatus?.let {
+                Text(
+                    it,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 26.sp),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
         }
         Button(
-            onClick = submitTest,
-            enabled = request.isNotBlank() && !busy,
+            onClick = {
+                focus.clearFocus()
+                keyboard?.hide()
+                if (isConsequenceTestRequest(request)) onTest() else onSubmit()
+            },
+            enabled = request.isNotBlank() && !busy && !isRecognizing && !isListening,
+            colors =
+                ButtonDefaults.buttonColors(
+                    disabledContainerColor = LightColorScheme.surfaceVariant,
+                    disabledContentColor = LightColorScheme.onSurfaceVariant,
+                ),
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-        ) { Text(if (busy) "안내 준비 중…" else "요청 보내기") }
+        ) {
+            Text(stringResource(if (busy) R.string.helper_overlay_preparing else R.string.helper_overlay_submit), fontSize = 18.sp)
+        }
     }
 }
 
@@ -337,7 +304,7 @@ internal fun HelperOverlayFrame(
                     style = Stroke(1.5.dp.toPx()),
                 )
             } else {
-                drawRect(Color.Black.copy(alpha = 0.60f))
+                drawRect(Color.Black.copy(alpha = 0.78f))
             }
             val depth = 22.dp.toPx().coerceAtMost(size.minDimension * 0.15f)
 

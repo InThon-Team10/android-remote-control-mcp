@@ -3,10 +3,18 @@
 
     <queries>
         <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
     <application>
+        <activity
+            android:name=".ui.helper.HelperVoicePermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <!-- E2E Configuration Receiver (test configuration injection via adb shell). -->
         <!-- Debug source set only, so it is absent from the release APK entirely. -->
         <!-- Also gated on DUMP: a signature/privileged platform permission held by the adb shell

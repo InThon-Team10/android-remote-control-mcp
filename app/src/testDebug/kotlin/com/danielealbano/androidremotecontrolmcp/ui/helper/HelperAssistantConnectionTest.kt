@@ -32,7 +32,7 @@ class HelperAssistantConnectionTest {
             "--- window:1 type:APPLICATION pkg:example title:Example layer:0 focused:true ---\n" +
             "node_id\tclass\ttext\tdesc\tres_id\tbounds\tflags\n" +
             "1:1\tButton\tSearch\t-\t-\t10,20,200,80\ton,clk,ena"
-    private val json = """{"nodeId":"1:1","explanation":"검색 화면으로 이동할 수 있어요.","action":"검색 버튼을 눌러 주세요."}"""
+    private val json = """{"nodeId":"1:1","explanation":"검색 화면으로 이동할 수 있어요.","action":"검색 버튼을 눌러 주세요.","category":"other"}"""
     private val connection = mockk<AssistantMcpConnection>()
     private val settings = mockk<AssistantSettings>()
     private val serverSettings = mockk<SettingsRepository>()
@@ -58,17 +58,16 @@ class HelperAssistantConnectionTest {
         gateway.enqueue(GeminiTestResponses.text(json))
     }
 
-    @Test fun `both variants consume same validated answer without action tools`() =
+    @Test fun `ordinary guidance consumes validated answer without action tools`() =
         runTest {
             setup()
             val answer = adapter.request(context, "검색하고 싶어요")
             assertEquals(parseHelperScreen(screen).nodes["1:1"], answer.step.target)
             assertFalse(answer.step.confirmed)
-            GuideVariant.entries.forEach { variant ->
-                val state = ConsequenceState()
-                state.begin(answer.step, variant)
-                assertEquals(if (variant == GuideVariant.A) ConsequencePhase.EXPLANATION else ConsequencePhase.TARGET, state.phase)
-            }
+            val state = ConsequenceState()
+            state.begin(answer.step)
+            assertEquals(ConsequencePhase.TARGET, state.phase)
+            assertFalse(answer.step.needsExplanation)
             assertTrue(
                 gateway.calls
                     .single()
@@ -111,5 +110,21 @@ class HelperAssistantConnectionTest {
         assertTrue(parseHelperScreen(screen.replace("10,20,200,80", "NaN,20,200,80")).nodes.isEmpty())
         assertTrue(parseHelperScreen(screen.replace("type:APPLICATION", "type:ACCESSIBILITY_OVERLAY")).nodes.isEmpty())
         assertEquals(androidx.compose.ui.geometry.Rect.Zero, decodeHelperAnswer(json.replace("\"1:1\"", "null"), parsed).step.target)
+    }
+
+    @Test fun `only payment and transmission open the explanation panel`() {
+        val parsed = parseHelperScreen(screen)
+        listOf("payment", "transmission", "other").forEach { category ->
+            val response = json.replace("\"other\"", "\"$category\"")
+            val answer = decodeHelperAnswer(response, parsed)
+            val state = ConsequenceState()
+            state.begin(answer.step)
+            assertEquals(category != "other", answer.step.needsExplanation)
+            assertEquals(if (category == "other") ConsequencePhase.TARGET else ConsequencePhase.EXPLANATION, state.phase)
+            assertFalse(answer.step.confirmed)
+        }
+        assertThrows(HelperGuideException::class.java) {
+            decodeHelperAnswer(json.replace("\"other\"", "\"unsupported\""), parsed)
+        }
     }
 }

@@ -1,9 +1,16 @@
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
+import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.ResultReceiver
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.Gravity
@@ -68,8 +75,22 @@ class HelperOverlayPreviewService :
     private var requestEpoch = 0
     private var busy by mutableStateOf(false)
     private var requestMessage by mutableStateOf<String?>(null)
-    private val variant = helperGuideVariant
     private var request by mutableStateOf("")
+    private var voiceListening by mutableStateOf(false)
+    private var voiceRecognizing by mutableStateOf(false)
+    private var voiceStatus by mutableStateOf<String?>(null)
+    private var permissionEpoch = 0
+    private val voiceInput by lazy {
+        HelperVoiceInput(
+            this,
+            onTranscript = { request = it },
+            onState = { listening, recognizing, message ->
+                voiceListening = listening
+                voiceRecognizing = recognizing
+                voiceStatus = message
+            },
+        )
+    }
     private var speech: TextToSpeech? = null
     private var speechReady by mutableStateOf(false)
     private var menuExpanded = false
@@ -80,6 +101,7 @@ class HelperOverlayPreviewService :
     private var renderGeneration = 0
     private var guideHidden = false
     private var menuCorner = 0
+    private var paused = false
     private var overlayConnected = false
     private var expanded = false
     private var guiding by mutableStateOf(false)
@@ -118,11 +140,74 @@ class HelperOverlayPreviewService :
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         overlayConnected = true
         consequenceHost.connect()
+        HelperRuntime.connect()
+        HelperRuntime.show = {
+            paused = false
+            showBubble()
+        }
+        HelperRuntime.ask = ::showSpeech
+        HelperRuntime.hide = {
+            paused = true
+            cancelRequest()
+            consequenceHost.finish()
+            speech?.stop()
+            expanded = false
+            clearWindows()
+        }
         showBubble()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event != null && event.packageName?.toString() != packageName) consequenceHost.invalidateLive()
+    }
+
+    private fun cancelVoiceInput() {
+        permissionEpoch++
+        voiceInput.cancel()
+    }
+
+    private fun toggleVoiceInput() {
+        if (busy) return
+        if (voiceListening) {
+            voiceInput.stop()
+            return
+        }
+        if (voiceRecognizing) return
+        speech?.stop()
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            voiceInput.start(request)
+            return
+        }
+        val token = ++permissionEpoch
+        voiceRecognizing = true
+        voiceStatus = getString(R.string.helper_voice_permission)
+        val receiver =
+            object : ResultReceiver(Handler(Looper.getMainLooper())) {
+                override fun onReceiveResult(
+                    resultCode: Int,
+                    resultData: Bundle?,
+                ) {
+                    if (token != permissionEpoch || !overlayConnected || !expanded || paused || HelperRuntime.suppressed) return
+                    voiceRecognizing = false
+                    if (resultCode == Activity.RESULT_OK &&
+                        checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        voiceInput.start(request)
+                    } else {
+                        voiceStatus = getString(R.string.helper_voice_permission_denied)
+                    }
+                }
+            }
+        try {
+            startActivity(
+                Intent(this, HelperVoicePermissionActivity::class.java)
+                    .putExtra(HelperVoicePermissionActivity.EXTRA_RESULT, receiver)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (_: RuntimeException) {
+            voiceRecognizing = false
+            voiceStatus = getString(R.string.helper_voice_permission_denied)
+        }
     }
 
     private fun cancelRequest() {
@@ -133,7 +218,7 @@ class HelperOverlayPreviewService :
     }
 
     private fun submitRequest() {
-        if (busy || request.isBlank()) return
+        if (busy || voiceRecognizing || request.isBlank()) return
         cancelRequest()
         consequenceHost.finish()
         val token = requestEpoch
@@ -148,7 +233,7 @@ class HelperOverlayPreviewService :
                     if (token != requestEpoch || !overlayConnected) return@launch
                     busy = false
                     requestMessage = null
-                    consequenceHost.beginLive(answer.step, variant, ::submitRequest) { locate ->
+                    consequenceHost.beginLive(answer.step, ::submitRequest) { locate ->
                         assistantScope.launch {
                             try {
                                 if (token == requestEpoch && assistantConnection.readScreen().signature == answer.signature) {
@@ -188,6 +273,7 @@ class HelperOverlayPreviewService :
 
     override fun onUnbind(intent: Intent?): Boolean {
         overlayConnected = false
+        HelperRuntime.disconnect()
         cancelRequest()
         consequenceHost.disconnect()
         clearWindows()
@@ -195,11 +281,13 @@ class HelperOverlayPreviewService :
     }
 
     override fun onInterrupt() {
+        cancelVoiceInput()
         speech?.stop()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        if (paused || HelperRuntime.suppressed) return
         if (ConsequencePreviewBridge.active) {
             consequenceHost.refresh()
         } else if (expanded) {
@@ -210,6 +298,7 @@ class HelperOverlayPreviewService :
     }
 
     private fun showBubble() {
+        if (HelperRuntime.suppressed || paused) return
         cancelRequest()
         requestMessage = null
         consequenceHost.finish()
@@ -385,17 +474,19 @@ class HelperOverlayPreviewService :
         attach(params) {
             HelperOverlaySpeech(
                 request = request,
-                onRequestChange = { request = it },
+                onRequestChange = {
+                    cancelVoiceInput()
+                    request = it
+                },
+                isListening = voiceListening,
+                isRecognizing = voiceRecognizing,
+                voiceStatus = voiceStatus,
+                onVoiceToggle = ::toggleVoiceInput,
                 onCollapse = { showBubble() },
                 guiding = guiding,
                 busy = busy,
                 message = requestMessage,
-                variant = variant,
                 onSubmit = ::submitRequest,
-                onSettings = {
-                    showBubble()
-                    startActivity(Intent(this, HelperConnectionSettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                },
                 onTest = {
                     showBubble()
                     startActivity(
@@ -403,13 +494,6 @@ class HelperOverlayPreviewService :
                             .putExtra(ConsequencePreviewActivity.EXTRA_START_TEST, true)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
                     )
-                },
-                onGuide = {
-                    guiding = true
-                    menuExpanded = false
-                    guideHidden = false
-                    menuCorner = 0
-                    showSpeech()
                 },
                 maxHeightDp = (usableHeight / resources.displayMetrics.density * 0.65f).toInt(),
             )
@@ -434,7 +518,7 @@ class HelperOverlayPreviewService :
         params: WindowManager.LayoutParams,
         content: @Composable () -> Unit,
     ) {
-        if (!overlayConnected) return
+        if (!overlayConnected || HelperRuntime.suppressed || paused) return
         params.setTitle(OWN_OVERLAY_ACCESSIBILITY_TITLE)
         val view =
             ComposeView(this).apply {
@@ -449,11 +533,13 @@ class HelperOverlayPreviewService :
             Log.w("HelperOverlay", "Overlay connection ended", error)
             view.disposeComposition()
             overlayConnected = false
+            HelperRuntime.disconnect()
             consequenceHost.disconnect()
             clearWindows()
             return
         }
         windows.add(view)
+        HelperRuntime.visible = true
         val origin = menuOpenOrigin
         if (menuExpanded && windows.size > 1 && origin != null) {
             menuOpenOrigin = null
@@ -506,18 +592,21 @@ class HelperOverlayPreviewService :
     }
 
     private fun clearWindows() {
+        cancelVoiceInput()
         renderGeneration++
         windows.forEach {
             windowManager.removeView(it)
             it.disposeComposition()
         }
         windows.clear()
+        HelperRuntime.visible = false
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
         overlayConnected = false
+        HelperRuntime.disconnect()
         cancelRequest()
         consequenceHost.disconnect()
         speech?.stop()

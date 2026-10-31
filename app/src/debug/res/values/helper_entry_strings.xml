@@ -21,7 +21,7 @@
     <string name="entry_open_settings">접근성 설정 열기</string>
     <string name="entry_later">나중에 설정</string>
     <string name="entry_ready_title">시작할 준비가 되었어요</string>
-    <string name="entry_ready_body">설정을 마친 경우의 예시예요. 버블을 켜고 도움이 필요한 앱으로 이동해 보세요.</string>
+    <string name="entry_ready_body">설정을 마친 경우의 예시예요. 도움 버튼을 켜고 도움이 필요한 앱으로 이동해 보세요.</string>
     <string name="entry_permission_title">설정 화면 예시</string>
     <string name="entry_permission_body">실제 휴대폰 설정은 바뀌지 않아요. 설정을 켠 경우와 켜지 않고 돌아온 경우를 확인해 보세요.</string>
     <string name="entry_grant">설정을 켠 것으로 보기</string>
@@ -29,11 +29,11 @@
     <string name="entry_home_title">도움이 필요할 때\n도우미를 켜세요</string>
     <string name="entry_status_missing">시작 설정이 필요해요</string>
     <string name="entry_status_off">도우미가 꺼져 있어요</string>
-    <string name="entry_status_starting">버블을 켜고 있어요</string>
+    <string name="entry_status_starting">도움 버튼을 켜고 있어요</string>
     <string name="entry_status_on">도우미가 켜져 있어요</string>
-    <string name="entry_status_failed">버블을 켜지 못했어요</string>
-    <string name="entry_body_missing">설정을 마치면 버블을 켤 수 있어요.</string>
-    <string name="entry_body_off">버블을 켜면 다른 앱에서 도우미를 열 수 있어요.</string>
+    <string name="entry_status_failed">도움 버튼을 켜지 못했어요</string>
+    <string name="entry_body_missing">설정을 마치면 도움 버튼을 켤 수 있어요.</string>
+    <string name="entry_body_off">도움 버튼을 켜면 다른 앱에서 도우미를 열 수 있어요.</string>
     <string name="entry_body_starting">잠시 기다려 주세요. 실행 상태를 확인하고 있어요.</string>
     <string name="entry_body_on">도움이 필요한 앱으로 이동해 보세요.</string>
     <string name="entry_body_failed">실행 실패를 재현한 예시예요. 다시 시도하면 켜진 상태를 확인할 수 있어요.</string>
@@ -45,7 +45,7 @@
     <string name="entry_stop">도우미 종료</string>
     <string name="entry_how_title">이렇게 사용해요</string>
     <string name="entry_how_1">도움이 필요한 앱을 여세요.</string>
-    <string name="entry_how_2">도우미 버블을 누르세요.</string>
+    <string name="entry_how_2">도우미 도움 버튼을 누르세요.</string>
     <string name="entry_how_3">궁금한 점을 입력하세요.</string>
     <string name="entry_help_return">버블로 돌아가면 현재 안내가 끝나요. 다시 열면 작성하던 질문이 남아 있어요.</string>
     <string name="entry_return">돌아가기</string>
@@ -61,5 +61,5 @@
     <string name="entry_request_hint">예: 검색은 어디에서 하나요?</string>
     <string name="entry_submit">요청 보내기</string>
     <string name="entry_request_unavailable">목업에서는 질문을 전송하지 않아요. AI 안내와 음성 입력은 아직 연결되지 않았어요.</string>
-    <string name="entry_return_bubble">버블로 돌아가기</string>
+    <string name="entry_return_bubble">도움 버튼으로 돌아가기</string>
 </resources>

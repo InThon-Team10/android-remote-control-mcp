@@ -30,8 +30,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
@@ -65,8 +67,9 @@ class HelperConnectionSettingsActivity : ComponentActivity() {
                             Modifier.weight(1f).verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Text("A안과 B안은 같은 Gemini 연결을 사용해요. 버튼은 사용자가 직접 눌러요.")
+                            Text("콕콕이가 안내하면 버튼은 내가 직접 눌러요.")
                             Text("요청을 보내면 질문과 현재 화면의 텍스트·버튼 이름·좌표가 Google Gemini로 전송돼요. 화면에 개인정보가 있으면 함께 전송될 수 있어요. 스크린샷은 보내지 않아요.")
+                            Text(stringResource(R.string.helper_voice_privacy))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(
                                     checked = accepted || config.privacyNoticeAccepted,
@@ -102,7 +105,7 @@ class HelperConnectionSettingsActivity : ComponentActivity() {
                                             if (!config.privacyNoticeAccepted) settings.acceptPrivacyNotice()
                                             settings.setEnabled(true)
                                             starter.ensureRunning(this@HelperConnectionSettingsActivity).getOrThrow()
-                                            message = "연결 준비가 끝났어요. 안내받을 앱으로 돌아가 버블에서 요청해 주세요."
+                                            message = "연결 준비가 끝났어요. 안내받을 앱으로 돌아가 도움 버튼에서 요청해 주세요."
                                         } catch (
                                             cancelled: CancellationException,
                                         ) {

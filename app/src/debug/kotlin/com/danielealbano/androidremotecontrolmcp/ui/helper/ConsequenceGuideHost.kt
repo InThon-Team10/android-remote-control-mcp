@@ -82,7 +82,6 @@ internal class ConsequenceGuideHost(
 
     fun beginLive(
         step: ConsequenceStep,
-        variant: GuideVariant,
         refresh: () -> Unit,
         validate: ((() -> Unit) -> Unit),
     ) {
@@ -92,7 +91,7 @@ internal class ConsequenceGuideHost(
         liveRefresh = refresh
         liveValidate = validate
         ConsequencePreviewBridge.active = true
-        state.begin(step, variant)
+        state.begin(step)
         render()
     }
 
@@ -119,13 +118,13 @@ internal class ConsequenceGuideHost(
 
     fun connect() {
         ConsequencePreviewBridge.ready = true
-        ConsequencePreviewBridge.onStart = { step, variant ->
+        ConsequencePreviewBridge.onStart = { step ->
             finish()
             stopSpeech()
             narration.spokenStep = null
             foreground = true
             ConsequencePreviewBridge.active = true
-            state.begin(step, variant)
+            state.begin(step)
             menu = false
             readFailed = false
             render()
@@ -330,9 +329,8 @@ internal class ConsequenceGuideHost(
                     onRead = { read(step.fullText) },
                     onExplain = {
                         menu = false
-                        state.compact = true
                         state.measured = false
-                        state.phase = if (state.variant == GuideVariant.A) ConsequencePhase.EXPLANATION else ConsequencePhase.TARGET
+                        state.phase = if (step.needsExplanation) ConsequencePhase.EXPLANATION else ConsequencePhase.TARGET
                         render()
                     },
                     onRetry = {
@@ -395,7 +393,7 @@ internal class ConsequenceGuideHost(
                                         style = MaterialTheme.typography.titleLarge,
                                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                                     )
-                                    if (state.variant == GuideVariant.B || !step.confirmed) {
+                                    if (!step.confirmed || !step.needsExplanation) {
                                         step.facts.forEach { Text(it, fontSize = 18.sp) }
                                     }
                                     Text(step.action, style = MaterialTheme.typography.titleLarge)
@@ -478,9 +476,9 @@ private fun ConsequencePanel(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .heightIn(max = maxHeight.dp)
-                .semantics { paneTitle = if (menu) "도움 메뉴" else "버튼 결과 설명" },
+                .semantics { paneTitle = if (menu) "도움 메뉴" else "실행 전 확인" },
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             HelperControlActions(
                 onReturn = onReturn,
                 secondaryLabel = if (menu) R.string.helper_overlay_menu_close else R.string.helper_overlay_menu,
@@ -491,12 +489,18 @@ private fun ConsequencePanel(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    if (menu) stringResource(R.string.helper_overlay_menu) else "누르면 어떻게 되나요?",
+                    if (menu) {
+                        stringResource(R.string.helper_overlay_menu)
+                    } else {
+                        stringResource(
+                            if (step.kind == GuideAction.PAYMENT) R.string.helper_before_payment else R.string.helper_before_transmission,
+                        )
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() },
                 )
                 if (menu) {
-                    HelperMenuAction(R.string.helper_result_again, Icons.Rounded.ChatBubbleOutline, onExplain)
+                    if (step.needsExplanation) HelperMenuAction(R.string.helper_result_again, Icons.Rounded.ChatBubbleOutline, onExplain)
                     HelperMenuAction(R.string.helper_overlay_retry, Icons.Rounded.Refresh, onRetry)
                     if (live) {
                         TextButton(onClick = onChange, modifier = Modifier.heightIn(min = 56.dp)) { Text("현재 화면 다시 확인") }
@@ -511,13 +515,23 @@ private fun ConsequencePanel(
                             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         )
                     }
-                    Text(step.result, style = MaterialTheme.typography.titleLarge)
-                    step.facts.forEach { Text(it, fontSize = 18.sp) }
-                    Text("실제 실행 없이 버튼 위치만 안내해요.", fontSize = 18.sp)
+                    Text(step.result, style = MaterialTheme.typography.headlineSmall)
+                    if (step.facts.isNotEmpty()) {
+                        Surface(
+                            color = LightColorScheme.surfaceVariant,
+                            contentColor = LightColorScheme.onSurface,
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                step.facts.forEach { Text(it, fontSize = 18.sp, lineHeight = 26.sp) }
+                            }
+                        }
+                    }
+                    Text(stringResource(R.string.helper_location_only), fontSize = 18.sp, lineHeight = 26.sp)
                     if (!canLocate) {
                         Text(
                             if (!foreground) {
-                                "테스트 화면을 벗어났어요. 테스트 화면으로 돌아오면 위치를 다시 확인해요."
+                                if (live) "화면이 바뀌었어요. 다음 안내를 요청해 주세요." else "테스트 화면으로 돌아오면 위치를 다시 확인해요."
                             } else {
                                 "버튼과 함께 표시할 공간이 부족하거나 위치를 확인할 수 없어요. 화면 방향을 바꿔 주세요."
                             },
@@ -537,15 +551,17 @@ private fun ConsequencePanel(
                         )
                     }
                 }
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .toggleable(value = autoRead, role = Role.Switch, onValueChange = onAutoReadChange),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(R.string.helper_result_auto_read), Modifier.weight(1f), fontSize = 18.sp)
-                    Switch(checked = autoRead, onCheckedChange = null)
+                if (menu) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .toggleable(value = autoRead, role = Role.Switch, onValueChange = onAutoReadChange),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.helper_result_auto_read), Modifier.weight(1f), fontSize = 18.sp)
+                        Switch(checked = autoRead, onCheckedChange = null)
+                    }
                 }
             }
             if (!menu) {

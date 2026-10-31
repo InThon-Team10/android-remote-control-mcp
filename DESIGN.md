@@ -23,7 +23,7 @@ components:
 
 # Design context
 
-현재 범위는 화면 개발용 구성요소와 debug 전용 실행 화면이다. 최종 브랜드 디자인은 아직 정하지 않았다.
+현재 범위는 화면 개발용 구성요소와 debug 전용 실행 화면이다. 앱 아이콘은 2026-11-01 사용자가 승인한 손을 든 휴대폰 캐릭터로 확정했다. 아래 확정 앱 아이콘 절을 따른다.
 사용자 요구: 정보 취약 계층을 위한 쉬운 설명, 텍스트/음성 입력, 현재 화면 강조와 안내.
 
 ## 지속 디자인 원칙: 유니버설 디자인과 포용적 UI/UX
@@ -40,7 +40,7 @@ components:
 6. **UD-06 적은 신체·인지 부담.** 반복 입력, 오래 누르기, 정교한 움직임, 불필요한 단계와 강제 시간 제한을 줄인다. 안내를 사용자의 속도로 읽고 다시 확인할 수 있게 한다. 깜빡임을 피하고 시스템의 애니메이션 감소 설정을 존중한다.
 7. **UD-07 충분한 크기와 공간.** 모든 터치 영역은 최소 48×48dp, 주요 행동과 닫기는 56×56dp 이상을 프로젝트 기준으로 한다. 인접 터치 영역이 겹치지 않게 하고 좁은 화면·키보드·가로 화면에서도 잘리지 않게 한다. 아이콘 그림 크기와 실제 터치 영역을 구분한다.
 8. **IN-01 읽기와 보조 기술.** 주요 설명은 기본 18sp 이상을 프로젝트 기준으로 하며 현재 더 큰 안내 글씨를 이유 없이 축소하지 않는다. sp와 시스템 글자 확대를 지원하고 200% 확대에서 핵심 내용·행동이 잘리거나 겹치지 않게 검증한다. 프로젝트 텍스트 대비는 크기와 관계없이 4.5:1 이상을 목표로 한다. TalkBack 이름·역할·상태·읽기 순서와 외부 키보드/Switch Access 접근을 검증한다. 장식 이미지는 읽기에서 제외한다.
-9. **IN-02 사용자 통제와 맥락 보존.** 도우미가 무엇을 하고 있는지 알리고, 언제든 쉽게 접거나 종료하게 한다. 복귀 수단은 스크롤 없이 보이는 ‘버블로 돌아가기’ 텍스트 버튼으로 제공한다. 표시 문구와 접근성 이름을 일치시킨다. 버블 복귀와 전체 서비스 종료를 구분한다. 설명은 대상 근처에 배치하되 대상·닫기·시스템 조작을 가리지 않는다. 밝은 강조 영역과 안내 위치는 실제 화면 좌표에 맞아야 하며 예시 좌표는 예시로 명시한다.
+9. **IN-02 사용자 통제와 맥락 보존.** 도우미가 무엇을 하고 있는지 알리고, 언제든 쉽게 접거나 종료하게 한다. 복귀 수단은 스크롤 없이 보이는 ‘도움 버튼으로 돌아가기’ 텍스트 버튼으로 제공한다. 표시 문구와 접근성 이름을 일치시킨다. 버블 복귀와 전체 서비스 종료를 구분한다. 설명은 대상 근처에 배치하되 대상·닫기·시스템 조작을 가리지 않는다. 밝은 강조 영역과 안내 위치는 실제 화면 좌표에 맞아야 하며 예시 좌표는 예시로 명시한다.
 10. **IN-03 다양한 사용자와 함께 검증.** 개발자 취향이나 스크린샷만으로 사용성을 확정하지 않는다. 디지털 경험·시각·운동·청각·인지 조건이 다양한 사용자의 피드백을 반영한다. 사용자의 실수를 탓하지 않고 디자인의 장벽을 찾아 개선한다. 작은 기기, 큰 글씨, 밝고 어두운 배경, 한 손 조작, 음성 사용 불가 상황을 검토한다.
 
 ### 디자인 작업 때 적용하는 절차
@@ -184,9 +184,9 @@ A/B 결과 안내는 새 안내/변경된 단계마다 기본적으로 fullText�
 
 ## Explicit bubble return and fresh request (2026-10-31)
 
-This decision supersedes all earlier X/collapse navigation descriptions above. All debug helper overlays use the shared HelperReturnToBubbleButton with the visible/accessibility label ‘버블로 돌아가기’. No X remains. Input and explanation panels keep return controls outside scrolling content. The shared HelperControlActions measures the actual labels at the user's font scale and stacks them when a row does not fit. Minimum action height is 56dp; labels wrap without ellipsis. Existing LightColorScheme and titleMedium own the appearance.
+This decision supersedes all earlier X/collapse navigation descriptions above. All debug helper overlays use the shared HelperReturnToBubbleButton with the visible/accessibility label ‘도움 버튼으로 돌아가기’. No X remains. Input and explanation panels keep return controls outside scrolling content. The shared HelperControlActions measures the actual labels at the user's font scale and stacks them when a row does not fit. Minimum action height is 56dp; labels wrap without ellipsis. Existing LightColorScheme and titleMedium own the appearance.
 
-Menu entry is ‘도우미 메뉴’. An expanded menu keeps ‘메뉴 닫기’ and ‘버블로 돌아가기’ visible outside its scroll region. Closing the menu returns to the same guide; returning to the bubble ends the guide. ‘도우미 종료’ retains its distinct service-stop behavior. Controls avoid the highlighted target, reserve caption space, and fall back to an explanation panel when there is insufficient space.
+Menu entry is ‘도우미 메뉴’. An expanded menu keeps ‘메뉴 닫기’ and ‘도움 버튼으로 돌아가기’ visible outside its scroll region. Closing the menu returns to the same guide; returning to the bubble ends the guide. ‘도우미 종료’ retains its distinct service-stop behavior. Controls avoid the highlighted target, reserve caption space, and fall back to an explanation panel when there is insufficient space.
 
 Bubble return stops TTS, hides the keyboard, clears overlay windows and touch restrictions, discards consequence step/measurement permission, and invalidates pending layout callbacks. The underlying app is then available for direct interaction. It does not execute or cancel a transaction. Opening the bubble shows the request input with the draft preserved and no automatic submission. Previous guidance is never resumed; auto-read preference survives. Real AI/request execution remains unconnected in this debug prototype.
 
@@ -240,3 +240,51 @@ HelperEntryScreen reuses Color.kt → MaterialTheme and Android system typograph
 Each branch fixes its guide mode in HelperBuildVariant.kt. A starts with explanation; B starts with the scrollable caption. The overlay request and inert test fixture use that same mode. Runtime A/B switching is removed from these branch builds; common onboarding/home source and settings storage are identical. The base MCP launcher is unchanged.
 
 Entry verification before the user requested a stop: assembleGmsDebug, ktlintCheck, strict static audit, compiled state checks, and emulator first-entry/skip/return/relaunch/mock grant/start/request-draft/stop/failure-retry/revocation flows passed. A contrast correction was subsequently rebuilt. New entry screens at 320dp/200% text, landscape, TalkBack/Switch Access and diverse-user testing remain unverified. No additional builds or UI tests were run for branch separation, following the user's request to prioritize Git publication.
+
+## 확정 앱 아이콘 — 손을 든 휴대폰 (2026-11-01)
+
+사용자가 웃는 얼굴과 손을 든 휴대폰 시안(v3-03)을 앱 아이콘으로 확정했다. 기존 유사 캐릭터 사례를 확인한 뒤 선택한 디자인이다. 이는 독점성이나 상표 조사 완료를 의미하지 않는다. 다른 로고 시안은 채택하지 않는다.
+
+승인 원본: docs/branding/approved-phone-helper.png. 내장 image_gen으로 원본의 배경만 제거한 런타임 이미지: app/src/main/res/drawable-nodpi/helper_phone_mascot.png. 표정·기울기·손을 든 자세를 유지한다. 새 시안으로 임의 교체하지 않는다.
+
+런타임 소유 경로: AndroidManifest.xml의 icon/roundIcon → mipmap-anydpi-v26/ic_launcher.xml 및 ic_launcher_round.xml → drawable/ic_launcher_foreground.xml → helper_phone_mascot.png. 두 아이콘 모두 같은 캐릭터와 18dp foreground inset을 사용한다. 배경은 values/ic_launcher_background.xml의 #DEE0FF이며 기존 PrimaryContainerLight와 동일한 팔레트다. 별도 폰트나 라이브러리는 추가하지 않았다.
+
+UD-01/03/04에 따라 친근한 도우미를 표현하고 얼굴·휴대폰 실루엣으로 색상 외 단서를 제공한다. 앱 이름/런처 접근성 라벨은 유지하며 이 캐릭터를 기능 버튼의 텍스트 라벨 대체물로 사용하지 않는다. 원칙 충돌은 확인되지 않았다.
+
+검증: :app:processGmsDebugResources 통과. 실제 런처에서 작은 크기·다양한 마스크·TalkBack 및 다양한 사용자의 인지 검증은 미완료다. 기존 설치 앱에는 아직 재설치하지 않았다.
+
+## A 단일 안내로 확정 — 결제·전송만 사전 설명 (2026-11-01)
+
+사용자가 A를 최종 선택하고 B를 폐기했다. 이 결정은 위 A/B 비교 및 "모든 A 사례는 설명 먼저" 기록을 대체한다. 활성 작업 브랜치는 feat/helper-version-a이다. 로컬 feat/helper-version-b 브랜치는 삭제했으며 원격 브랜치는 변경하지 않았다. GuideVariant와 HelperBuildVariant 및 B 표시·분기를 제거한다.
+
+ConsequenceStep.kind의 PAYMENT(결제·송금 실행), TRANSMISSION(메시지·사진·파일 전송 실행)만 긴 사전 설명을 연다. OTHER(검색·화면 이동·삭제·결과 미확인)는 A의 위치 안내 단계로 바로 진입한다. 이는 B 모드 유지가 아니다. 일반 안내도 측정 전에는 타깃을 열지 않으며, 화면 변경·종료 시 이전 타깃 권한을 무효화한다. 결제·전송의 화면 변경은 사전 재확인으로 돌아간다.
+
+Gemini 응답 category는 필수이며 허용 값 밖이나 누락된 응답은 오류 처리한다. category는 설명 화면 선택용 AI 분류일 뿐, 거래 안전성이나 실행 결과를 검증한 값이 아니다. 자동 조작 권한은 추가하지 않는다. 미확인 결과는 미확인으로 유지한다. 삭제 등 OTHER의 주의사항은 짧은 안내 안에 계속 표시하여 UD-05의 결과 확인 정보를 보존한다.
+
+Impeccable polish를 사용하되 AGENTS.md의 유니버설 디자인·포용적 UI/UX 기준을 우선한다. 사전 설명은 "결제 전에 확인해 주세요"/"보내기 전에 확인해 주세요" → 결과 → 확인할 사실 묶음 → 버튼 위치 보기 순서다. 18sp/26sp 사실 설명, 24dp 패널 모서리, 56dp 주요 행동, 스크롤 밖 복귀/메뉴와 주 행동을 유지한다. 자동 읽기 설정만 메뉴로 이동하고 다시 읽기는 안내 안에 유지한다. 재확인 시 상태 문구를 유지하며 실제 실행은 사용자가 선택함을 밝힌다.
+
+검증: assembleGmsDebug 및 ktlintCheck 통과. HelperAssistantConnectionTest 5개 통과(기존 누락 ngrok host jar를 제외하는 /tmp/inthon-ui-test.init.gradle 사용, 전체 native 의존 테스트 아님). check-consequence-guide.sh, check-helper-caption.sh, check-helper-entry.sh 통과. strict premium 정적 감사 오류/경고 0. category 필수화 후 최종 assembleGmsDebug·ktlintCheck·관련 테스트 5개를 다시 통과했다. git diff --check 통과.
+실기 한계: WSL 에뮬레이터는 /dev/kvm 부재, Windows 가상 기기는 실행 잠금/ADB 미연결로 이번 변경 화면을 새로 촬영하지 못했다. 실제 작은 아이콘, 200% 글자, TalkBack/Switch Access, 실제 Gemini 응답 및 다양한 사용자 검증은 미완료다. 기존 캡처를 이번 변경의 검증 증거로 사용하지 않는다.
+
+
+## 첫 사용 리메이크 · 2026-11-01
+사용자 확정 명칭: 캐릭터 **콕콕이**, 기능 **도움 버튼**. A 단일 버전. 기존 모의 권한/켜짐 화면을 교체한다.
+- 환영 → 격리된 연습용 휴대폰(도움 버튼 / 예시 질문 / 직접 목표 누르기) → 사용 초대 → 권한 설명 → 실제 Android 접근성 설정 → 홈.
+- 따뜻한 밝은 바탕, 승인한 손을 든 휴대폰, 큰 환영 문장과 한 단계당 한 행동. 네이티브 Material 구성과 기존 토큰 유지. 전화기 프레임은 연습 영역에만 사용한다.
+- 연습이라는 표시는 스크롤 바깥에 항상 보인다. 외부 앱·사진·마이크·AI 요청·권한 변경과 연결하지 않는다. 중단/재연습을 제공한다.
+- 온보딩 중 실제 도움 버튼을 숨겨 가짜 버튼과 혼동하지 않게 하며, 홈 복귀나 앱 이탈 시 기존 켜짐 상태를 복원한다. 홈 상태는 실제 서비스 창의 부착/제거를 관찰한다. 모의 권한 preferences는 사용하지 않는다.
+- 권한 화면은 Android의 실제 허용/사용/확인 문구 차이를 설명하며 사용자가 읽고 선택한다. 새 권한을 앱이 임의로 허용하지 않는다.
+- 본문 18sp 이상, 주요 터치 56dp 이상, 세로 스크롤, 장식 캐릭터 읽기 제외. 보조 기술의 실제 탐색 및 다양한 사용자 검증은 별도 미검증이다.
+검증 기록: assembleGmsDebug / ktlintCheck 통과. 격리된 연습 전환, 기존 결과 안내·캡션 회귀 스크립트 통과. HelperRuntimeTest 3개와 HelperAssistantConnectionTest 5개 통과. API 35 에뮬레이터에서 환영·연습 전 단계·완료·초대·홈 및 켜짐/꺼짐 실제 일치 확인. 글자 200%에서 연습 고정 표시와 스크롤 후 도움 버튼 노출 확인, 설정 1.0으로 복원. 정적 디자인 감사 오류 0건은 네이티브 접근성 인증이 아니다. 권한 미허용 상태의 실제 허용/거절 전 과정, TalkBack/Switch Access, 가로·320dp 화면, 다양한 사용자 테스트는 미검증.
+
+
+## 홈 상태와 음성 입력 정리 · 2026-11-01
+사용자 항목 1·2는 home_status, 4·6은 overlay_simplify, 5는 voice_input 서브에이전트가 담당했고 반환 후 메인이 3번 정렬을 통합했다. 각 담당은 AGENTS.md·지속 유니버설/포용적 원칙과 Impeccable 지침을 읽었다.
+- 첫 안내는 완료 이력이 없을 때 표시하고 재실행은 홈으로 간다. 사용자 지시에 따라 이 정책은 유지한다. 홈의 사용법 다시 연습하기는 유지한다.
+- 홈은 승인 캐릭터 + 체크/일시정지 그래픽 + 실제 켜짐 문구로 상태를 전달한다. 색만으로 구분하지 않는다. 상태·설명·주요 행동은 중심선을 맞추고 도움 버튼이 뜨는 옆 공간을 피하도록 상태/설명 폭을 제한한다.
+- 입력은 중복 안내/상시 설정/긴 개인정보 설명/가짜 음성 팝업을 제거한다. 개인정보 안내는 AI 연결 설정에서 확인한다. 입력과 마이크는 한 행, 입력·전송은 같은 양끝, X와 마이크는 같은 오른쪽 축이다. X 56dp와 입력 사이 최소 24dp. 비활성 전송도 글자를 읽을 수 있는 대비를 유지한다. 입력 배경의 앱 내용은 검정 78%로 낮춰 입력에 집중한다.
+- 음성은 Android SpeechRecognizer로 기존 입력창에 부분·최종 결과를 반영한다. 기기 내 인식을 우선하며 없으면 시스템 인식기를 쓴다. 부분 결과 제공 여부는 기기 음성 서비스에 달려 있다. 발화 종료나 수동 중지 즉시 녹음 아이콘을 해제하고 결과를 기다리며 자동 전송하지 않는다. 재시작/종료 후 이전 콜백은 무시한다. 최초 마이크 권한은 시스템 화면으로 요청한다.
+- X-only는 기존 사용자 승인 예외(UD-03/IN-02)를 유지한다. 시각적으로 복귀 의미가 모호할 수 있으므로 접근성 이름 ‘도움 버튼으로 돌아가기’와 처음 사용 연습으로 보완한다.
+
+검증 기록(1차 수정): assembleGmsDebug 및 ktlintCheck 통과. HelperVoiceInputTest 4개(부분/최종 결과, 자동 종료, 수동 중지 후 늦은 준비 콜백, 오래된 콜백, 시스템 인식기 대체)와 HelperRuntimeTest 3개 통과. 연습/결과 안내/캡션 회귀 스크립트 통과. API35 에뮬레이터에서 상태 그래픽, 간결한 입력 UI, 최초 시스템 마이크 권한창, 200% 입력 UI를 확인했다. 실제 마이크 권한은 부여하지 않았고 실음성 전사 및 TalkBack/Switch Access는 미검증이다. 글자 배율은 1.0으로 복원했다.
+사용자 후속 지적: 입력창과 마이크 버튼 높이가 달라 보임. 같은 행의 intrinsic 높이를 공유하고 기본 최소 높이 64dp, 동일한 24dp 모서리를 적용했다. 이 최종 크기 수정은 빌드/스타일 검사 통과, 최종 실화면 재확인은 PR 이후 후속 검토 대상으로 남긴다.

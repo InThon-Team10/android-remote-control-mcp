@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="helper_overlay_service_name">도우미 오버레이 디자인</string>
+    <string name="helper_overlay_service_name">콕콕이 도움 버튼</string>
     <string name="helper_overlay_service_description">다른 앱 위에 도움 캐릭터와 말풍선을 표시하는 디자인 미리보기입니다. 화면 내용 읽기, 녹음, 자동 조작은 하지 않습니다.</string>
     <string name="helper_overlay_help">도움</string>
     <string name="helper_overlay_preview">디자인 미리보기</string>
@@ -14,7 +14,7 @@
     <string name="helper_overlay_hide_input">입력창 접기</string>
     <string name="helper_overlay_highlight">강조 화면 보기</string>
     <string name="helper_overlay_hide_highlight">강조 표시 끄기</string>
-    <string name="helper_overlay_collapse">버블로 돌아가기</string>
+    <string name="helper_overlay_collapse">도움 버튼으로 돌아가기</string>
     <string name="helper_overlay_launch">다른 앱 위에 띄워보기</string>
     <string name="helper_overlay_ready">도우미 · 한 단계씩 안내</string>
     <string name="helper_overlay_input_hint">무엇을 도와드릴까요?</string>
@@ -40,6 +40,11 @@
     <string name="helper_result_read">다시 읽어주기</string>
     <string name="helper_result_auto_read">설명 자동으로 읽기</string>
     <string name="helper_overlay_run_test">테스트 실행</string>
-    <string name="helper_branch_a">버전 A · 설명 먼저</string>
-    <string name="helper_branch_b">버전 B · 말풍선 먼저</string>
+    <string name="helper_before_payment">결제 전에 확인해 주세요</string>
+    <string name="helper_before_transmission">보내기 전에 확인해 주세요</string>
+    <string name="helper_location_only">도우미는 위치만 알려드려요. 실행은 직접 선택해 주세요.</string>
+    <string name="helper_overlay_voice_stop">말하기 마치기</string>
+    <string name="helper_overlay_voice_processing">말씀 확인 중…</string>
+    <string name="helper_overlay_preparing">안내 준비 중…</string>
+    <string name="helper_overlay_submit">요청 보내기</string>
 </resources>

@@ -5,7 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 
-internal enum class GuideVariant { A, B }
+internal enum class GuideAction { PAYMENT, TRANSMISSION, OTHER }
 
 internal enum class ConsequencePhase { INPUT, EXPLANATION, TARGET, RECONFIRM }
 
@@ -18,7 +18,9 @@ internal data class ConsequenceStep(
     val confirmed: Boolean,
     val target: Rect,
     val version: Int,
+    val kind: GuideAction = GuideAction.OTHER,
 ) {
+    val needsExplanation: Boolean get() = kind == GuideAction.PAYMENT || kind == GuideAction.TRANSMISSION
     val fullText: String get() = (listOf(result) + facts + action).joinToString("\n")
     val coreText: String get() = "$result\n$action"
 }
@@ -26,38 +28,29 @@ internal data class ConsequenceStep(
 internal class ConsequenceState {
     var phase = ConsequencePhase.INPUT
     var step: ConsequenceStep? = null
-    var variant = GuideVariant.A
-    var compact = false
     var canLocate = false
     var measured = false
 
     fun finish() {
         phase = ConsequencePhase.INPUT
         step = null
-        compact = false
         canLocate = false
         measured = false
     }
 
-    fun begin(
-        value: ConsequenceStep,
-        mode: GuideVariant,
-    ) {
+    fun begin(value: ConsequenceStep) {
         step = value
-        variant = mode
-        compact = mode == GuideVariant.A
         canLocate = false
         measured = false
-        phase = if (mode == GuideVariant.A) ConsequencePhase.EXPLANATION else ConsequencePhase.TARGET
+        phase = if (value.needsExplanation) ConsequencePhase.EXPLANATION else ConsequencePhase.TARGET
     }
 
     fun replace(value: ConsequenceStep) {
         if (step == value) return
         step = value
-        compact = true
         measured = false
         canLocate = false
-        phase = if (variant == GuideVariant.A) ConsequencePhase.RECONFIRM else ConsequencePhase.TARGET
+        phase = if (value.needsExplanation) ConsequencePhase.RECONFIRM else ConsequencePhase.TARGET
     }
 
     fun fit(fits: Boolean) {
@@ -74,7 +67,7 @@ internal class ConsequenceState {
 
 /** In-process bridge only: no external intents can supply a real transaction or target. */
 internal object ConsequencePreviewBridge {
-    var onStart: ((ConsequenceStep, GuideVariant) -> Unit)? = null
+    var onStart: ((ConsequenceStep) -> Unit)? = null
     var onUpdate: ((ConsequenceStep) -> Unit)? = null
     var onVisibility: ((Boolean) -> Unit)? = null
     var onLeave: (() -> Unit)? = null
@@ -109,6 +102,7 @@ internal fun consequenceExample(
                 true,
                 target,
                 version,
+                GuideAction.TRANSMISSION,
             )
         }
 
@@ -161,6 +155,7 @@ internal fun consequenceExample(
                 true,
                 target,
                 version,
+                GuideAction.PAYMENT,
             )
         }
     }

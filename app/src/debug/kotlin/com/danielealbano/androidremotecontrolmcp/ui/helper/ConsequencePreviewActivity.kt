@@ -88,7 +88,6 @@ private fun Playground(
     val context = LocalContext.current
     var selected by remember { mutableStateOf(startTest) }
     var pendingStart by remember { mutableStateOf(startTest) }
-    val variant = helperGuideVariant
     var example by remember { mutableIntStateOf(0) }
     var corner by remember { mutableIntStateOf(0) }
     var version by remember { mutableIntStateOf(0) }
@@ -120,7 +119,7 @@ private fun Playground(
             val start = ConsequencePreviewBridge.onStart ?: return@LaunchedEffect
             pendingStart = false
             ConsequencePreviewBridge.active = true
-            start(consequenceExample(example, target, version), variant)
+            start(consequenceExample(example, target, version))
         }
     }
     BackHandler(selected) { leave() }
@@ -134,8 +133,7 @@ private fun Playground(
             Text("실제 결제·전송·삭제가 없는 테스트예요.", style = MaterialTheme.typography.bodyLarge)
             if (!selected) {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("설명 방식", style = MaterialTheme.typography.titleMedium)
-                    Text(if (variant == GuideVariant.A) "A · 항상 설명 먼저" else "B · 말풍선 우선")
+                    Text("결제·전송은 확인 후 안내, 나머지는 바로 안내", style = MaterialTheme.typography.titleMedium)
                     listOf("짧은 결제", "긴 전송 설명", "삭제", "결과 미확인", "일반 검색").forEachIndexed { i, label ->
                         FilterChip(selected = example == i, onClick = { example = i }, label = { Text(label) })
                     }
