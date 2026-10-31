@@ -152,4 +152,49 @@ class HelperAssistantConnectionTest {
             assertTrue(failure is HelperGuideException, "input '$text' threw $failure")
         }
     }
+
+    @Test fun swipeRequiresValidatedScrollableRegion() {
+        val parsed = parseHelperScreen(screen.replace("on,clk,ena", "on,scr,ena"))
+        val swipe = json.replace("}", ""","gesture":"swipe","direction":"up","distance":"long"}""")
+        assertTrue(parsed.nodes.isEmpty())
+        assertEquals(SwipeGuide(SwipeDirection.UP, SwipeDistance.LONG), decodeHelperAnswer(swipe, parsed).step.swipe)
+        assertThrows(HelperGuideException::class.java) { decodeHelperAnswer(swipe, parseHelperScreen(screen)) }
+        assertThrows(HelperGuideException::class.java) { decodeHelperAnswer(json, parsed) }
+        listOf(
+            swipe.replace("up", "diagonal"),
+            swipe.replace("long", "precise"),
+            swipe.replace("other", "payment"),
+            swipe.replace("1:1", "fake"),
+        ).forEach { invalid ->
+            assertThrows(HelperGuideException::class.java) { decodeHelperAnswer(invalid, parsed) }
+        }
+        assertTrue(parseHelperScreen(screen.replace("on,clk,ena", "off,scr,ena")).scrollNodes.isEmpty())
+        assertTrue(parseHelperScreen(screen.replace("on,clk,ena", "on,scr")).scrollNodes.isEmpty())
+    }
+
+    @Test fun swipeGeometryRespectsDirectionDistanceAndCaption() {
+        val viewport =
+            androidx.compose.ui.geometry
+                .Rect(0f, 0f, 720f, 1600f)
+        SwipeDirection.entries.forEach { direction ->
+            val paths =
+                SwipeDistance.entries.map {
+                    swipePath(SwipeGuide(direction, it), viewport, viewport, 500f, 40f)!!
+                }
+            assertTrue(paths[0].length < paths[1].length && paths[1].length < paths[2].length)
+            paths.forEach {
+                assertTrue(it.start.y >= 540f && it.end.y >= 540f)
+                assertTrue(viewport.contains(it.start) && viewport.contains(it.end))
+                when (direction) {
+                    SwipeDirection.UP -> assertTrue(it.end.y < it.start.y)
+                    SwipeDirection.DOWN -> assertTrue(it.end.y > it.start.y)
+                    SwipeDirection.LEFT -> assertTrue(it.end.x < it.start.x)
+                    SwipeDirection.RIGHT -> assertTrue(it.end.x > it.start.x)
+                }
+            }
+        }
+        val guide = SwipeGuide(SwipeDirection.UP, SwipeDistance.LONG)
+        assertEquals(null, swipePath(guide, androidx.compose.ui.geometry.Rect.Zero, viewport, 500f, 40f))
+        assertEquals(null, swipePath(guide, viewport, viewport, 1590f, 40f))
+    }
 }

@@ -51,6 +51,17 @@ class HelperPreviewActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AndroidRemoteControlMcpTheme(dynamicColor = false) {
+                var swipePreview by rememberSaveable { mutableStateOf(intent.getStringExtra("preview_swipe")) }
+                if (swipePreview != null) {
+                    BackHandler { swipePreview = null }
+                    val direction = SwipeDirection.entries.firstOrNull { it.name.equals(swipePreview, true) } ?: SwipeDirection.UP
+                    val distance =
+                        SwipeDistance.entries.firstOrNull {
+                            it.name.equals(intent.getStringExtra("preview_distance"), true)
+                        } ?: SwipeDistance.MEDIUM
+                    SwipeGuidePreview(SwipeGuide(direction, distance), onClose = { swipePreview = null })
+                    return@AndroidRemoteControlMcpTheme
+                }
                 var thinkingPreview by rememberSaveable { mutableStateOf(intent.getBooleanExtra("preview_thinking", false)) }
                 if (thinkingPreview) {
                     BackHandler { thinkingPreview = false }

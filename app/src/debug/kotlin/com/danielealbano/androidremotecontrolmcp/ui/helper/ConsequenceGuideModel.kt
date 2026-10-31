@@ -19,6 +19,7 @@ internal data class ConsequenceStep(
     val target: Rect,
     val version: Int,
     val kind: GuideAction = GuideAction.OTHER,
+    val swipe: SwipeGuide? = null,
 ) {
     val needsExplanation: Boolean get() = kind == GuideAction.PAYMENT || kind == GuideAction.TRANSMISSION
     val fullText: String get() = (listOf(result) + facts + action).joinToString("\n")

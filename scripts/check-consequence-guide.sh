@@ -14,7 +14,7 @@ class ConsequenceCheck {
     static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
     static ConsequenceStep step(boolean important, boolean confirmed, int version) {
         return new ConsequenceStep("test", "action", "result", List.of("facts"),
-            important, confirmed, new Rect(160f,80f,220f,140f), version, important ? GuideAction.PAYMENT : GuideAction.OTHER);
+            important, confirmed, new Rect(160f,80f,220f,140f), version, important ? GuideAction.PAYMENT : GuideAction.OTHER, null);
     }
     public static void main(String[] args) {
         check(ConsequenceGuideModelKt.isConsequenceTestRequest("테스트"),"test request accepted");

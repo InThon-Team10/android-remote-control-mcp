@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -239,6 +240,38 @@ internal class ConsequenceGuideHost(
         }
     }
 
+    private fun renderSwipe(
+        step: ConsequenceStep,
+        region: Rect,
+        width: Int,
+        height: Int,
+    ) {
+        val guide = step.swipe ?: return
+        // Drawing is not touchable: the user performs the gesture in the real app.
+        // Only the caption owns input, and the path excludes its measured bounds.
+        ConsequencePreviewBridge.touchPolicy = 0
+        val captionHeight = mutableStateOf(dp(280))
+        val viewport = Rect(0f, 0f, width.toFloat(), height.toFloat())
+
+        fun path() = swipePath(guide, region, viewport, captionHeight.value.toFloat(), dp(24).toFloat())
+        attach(params(width, height)) {
+            SwipeGuideCanvas(path())
+        }
+        attach(params(width, WindowManager.LayoutParams.WRAP_CONTENT, touch = true)) {
+            SwipeGuideCaption(
+                guide = guide,
+                available = path() != null,
+                onReturn = { close() },
+                onRead = if (speechReady()) ({ read(guide.instruction + ". 동그라미에서 시작해 흰 선 끝까지 움직여 주세요.") }) else null,
+                onRefresh = { liveRefresh?.invoke() },
+                modifier =
+                    Modifier
+                        .heightIn(max = (height / service.resources.displayMetrics.density * 0.45f).dp)
+                        .onSizeChanged { captionHeight.value = it.height },
+            )
+        }
+    }
+
     fun render() {
         if (!ConsequencePreviewBridge.active) return
         val step = state.step ?: return
@@ -252,6 +285,10 @@ internal class ConsequenceGuideHost(
         val valid =
             target.width > 0 && target.height > 0 && target.left >= 0 && target.top >= 0 &&
                 target.right <= width && target.bottom <= height
+        if (step.swipe != null && foreground) {
+            renderSwipe(step, target, width, height)
+            return
+        }
         val below = height - target.bottom.toInt() - dp(32)
         val above = target.top.toInt() - dp(32)
         val captionBelow = below >= above
