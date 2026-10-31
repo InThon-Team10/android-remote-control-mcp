@@ -71,6 +71,8 @@ class ListStorageLocationsHandler
                         }
                     }
                 McpToolUtils.untrustedTextResult(Json.encodeToString(jsonArray))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
@@ -170,6 +172,8 @@ class ListFilesHandler
                     }
 
                 McpToolUtils.untrustedTextResult(Json.encodeToString(resultJson))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
@@ -277,6 +281,8 @@ class ReadFileHandler
                     }
 
                 McpToolUtils.untrustedTextResult(text)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
@@ -363,6 +369,8 @@ class WriteFileHandler
                 fileOperationProvider.writeFile(locationId, path, content)
 
                 McpToolUtils.textResult("File written successfully: $locationId/$path")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
@@ -439,6 +447,8 @@ class AppendFileHandler
                 fileOperationProvider.appendFile(locationId, path, content)
 
                 McpToolUtils.textResult("Content appended successfully to: $locationId/$path")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
@@ -521,6 +531,8 @@ class FileReplaceHandler
                 val result = fileOperationProvider.replaceInFile(locationId, path, oldString, newString, replaceAll)
 
                 McpToolUtils.textResult("Replaced ${result.replacementCount} occurrence(s) of the specified string.")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
@@ -694,6 +706,8 @@ class DeleteFileHandler
                 fileOperationProvider.deleteFile(locationId, path)
 
                 McpToolUtils.textResult("File deleted successfully: $locationId/$path")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: McpToolException) {
                 throw e
             } catch (e: Exception) {
