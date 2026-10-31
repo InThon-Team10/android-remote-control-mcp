@@ -76,7 +76,7 @@ class SendIntentHandler
         }
 
         private fun extractExtras(arguments: JsonObject?): Map<String, Any?>? {
-            val extrasObj = (arguments?.get("extras") as? JsonObject) ?: return null
+            val extrasObj = optionalJsonObject(arguments, "extras") ?: return null
             val result = mutableMapOf<String, Any?>()
             for ((key, value) in extrasObj) {
                 convertExtra(key, value)?.let { result[key] = it }
@@ -144,22 +144,41 @@ class SendIntentHandler
         }
 
         private fun extractExtrasTypes(arguments: JsonObject?): Map<String, String>? {
-            val obj = (arguments?.get("extras_types") as? JsonObject) ?: return null
+            val obj = optionalJsonObject(arguments, "extras_types") ?: return null
             val result = mutableMapOf<String, String>()
             for ((key, value) in obj) {
-                val primitive = value as? JsonPrimitive ?: continue
+                val primitive = value as? JsonPrimitive
+                if (primitive == null || !primitive.isString) {
+                    throw McpToolException.InvalidParams("Parameter 'extras_types' value for '$key' must be a string")
+                }
                 result[key] = primitive.content
             }
             return result.ifEmpty { null }
         }
 
         private fun extractFlags(arguments: JsonObject?): List<String>? {
-            val array = (arguments?.get("flags") as? JsonArray) ?: return null
+            val element = arguments?.get("flags") ?: return null
+            val array =
+                element as? JsonArray
+                    ?: throw McpToolException.InvalidParams("Parameter 'flags' must be an array of strings")
             val result =
-                array.mapNotNull { item ->
-                    (item as? JsonPrimitive)?.content
+                array.map { item ->
+                    val primitive = item as? JsonPrimitive
+                    if (primitive == null || !primitive.isString) {
+                        throw McpToolException.InvalidParams("Each element in 'flags' must be a string")
+                    }
+                    primitive.content
                 }
             return result.ifEmpty { null }
+        }
+
+        private fun optionalJsonObject(
+            arguments: JsonObject?,
+            name: String,
+        ): JsonObject? {
+            val element = arguments?.get(name) ?: return null
+            return element as? JsonObject
+                ?: throw McpToolException.InvalidParams("Parameter '$name' must be an object")
         }
 
         fun register(

@@ -156,6 +156,77 @@ class IntentToolsTest {
             }
 
         @Test
+        fun `send_intent with non-object extras throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras", "not-an-object")
+                    }
+
+                val exception = assertThrows<McpToolException.InvalidParams> { handler.execute(params) }
+                assertTrue(exception.message!!.contains("'extras' must be an object"))
+                coVerify(exactly = 0) { mockIntentDispatcher.sendIntent(any()) }
+            }
+
+        @Test
+        fun `send_intent with non-object extras_types throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras_types", buildJsonArray { add(JsonPrimitive("int")) })
+                    }
+
+                val exception = assertThrows<McpToolException.InvalidParams> { handler.execute(params) }
+                assertTrue(exception.message!!.contains("'extras_types' must be an object"))
+                coVerify(exactly = 0) { mockIntentDispatcher.sendIntent(any()) }
+            }
+
+        @Test
+        fun `send_intent with non-string extras_types value throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        putJsonObject("extras") { put("count", 5) }
+                        putJsonObject("extras_types") { put("count", buildJsonArray { add(JsonPrimitive("int")) }) }
+                    }
+
+                val exception = assertThrows<McpToolException.InvalidParams> { handler.execute(params) }
+                assertTrue(exception.message!!.contains("'extras_types'"))
+                coVerify(exactly = 0) { mockIntentDispatcher.sendIntent(any()) }
+            }
+
+        @Test
+        fun `send_intent with non-array flags throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("flags", "FLAG_ACTIVITY_CLEAR_TOP")
+                    }
+
+                val exception = assertThrows<McpToolException.InvalidParams> { handler.execute(params) }
+                assertTrue(exception.message!!.contains("'flags' must be an array"))
+                coVerify(exactly = 0) { mockIntentDispatcher.sendIntent(any()) }
+            }
+
+        @Test
+        fun `send_intent with non-string flag item throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("flags", buildJsonArray { add(JsonPrimitive(5)) })
+                    }
+
+                val exception = assertThrows<McpToolException.InvalidParams> { handler.execute(params) }
+                assertTrue(exception.message!!.contains("'flags'"))
+                coVerify(exactly = 0) { mockIntentDispatcher.sendIntent(any()) }
+            }
+
+        @Test
         fun `send_intent with extras passes map to dispatcher`() =
             runTest {
                 coEvery {
