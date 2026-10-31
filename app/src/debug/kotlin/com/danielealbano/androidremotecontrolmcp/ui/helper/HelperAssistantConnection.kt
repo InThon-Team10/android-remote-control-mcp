@@ -104,6 +104,8 @@ internal data class HelperAnswer(
     val signature: String,
 )
 
+private val WINDOW_TYPE = Regex("""^--- window:-?\d+ type:(\S+) """)
+
 /** Coordinates come from current MCP rows, never from model-generated numbers. */
 internal fun parseHelperScreen(text: String): HelperScreen {
     val nodes = linkedMapOf<String, Rect>()
@@ -112,7 +114,7 @@ internal fun parseHelperScreen(text: String): HelperScreen {
     text.lineSequence().forEach { line ->
         if (line.startsWith("screen:")) signature.add(line)
         if (line.startsWith("--- window:")) {
-            applicationWindow = line.contains("type:APPLICATION ")
+            applicationWindow = WINDOW_TYPE.find(line)?.groupValues?.get(1) == "APPLICATION"
             if (applicationWindow) signature.add(line.substringBefore(" layer:"))
         }
         val columns = line.split('\t')
