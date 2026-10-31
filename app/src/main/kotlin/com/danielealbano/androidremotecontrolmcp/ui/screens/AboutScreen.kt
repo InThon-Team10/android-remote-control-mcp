@@ -47,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -64,8 +63,11 @@ import com.danielealbano.androidremotecontrolmcp.BuildConfig
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.components.rememberChangedSinceShown
+import com.danielealbano.androidremotecontrolmcp.ui.theme.PrimaryContainerLight
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.UpdateCheckUiState
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.UpdateViewModel
+
+private val ABOUT_ICON_ART = 70.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,14 +101,14 @@ fun AboutScreen(
                         Modifier
                             .size(72.dp)
                             .clip(CircleShape)
-                            .background(colorResource(R.color.ic_launcher_background)),
+                            .background(PrimaryContainerLight),
                     contentAlignment = Alignment.Center,
                 ) {
                     // Decorative: the app's name is the text below
                     Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        painter = painterResource(id = R.drawable.helper_launcher_tap),
                         contentDescription = null,
-                        modifier = Modifier.size(72.dp),
+                        modifier = Modifier.size(ABOUT_ICON_ART),
                     )
                 }
                 Spacer(Modifier.height(12.dp))
