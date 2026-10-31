@@ -98,9 +98,14 @@ Bun.serve({
         data: unknown;
       };
 
-      if (!event.type || !event.timestamp) {
+      // type/timestamp are interpolated into the channel text and meta, so they
+      // must be single-line strings or they could forge extra lines/fields.
+      const isSingleLine = (v: unknown): v is string =>
+        typeof v === "string" && v.length > 0 && !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(v);
+
+      if (!isSingleLine(event.type) || !isSingleLine(event.timestamp)) {
         return new Response(
-          JSON.stringify({ error: "Missing type or timestamp" }),
+          JSON.stringify({ error: "Missing or invalid type or timestamp" }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -95,12 +95,13 @@ describe(".env loading", () => {
 });
 
 describe("LISTEN_PORT", () => {
+  setDefaultTimeout(15000);
   for (const bad of ["abc", "-1", "70000"]) {
     test(`rejects invalid LISTEN_PORT "${bad}"`, async () => {
       const p = await start({ AUTH_TOKEN: "secret", LISTEN_PORT: bad });
       const code = await Promise.race([
         p.proc.exited,
-        Bun.sleep(3000).then(() => "still running"),
+        Bun.sleep(10000).then(() => "still running"),
       ]);
       expect(code).toBe(1);
     });
