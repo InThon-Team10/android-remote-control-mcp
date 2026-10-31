@@ -40,6 +40,11 @@ internal object OpenAiToolOutput {
         message: String,
     ): ResponseInputItem = build(callId, ERROR_PREFIX + message, emptyList())
 
+    fun errorOutput(
+        callId: String,
+        message: String,
+    ): ResponseInputItem = errorItem(callId, message)
+
     fun invalidArguments(callId: String): ResponseInputItem = errorItem(callId, INVALID_ARGUMENTS_MESSAGE)
 
     /** Undecodable image data is dropped rather than sent. */
