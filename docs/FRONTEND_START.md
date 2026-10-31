@@ -21,7 +21,7 @@
 2. 알림: Android 13 이상에서만 권한을 요청합니다. 그 아래 버전에서는 완료로 표시합니다.
 3. 마이크(선택): 허용하면 "음성으로 대화하기" 스위치가 나타납니다.
 4. AI 사용 동의: 요청 글, 화면 내용(스크린샷 포함), 음성(켠 경우)이 Google Gemini로 전송된다는 안내와 무료 이용 단계의 데이터 사용 안내.
-5. AI 연결: 빌드에 앱의 Gemini 키(`GEMINI_API_KEY`)가 들어 있으면 이 단계는 보이지 않고 완료로 처리됩니다.
+5. AI 연결: 빌드에 앱의 OpenAI 키(`OPENAI_API_KEY`)가 들어 있으면 이 단계는 보이지 않고 완료로 처리됩니다.
    키가 없는 빌드에서만 키를 입력하는 화면이 나타납니다.
 
 접근성(1), 동의(4), AI 연결(5)이 끝나면 "버블 켜기"가 활성화됩니다. 버튼은 보이는 화면에서 MCP 서버를 시작하고,
@@ -42,13 +42,13 @@
 
 문구: `app/src/main/res/values/helper_entry_strings.xml` (이름은 `entry_` 접두사).
 
-## APK 만들기 (Gemini 키 포함)
+## APK 만들기 (OpenAI 키 포함)
 
-앱의 Gemini 키는 저장소 루트의 `local.properties`(Git에서 제외됨)에 두거나 `GEMINI_API_KEY` 환경 변수로 넘깁니다.
+앱의 OpenAI 키는 저장소 루트의 `local.properties`(Git에서 제외됨)에 두거나 `OPENAI_API_KEY` 환경 변수로 넘깁니다.
 키는 release와 debug 빌드 모두에 들어갑니다. 해커톤용 빌드이며 앱 스토어에 배포하지 않습니다.
 
 ```properties
-GEMINI_API_KEY=여기에_키
+OPENAI_API_KEY=여기에_키
 ```
 
 그 뒤 `./gradlew :app:assembleGmsDebug`로 빌드하면 키가 빌드 시점에 앱에 들어갑니다.

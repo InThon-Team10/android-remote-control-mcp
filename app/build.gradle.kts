@@ -212,20 +212,21 @@ configurations.matching { it.name.startsWith("ktlint") }.configureEach {
     }
 }
 
-// Built-in Gemini key: from the gitignored root local.properties, else the environment; never printed or committed.
-val geminiApiKey: String =
+// Built-in OpenAI key, embedded in release and debug builds: from the gitignored root local.properties, else the
+// environment; never printed or committed.
+val openAiApiKey: String =
     run {
         val file = rootProject.file("local.properties")
         val fromFile =
             if (file.exists()) {
-                Properties().also { props -> file.inputStream().use { props.load(it) } }.getProperty("GEMINI_API_KEY")
+                Properties().also { props -> file.inputStream().use { props.load(it) } }.getProperty("OPENAI_API_KEY")
             } else {
                 null
             }
-        (fromFile ?: System.getenv("GEMINI_API_KEY") ?: "").trim()
+        (fromFile ?: System.getenv("OPENAI_API_KEY") ?: "").trim()
     }
-check(Regex("[A-Za-z0-9._-]*").matches(geminiApiKey)) {
-    "GEMINI_API_KEY contains characters outside [A-Za-z0-9._-]; the value is not shown."
+check(Regex("[A-Za-z0-9._-]*").matches(openAiApiKey)) {
+    "OPENAI_API_KEY contains characters outside [A-Za-z0-9._-]; the value is not shown."
 }
 
 android {
@@ -238,7 +239,7 @@ android {
         targetSdk = 34
         versionCode = versionCodeProp
         versionName = versionNameProp
-        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "OPENAI_API_KEY", "\"$openAiApiKey\"")
     }
 
     // Distribution flavors: `gms` (full app, GitHub/Play) and `foss` (F-Droid, no Google Play Services).
@@ -314,6 +315,8 @@ android {
             excludes += "/META-INF/LICENSE-notice.md"
             // google-genai ships ~800 KB of GraalVM native-image metadata; unused on Android.
             excludes += "/META-INF/native-image/com.google.genai/**"
+            // openai-java-core ships ~5 MB of GraalVM native-image metadata at the top level; unused on Android.
+            excludes += "/META-INF/native-image/*.json"
             // google-genai's auth dependency brings Apache httpclient + httpcore, each with a Maven metadata file.
             excludes += "/META-INF/DEPENDENCIES"
             // jakarta.annotation-api and jakarta.inject-api (via google-genai) ship the same Eclipse notice.
@@ -447,10 +450,12 @@ dependencies {
 
     // Gemini (on-device assistant): Google Gen AI Java SDK (async API driven from coroutines)
     implementation(libs.google.genai)
+    // OpenAI (on-device assistant): official Java SDK, blocking client driven from runInterruptible(Dispatchers.IO)
+    implementation(libs.openai.java)
 
     // OAuth (JWT signing/verification)
-    // The Jackson BOM aligns java-jwt's transitive jackson-core/jackson-databind to a patched
-    // release, closing the CVE alerts on the 2.22.0 versions the library would otherwise pull in.
+    // The Jackson BOM aligns the transitive Jackson modules of java-jwt (2.22.0) and openai-java (2.18.x,
+    // including jackson-module-kotlin) to one patched release, closing the CVE alerts on the older versions.
     implementation(platform(libs.jackson.bom))
     implementation(libs.java.jwt)
 

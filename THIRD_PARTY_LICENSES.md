@@ -47,7 +47,11 @@ Gradle Plugin, ...) are not part of the app and are not listed.
 | ONNX Runtime (Android) | MIT; bundles third-party code listed in its ThirdPartyNotices.txt | https://github.com/microsoft/onnxruntime |
 | MCP Kotlin SDK | MIT | https://github.com/modelcontextprotocol/kotlin-sdk |
 | java-jwt | MIT | https://github.com/auth0/java-jwt |
-| Jackson (`jackson-core`, `jackson-databind`, `jackson-annotations`, `jackson-datatype-jdk8`, `jackson-datatype-jsr310`) | Apache-2.0 | https://github.com/FasterXML/jackson |
+| Jackson (`jackson-core`, `jackson-databind`, `jackson-annotations`, `jackson-datatype-jdk8`, `jackson-datatype-jsr310`, `jackson-module-kotlin`) | Apache-2.0 | https://github.com/FasterXML/jackson |
+| OpenAI Java SDK (`openai-java`, `openai-java-core`, `openai-java-client-okhttp`) | Apache-2.0 | https://github.com/openai/openai-java |
+| victools JSON Schema Generator (`jsonschema-generator`, `jsonschema-module-jackson`, `jsonschema-module-swagger-2`) | Apache-2.0 | https://github.com/victools/jsonschema-generator |
+| ClassMate (`com.fasterxml:classmate`) | Apache-2.0 | https://github.com/FasterXML/java-classmate |
+| Swagger annotations (`io.swagger.core.v3:swagger-annotations`) | Apache-2.0 | https://github.com/swagger-api/swagger-core |
 | Bouncy Castle (`bcprov`, `bcpkix`, `bcutil`) | Bouncy Castle Licence (MIT-style) | https://www.bouncycastle.org/licence.html |
 | Checker Framework qualifiers (`checker-qual`) | MIT | https://github.com/typetools/checker-framework |
 | SLF4J (`slf4j-api`, `slf4j-android`) | MIT | https://www.slf4j.org/license.html |

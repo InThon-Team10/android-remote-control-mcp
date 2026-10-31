@@ -26,8 +26,11 @@ mcp-kotlin-sdk = "0.15.0"
 # OAuth (JWT signing/verification)
 java-jwt = "4.6.0"
 
-# Jackson (transitive via java-jwt and google-genai) — pinned to a patched release to close CVE alerts
+# Jackson (transitive via java-jwt, google-genai and openai-java) — pinned to a patched release to close CVE alerts
 jackson = "2.22.4"
+
+# OpenAI (on-device assistant: Responses API planner and Realtime API voice)
+openai-java = "4.95.0"
 
 # Image loading (OAuth client logos)
 coil = "3.5.0"
@@ -145,10 +148,12 @@ okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref 
 # OAuth (JWT signing/verification)
 java-jwt = { group = "com.auth0", name = "java-jwt", version.ref = "java-jwt" }
 
-# Jackson BOM — aligns transitive jackson-core/jackson-databind (pulled by java-jwt and google-genai) to a patched release
+# Jackson BOM — aligns transitive Jackson modules (pulled by java-jwt, google-genai and openai-java) to a patched release
 jackson-bom = { group = "com.fasterxml.jackson", name = "jackson-bom", version.ref = "jackson" }
 # Gemini (on-device assistant) — Google Gen AI Java SDK. Strictly < 2.0.0 (2.0 requires Java 17+); bump manually.
 google-genai = { group = "com.google.genai", name = "google-genai", version = { strictly = "[1.80.0, 2.0.0)", prefer = "1.80.0" } }
+# OpenAI (on-device assistant) — official OpenAI Java SDK (blocking client; Responses and Realtime helpers)
+openai-java = { group = "com.openai", name = "openai-java", version.ref = "openai-java" }
 
 # Image loading (OAuth client logos)
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
