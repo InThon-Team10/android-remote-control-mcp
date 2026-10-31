@@ -9,6 +9,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.http.URLBuilder
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.header
 import io.ktor.server.response.respondRedirect
@@ -20,7 +22,17 @@ import java.util.UUID
 
 /** `POST /token` — dispatches by `grant_type`. */
 internal suspend fun ApplicationCall.handleToken(deps: OAuthRouteDeps) {
-    val form = receiveParameters()
+    // A non-form body (JSON, missing content type) must yield an RFC 6749 error, not Ktor's plain 415.
+    val form =
+        try {
+            receiveParameters()
+        } catch (_: ContentTransformationException) {
+            respondOAuthError(HttpStatusCode.BadRequest, "invalid_request")
+            return
+        } catch (_: BadRequestException) {
+            respondOAuthError(HttpStatusCode.BadRequest, "invalid_request")
+            return
+        }
     when (form["grant_type"]) {
         "authorization_code" -> handleAuthorizationCodeGrant(deps, form)
         "refresh_token" -> handleRefreshTokenGrant(deps, form)
