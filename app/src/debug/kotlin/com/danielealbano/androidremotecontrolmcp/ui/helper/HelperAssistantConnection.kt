@@ -104,6 +104,8 @@ internal data class HelperAnswer(
     val signature: String,
 )
 
+private val BOUND = Regex("""-?[0-9]+""")
+
 private val WINDOW_TYPE = Regex("""^--- window:-?\d+ type:(\S+) """)
 
 /** Coordinates come from current MCP rows, never from model-generated numbers. */
@@ -121,11 +123,12 @@ internal fun parseHelperScreen(text: String): HelperScreen {
         if (columns.size == 7 && columns[0] != "node_id") {
             if (applicationWindow) signature.add(line)
             val flags = columns[6].split(',').toSet()
-            val coordinates = columns[5].split(',').mapNotNull { it.toFloatOrNull() }
+            val coordinates = columns[5].split(',').map { if (BOUND.matches(it)) it.toIntOrNull()?.toFloat() else null }
             if (applicationWindow && setOf("on", "clk", "ena").all { it in flags } &&
-                coordinates.size == 4 && coordinates.all { it.isFinite() }
+                coordinates.size == 4 && coordinates.none { it == null }
             ) {
-                val rect = Rect(coordinates[0], coordinates[1], coordinates[2], coordinates[3])
+                val (left, top, right, bottom) = coordinates.filterNotNull()
+                val rect = Rect(left, top, right, bottom)
                 if (rect.left >= 0 && rect.top >= 0 && rect.width > 0 && rect.height > 0) nodes[columns[0]] = rect
             }
         }

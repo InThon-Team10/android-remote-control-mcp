@@ -30,4 +30,14 @@ class HelperScreenParseRegressionTest {
         val header = "--- window:-1 type:APPLICATION pkg:p title:t layer:0 focused:true ---"
         assertEquals(setOf("1:1"), parseHelperScreen(screen(header)).nodes.keys)
     }
+
+    @Test
+    fun `malformed bounds columns are rejected instead of shifted or coerced`() {
+        val header = "--- window:1 type:APPLICATION pkg:p title:t layer:0 focused:true ---"
+        listOf("x,10,20,200,80", "10,20,200", "10,20,200,80,5", "10,,20,200,80", "1,1,200,1e2", "10f,20,200,80", "0x10,20,200,80", "10, 20,200,80")
+            .forEach { bounds ->
+                assertTrue(parseHelperScreen(screen(header, bounds)).nodes.isEmpty(), bounds)
+            }
+        assertEquals(1, parseHelperScreen(screen(header, "10,20,200,80")).nodes.size)
+    }
 }
