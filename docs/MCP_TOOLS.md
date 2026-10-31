@@ -2378,7 +2378,7 @@ Downloads a file from a URL and saves it to a storage location.
 - Subject to file size limit, download timeout, and HTTP/HTTPS security settings configured in the app.
 - HTTP downloads (non-HTTPS) must be explicitly allowed in app settings.
 - Unverified HTTPS certificates must be explicitly allowed in app settings.
-- When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale and IPv6 unique-local addresses, including their IPv4-mapped/compatible IPv6 forms). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
+- When "Block Local Network Downloads" is enabled in the storage settings, the download refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale, 192.0.0.0/24 and IPv6 unique-local/site-local addresses, including their IPv4-mapped/compatible IPv6 forms). The check runs on the real address of every connection, redirects included; while it is on, downloads connect directly, never through a system proxy.
 - Parent directories are created automatically if they don't exist.
 - Cancelling the call (see [Cancellation](#cancellation)) stops the transfer at once and deletes the partial file.
 
