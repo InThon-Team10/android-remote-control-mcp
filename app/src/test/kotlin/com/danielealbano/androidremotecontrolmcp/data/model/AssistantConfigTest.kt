@@ -15,16 +15,17 @@ class AssistantConfigTest {
 
         assertFalse(config.enabled)
         assertFalse(config.voiceEnabled)
-        assertEquals("gemini-flash-latest", config.model)
+        assertEquals("gpt-6.1-terra", config.model)
         assertEquals(30, config.stepLimit)
         assertFalse(config.privacyNoticeAccepted)
         assertFalse(config.apiKeyConfigured)
     }
 
     @Test
-    fun `the text model is pinned to the latest Flash and voice keeps the 3_8 live model`() {
-        assertEquals(listOf("gemini-flash-latest"), AssistantConfig.MODELS)
-        assertEquals("gemini-3.8-live", AssistantConfig.LIVE_MODEL)
+    fun `the text model is pinned to gpt-6_1-terra and voice to gpt-realtime-2_1`() {
+        assertEquals(listOf("gpt-6.1-terra"), AssistantConfig.MODELS)
+        assertEquals("gpt-6.1-terra", AssistantConfig.DEFAULT_MODEL)
+        assertEquals("gpt-realtime-2.1", AssistantConfig.LIVE_MODEL)
     }
 
     @Test

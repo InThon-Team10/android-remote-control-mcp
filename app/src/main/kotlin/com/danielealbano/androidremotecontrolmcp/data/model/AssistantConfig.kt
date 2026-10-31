@@ -1,7 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.data.model
 
 /**
- * Persisted assistant configuration. The Gemini API key is deliberately NOT part of this class: only
+ * Persisted assistant configuration. The OpenAI API key is deliberately NOT part of this class: only
  * [apiKeyConfigured] is exposed so the key cannot leak through state, logs or `toString()`.
  * [builtInApiKeyInUse] is true when no key is saved and the built-in key embedded at build time is used instead.
  */
@@ -17,14 +17,19 @@ data class AssistantConfig(
     val builtInApiKeyInUse: Boolean = false,
 ) {
     companion object {
-        /** Pinned (owner decision): Google's alias that always points to the newest Gemini Flash. */
-        const val DEFAULT_MODEL = "gemini-flash-latest"
-        const val LIVE_MODEL = "gemini-3.8-live"
+        /** Pinned (owner decision): the text planner's model on the Responses API, run with low reasoning effort. */
+        const val DEFAULT_MODEL = "gpt-6.1-terra"
+
+        /** Pinned (owner decision): the live voice model on the Realtime API. */
+        const val LIVE_MODEL = "gpt-realtime-2.1"
         const val DEFAULT_STEP_LIMIT = 30
         const val MIN_STEP_LIMIT = 1
         const val MAX_STEP_LIMIT = 100
 
-        /** The text assistant uses only the pinned model; live voice uses [LIVE_MODEL] (no Flash model is live). */
+        /**
+         * The text assistant uses only the pinned [DEFAULT_MODEL]; a stored model outside this list (for example one
+         * saved for the previous AI provider) reads as [DEFAULT_MODEL]. Live voice uses [LIVE_MODEL].
+         */
         val MODELS: List<String> = listOf(DEFAULT_MODEL)
 
         /** Tools (un-prefixed names) that require an Allow/Deny confirmation in the chat before running. */

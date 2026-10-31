@@ -64,7 +64,8 @@ class AssistantSettingsImplTest {
         assertEquals("assistant_model", ASSISTANT_MODEL_KEY.name)
         assertEquals("assistant_step_limit", ASSISTANT_STEP_LIMIT_KEY.name)
         assertEquals("assistant_privacy_notice_accepted", ASSISTANT_PRIVACY_NOTICE_ACCEPTED_KEY.name)
-        assertEquals("assistant_api_key_ciphertext", ASSISTANT_API_KEY_CIPHERTEXT_KEY.name)
+        assertEquals("assistant_openai_api_key_ciphertext", ASSISTANT_API_KEY_CIPHERTEXT_KEY.name)
+        assertEquals("assistant_api_key_ciphertext", LEGACY_ASSISTANT_API_KEY_CIPHERTEXT_KEY.name)
     }
 
     @Test
@@ -109,12 +110,12 @@ class AssistantSettingsImplTest {
         }
 
     @Test
-    fun `a model saved before the pin falls back to the pinned latest Flash and cannot be set again`() =
+    fun `a model saved for the previous provider reads as the pinned model and cannot be set again`() =
         testScope.runTest {
-            dataStore.edit { it[ASSISTANT_MODEL_KEY] = "gemini-3.8-flash" }
+            dataStore.edit { it[ASSISTANT_MODEL_KEY] = "gemini-flash-latest" }
 
-            assertEquals("gemini-flash-latest", settings.config.first().model)
-            assertFailsWith<IllegalArgumentException> { settings.setModel("gemini-3.5-flash-lite") }
+            assertEquals("gpt-6.1-terra", settings.config.first().model)
+            assertFailsWith<IllegalArgumentException> { settings.setModel("gemini-flash-latest") }
         }
 
     @Test
@@ -225,11 +226,11 @@ class AssistantSettingsImplTest {
     @Test
     fun `stored value is ciphertext never equal to the plaintext`() =
         testScope.runTest {
-            settings.setApiKey("AIzaSyExampleKey123")
+            settings.setApiKey("example-user-key-123")
 
             val raw = dataStore.data.first()[ASSISTANT_API_KEY_CIPHERTEXT_KEY]!!
-            assertNotEquals("AIzaSyExampleKey123", raw)
-            assertFalse(raw.contains("AIzaSyExampleKey123"))
+            assertNotEquals("example-user-key-123", raw)
+            assertFalse(raw.contains("example-user-key-123"))
         }
 
     @Test
@@ -325,6 +326,38 @@ class AssistantSettingsImplTest {
             assertEquals("built-in-key", withBuiltIn.getApiKey())
             assertTrue(withBuiltIn.getConfig().builtInApiKeyInUse)
         }
+
+    @Test
+    fun `a key saved for the previous provider is never used and the built-in key stays in use`() =
+        testScope.runTest {
+            val withBuiltIn = createAssistantSettings(dataStore, changeLogger, builtInKey = "built-in-key")
+            withBuiltIn.storeUnderLegacyKey("previous-provider-key")
+
+            assertEquals("built-in-key", withBuiltIn.getApiKey())
+            val config = withBuiltIn.getConfig()
+            assertTrue(config.apiKeyConfigured)
+            assertTrue(config.builtInApiKeyInUse)
+        }
+
+    @Test
+    fun `a key saved for the previous provider does not count as configured without a built-in key`() =
+        testScope.runTest {
+            settings.storeUnderLegacyKey("previous-provider-key")
+
+            assertNull(settings.getApiKey())
+            assertFalse(settings.getConfig().apiKeyConfigured)
+            assertFalse(settings.getConfig().builtInApiKeyInUse)
+        }
+
+    /** Encrypts [key] with this instance's cipher (so it could be decrypted) and moves it to the legacy preference. */
+    private suspend fun AssistantSettingsImpl.storeUnderLegacyKey(key: String) {
+        setApiKey(key)
+        dataStore.edit { prefs ->
+            val ciphertext = checkNotNull(prefs[ASSISTANT_API_KEY_CIPHERTEXT_KEY])
+            prefs.remove(ASSISTANT_API_KEY_CIPHERTEXT_KEY)
+            prefs[LEGACY_ASSISTANT_API_KEY_CIPHERTEXT_KEY] = ciphertext
+        }
+    }
 
     @Test
     fun `without saved or built-in key nothing is configured`() =

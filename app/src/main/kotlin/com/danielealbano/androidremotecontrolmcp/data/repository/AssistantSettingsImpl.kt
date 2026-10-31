@@ -25,7 +25,10 @@ internal val ASSISTANT_VOICE_ENABLED_KEY = booleanPreferencesKey("assistant_voic
 internal val ASSISTANT_MODEL_KEY = stringPreferencesKey("assistant_model")
 internal val ASSISTANT_STEP_LIMIT_KEY = intPreferencesKey("assistant_step_limit")
 internal val ASSISTANT_PRIVACY_NOTICE_ACCEPTED_KEY = booleanPreferencesKey("assistant_privacy_notice_accepted")
-internal val ASSISTANT_API_KEY_CIPHERTEXT_KEY = stringPreferencesKey("assistant_api_key_ciphertext")
+
+/** The OpenAI key the user saved, encrypted; the previous provider's key is dropped by [AssistantProviderMigration]. */
+internal val ASSISTANT_API_KEY_CIPHERTEXT_KEY = stringPreferencesKey("assistant_openai_api_key_ciphertext")
+
 internal val ASSISTANT_HELPER_INTRO_SEEN_KEY = booleanPreferencesKey("assistant_helper_intro_seen")
 internal val ASSISTANT_HELPER_SPEECH_ENABLED_KEY = booleanPreferencesKey("assistant_helper_speech_enabled")
 

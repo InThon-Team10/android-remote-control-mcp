@@ -1,6 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.data.security
 
-/** Reversible encryption of the Gemini API key for storage in DataStore. */
+/** Reversible encryption of the OpenAI API key for storage in DataStore. */
 interface ApiKeyCipher {
     /**
      * Returns the opaque Base64 text form of [plain].

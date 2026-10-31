@@ -88,7 +88,7 @@ class GeminiAssistantAgentTest {
             assertEquals(AgentOutcome.Completed, outcome)
             assertEquals(listOf("text:Hi"), listener.events)
             val call = gateway.calls.single()
-            assertEquals("gemini-flash-latest", call.model)
+            assertEquals(AssistantConfig.DEFAULT_MODEL, call.model)
             assertEquals(
                 ElderGuidancePrompt.TEXT,
                 call.config

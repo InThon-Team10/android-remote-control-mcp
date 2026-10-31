@@ -20,6 +20,7 @@ import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSessio
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceServiceLauncher
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
+import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantProviderMigration
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.DownloadSettings
@@ -123,6 +124,7 @@ annotation class OAuthClientsDataStore
 /** Extension property for creating the Preferences DataStore on [Context]. */
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "settings",
+    produceMigrations = { listOf(AssistantProviderMigration) },
 )
 
 /** Extension property for the dedicated OAuth-clients Preferences DataStore on [Context]. */
@@ -152,7 +154,7 @@ object AppModule {
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = context.oauthClientsDataStore
 
-    /** Provides the Tink cipher (Android Keystore master key) protecting the assistant's Gemini API key. */
+    /** Provides the Tink cipher (Android Keystore master key) protecting the assistant's OpenAI API key. */
     @Provides
     @Singleton
     fun provideApiKeyCipher(
