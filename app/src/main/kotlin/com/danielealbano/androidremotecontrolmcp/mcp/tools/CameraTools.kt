@@ -5,6 +5,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.mcp.escapeControlCharacters
 import com.danielealbano.androidremotecontrolmcp.services.camera.CameraProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -383,7 +384,9 @@ class SaveCameraPhotoHandler
                     )
                 }
 
-            return McpToolUtils.textResult("Photo saved successfully: $path ($fileSizeBytes bytes)")
+            return McpToolUtils.textResult(
+                "Photo saved successfully: ${path.escapeControlCharacters()} ($fileSizeBytes bytes)",
+            )
         }
 
         @Suppress("LongMethod")
@@ -514,7 +517,7 @@ class SaveCameraVideoHandler
                 }
 
             val text =
-                "Video saved successfully: $path " +
+                "Video saved successfully: ${path.escapeControlCharacters()} " +
                     "(${result.fileSizeBytes} bytes, ${result.durationMs}ms)"
 
             return McpToolUtils.untrustedTextAndImageResult(text, result.thumbnailData, "image/jpeg")

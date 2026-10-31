@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.mcp.escapeControlCharacters
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -368,7 +369,10 @@ class WriteFileHandler
 
                 fileOperationProvider.writeFile(locationId, path, content)
 
-                McpToolUtils.textResult("File written successfully: $locationId/$path")
+                McpToolUtils.textResult(
+                    "File written successfully: " +
+                        "${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: McpToolException) {
@@ -446,7 +450,10 @@ class AppendFileHandler
 
                 fileOperationProvider.appendFile(locationId, path, content)
 
-                McpToolUtils.textResult("Content appended successfully to: $locationId/$path")
+                McpToolUtils.textResult(
+                    "Content appended successfully to: " +
+                        "${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: McpToolException) {
@@ -625,7 +632,8 @@ class DownloadFromUrlHandler
                 val downloadedBytes = fileOperationProvider.downloadFromUrl(locationId, path, url)
 
                 McpToolUtils.textResult(
-                    "File downloaded successfully. Size: $downloadedBytes bytes. Saved to: $locationId/$path",
+                    "File downloaded successfully. Size: $downloadedBytes bytes. " +
+                        "Saved to: ${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
                 )
             } catch (e: CancellationException) {
                 // A cancelled download stays a cancellation, never a failed download
@@ -705,7 +713,10 @@ class DeleteFileHandler
 
                 fileOperationProvider.deleteFile(locationId, path)
 
-                McpToolUtils.textResult("File deleted successfully: $locationId/$path")
+                McpToolUtils.textResult(
+                    "File deleted successfully: " +
+                        "${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: McpToolException) {
