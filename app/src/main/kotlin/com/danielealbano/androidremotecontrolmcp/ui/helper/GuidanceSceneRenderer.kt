@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ElderGuidanceGeometry
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceTarget
@@ -62,9 +63,10 @@ internal class GuidanceSceneRenderer(
     }
 
     /**
-     * A swipe is shown by an arrow and a caption only: for a swipe gesture the arrow begins just past where the finger
-     * goes down (never over that point), for scrolling a node it is centred on the node. Nothing blocks the screen, so
-     * a 1-pixel watcher window reports the user's touch (it receives ACTION_OUTSIDE for every touch elsewhere).
+     * A swipe is shown by a caption and a guide, never dimmed or boxed. For a swipe gesture the guide is a ring around
+     * an uncovered gap at the start point (no window may cover where the finger goes down) and a path line from the
+     * gap to an arrowhead; scrolling a node shows a centred arrow. Nothing blocks the screen, so a 1-pixel watcher
+     * window reports the user's touch (it receives ACTION_OUTSIDE for every touch elsewhere).
      */
     private fun showSwipeHint(
         target: GuidanceTarget,
@@ -77,16 +79,57 @@ internal class GuidanceSceneRenderer(
             return
         }
         val direction = target.scrollDirection ?: ScrollDirection.UP
-        val pill = SwipePillSize(display.dp(ARROW_THICKNESS_DP), display.dp(ARROW_LENGTH_DP), display.dp(ARROW_GAP_DP))
-        val arrow = swipeArrowRect(area, target.swipeStart, direction, pill, screen)
-        arrow?.let { windows.add(ARROW_ID, GuidanceWindowSpec(it, touchable = false)) { SwipeArrow(direction) } }
-        val watcher = watcherRect(target.swipeStart, screen)
+        val start = target.swipeStart
+        val occupied =
+            if (start == null) {
+                showCentredArrow(area, direction, screen)
+            } else {
+                showSwipePath(area, start, direction, screen)
+            }
+        val watcher = watcherRect(start, screen)
         windows.add(WATCHER_ID, GuidanceWindowSpec(watcher, touchable = true, watchOutside = true)) {}
         detector.reset(setOf(WATCHER_ID))
-        // The caption goes outside the whole swipe path (not just the small pill): a caption window under the
-        // finger would take the swipe instead of the app.
-        val path = arrow?.let { area.union(it) } ?: area
-        showCaptionNear(path, caption, screen)
+        // The caption goes outside the whole swipe path: a caption window under the finger would take the swipe.
+        showCaptionNear(occupied, caption, screen)
+    }
+
+    private fun showCentredArrow(
+        area: PxRect,
+        direction: ScrollDirection,
+        screen: PxSize,
+    ): PxRect {
+        val pill = SwipePillSize(display.dp(ARROW_THICKNESS_DP), display.dp(ARROW_LENGTH_DP))
+        val arrow = swipeArrowRect(area, direction, pill, screen)
+        windows.add(ARROW_ID, GuidanceWindowSpec(arrow, touchable = false)) { SwipeArrow(direction) }
+        return area.union(arrow)
+    }
+
+    private fun showSwipePath(
+        area: PxRect,
+        start: ScreenPoint,
+        direction: ScrollDirection,
+        screen: PxSize,
+    ): PxRect {
+        val metrics =
+            SwipePathMetrics(
+                gapHalf = display.dp(GAP_HALF_DP),
+                ringOuter = display.dp(RING_OUTER_DP),
+                lineHalf = display.dp(LINE_HALF_DP),
+                endPad = display.dp(END_PAD_DP),
+                endInset = display.dp(ElderGuidanceGeometry.SWIPE_MARGIN_DP),
+                minLine = display.dp(MIN_LINE_DP),
+            )
+        val layout = swipePathLayout(area, start, direction, metrics, screen)
+        val radius = (metrics.gapHalf + metrics.ringOuter) / 2
+        layout.ringStrips.forEachIndexed { index, strip ->
+            windows.add(RING_FIRST_ID + index, GuidanceWindowSpec(strip, touchable = false)) {
+                SwipeStartRingPart(start, strip, radius)
+            }
+        }
+        layout.line?.let { line ->
+            windows.add(ARROW_ID, GuidanceWindowSpec(line, touchable = false)) { SwipePathLine(direction) }
+        }
+        return layout.line?.let { layout.ring.union(it) } ?: layout.ring
     }
 
     private fun PxRect.union(other: PxRect) =
@@ -185,7 +228,12 @@ internal class GuidanceSceneRenderer(
         const val OUTLINE_THICKNESS_DP = 8
         const val ARROW_THICKNESS_DP = 56
         const val ARROW_LENGTH_DP = 128
-        const val ARROW_GAP_DP = 16
+        const val RING_FIRST_ID = 10
+        const val GAP_HALF_DP = 12
+        const val RING_OUTER_DP = 24
+        const val LINE_HALF_DP = 24
+        const val END_PAD_DP = 8
+        const val MIN_LINE_DP = 24
         val WATCHER_RECT = PxRect(0, 0, 1, 1)
     }
 }

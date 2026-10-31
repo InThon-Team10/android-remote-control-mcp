@@ -34,34 +34,17 @@ internal fun outlineStrips(
         PxRect(hole.right, hole.top, ring.right, hole.bottom),
     ).filter { it.width > 0 && it.height > 0 }
 
-/** Size of the swipe pill: [thickness] across the swipe, at most [length] along it, [gap] past the swipe's start. */
+/** Size of the centred swipe pill: [thickness] across the swipe, at most [length] along it. */
 internal data class SwipePillSize(
     val thickness: Int,
     val length: Int,
-    val gap: Int,
 )
 
 /**
- * The compact swipe pill for a swipe in [direction]. With the swipe's [start] the pill begins [SwipePillSize.gap]
- * after it along the swipe and is centred on it across, so it shows where the finger goes down without covering
- * that point: at the screen edge it is shortened, never moved back over [start] (null when not even a pill as long
- * as it is thick fits). Without a start (scrolling a node) it is centred on [area]. Always on screen; the pill window
- * is inert and the swipe reaches the app underneath.
+ * The compact swipe pill for scrolling a node (no start point): centred on [area], pointing [direction], always on
+ * screen. The pill window is inert and the gesture reaches the app underneath.
  */
 internal fun swipeArrowRect(
-    area: PxRect,
-    start: ScreenPoint?,
-    direction: ScrollDirection,
-    size: SwipePillSize,
-    screen: PxSize,
-): PxRect? =
-    if (start == null) {
-        centredSwipePill(area, direction, size, screen)
-    } else {
-        anchoredSwipePill(start, direction, size, screen)
-    }
-
-private fun centredSwipePill(
     area: PxRect,
     direction: ScrollDirection,
     size: SwipePillSize,
@@ -75,51 +58,82 @@ private fun centredSwipePill(
     return PxRect(left, top, left + width, top + height)
 }
 
-private fun anchoredSwipePill(
-    start: ScreenPoint,
-    direction: ScrollDirection,
-    size: SwipePillSize,
-    screen: PxSize,
-): PxRect? {
-    val forward = direction == ScrollDirection.DOWN || direction == ScrollDirection.RIGHT
-    return if (direction.isVertical()) {
-        spanPastStart(start.y, forward, size, screen.height)?.let { (top, bottom) ->
-            val left = centredAcross(start.x, size.thickness, screen.width)
-            PxRect(left, top, left + size.thickness, bottom)
-        }
-    } else {
-        spanPastStart(start.x, forward, size, screen.width)?.let { (left, right) ->
-            val top = centredAcross(start.y, size.thickness, screen.height)
-            PxRect(left, top, right, top + size.thickness)
-        }
-    }
-}
+/**
+ * Pixel sizes of the swipe path guide: an uncovered square of [gapHalf] around the start, a ring drawn in windows
+ * around it out to [ringOuter], and a line window [lineHalf] either side of the path ending [endPad] past the end.
+ * The line stops [endInset] short of the far edge of the swipe area (the margin the area was grown by).
+ */
+internal data class SwipePathMetrics(
+    val gapHalf: Int,
+    val ringOuter: Int,
+    val lineHalf: Int,
+    val endPad: Int,
+    val endInset: Int,
+    val minLine: Int,
+)
 
 /**
- * The pill's [low, high) span along the swipe axis: from the gap past [start] onward ([forward] = increasing
- * coordinates), at most the pill length and within [0, limit). Null when it would be shorter than the pill is thick.
+ * Windows of the swipe path guide. [gap] is never covered (it holds the start pixel); [ringStrips] surround it;
+ * [line] begins at the gap's edge and runs along the swipe to the arrowhead (null when there is no room).
  */
-private fun spanPastStart(
-    start: Int,
-    forward: Boolean,
-    size: SwipePillSize,
-    limit: Int,
-): Pair<Int, Int>? {
-    val gap = size.gap.coerceAtLeast(1)
-    val span =
-        if (forward) {
-            (start + gap) to minOf(start + gap + size.length, limit)
-        } else {
-            maxOf(start - gap - size.length, 0) to (start - gap)
-        }
-    return span.takeIf { it.second - it.first >= minOf(size.thickness, size.length) }
+internal data class SwipePathLayout(
+    val gap: PxRect,
+    val ring: PxRect,
+    val ringStrips: List<PxRect>,
+    val line: PxRect?,
+)
+
+/**
+ * The path guide for a swipe from [start] in [direction] across [area]: the finger goes down inside
+ * [SwipePathLayout.gap] (no window covers it, apps ignore a gesture whose down point lies under another window)
+ * and moves along the line window to its far end. Everything is limited to [screen].
+ */
+internal fun swipePathLayout(
+    area: PxRect,
+    start: ScreenPoint,
+    direction: ScrollDirection,
+    metrics: SwipePathMetrics,
+    screen: PxSize,
+): SwipePathLayout {
+    val gap =
+        PxRect(
+            (start.x - metrics.gapHalf).coerceAtLeast(0),
+            (start.y - metrics.gapHalf).coerceAtLeast(0),
+            (start.x + metrics.gapHalf).coerceAtMost(screen.width),
+            (start.y + metrics.gapHalf).coerceAtMost(screen.height),
+        )
+    val ring = outlineRing(gap, metrics.ringOuter - metrics.gapHalf, screen)
+    val line = lineWindow(area, start, direction, gap, metrics, screen)
+    return SwipePathLayout(gap, ring, outlineStrips(gap, ring), line)
 }
 
-/** Where the pill begins across the swipe: centred on [center], kept within [0, limit). */
-private fun centredAcross(
-    center: Int,
-    thickness: Int,
-    limit: Int,
-): Int = (center - thickness / 2).coerceIn(0, maxOf(0, limit - thickness))
+private fun lineWindow(
+    area: PxRect,
+    start: ScreenPoint,
+    direction: ScrollDirection,
+    gap: PxRect,
+    metrics: SwipePathMetrics,
+    screen: PxSize,
+): PxRect? {
+    val vertical = direction.isVertical()
+    val forward = direction == ScrollDirection.DOWN || direction == ScrollDirection.RIGHT
+    val limit = if (vertical) screen.height else screen.width
+    val near = if (vertical) area.top else area.left
+    val far = if (vertical) area.bottom else area.right
+    val from = if (vertical) gap.bottom else gap.right
+    val back = if (vertical) gap.top else gap.left
+    val span =
+        if (forward) {
+            from to minOf((far - metrics.endInset).coerceAtMost(limit) + metrics.endPad, limit)
+        } else {
+            maxOf((near + metrics.endInset).coerceAtLeast(0) - metrics.endPad, 0) to back
+        }
+    if (span.second - span.first < metrics.minLine) return null
+    val center = if (vertical) start.x else start.y
+    val across = if (vertical) screen.width else screen.height
+    val low = (center - metrics.lineHalf).coerceIn(0, maxOf(0, across - 2 * metrics.lineHalf))
+    val high = minOf(low + 2 * metrics.lineHalf, across)
+    return if (vertical) PxRect(low, span.first, high, span.second) else PxRect(span.first, low, span.second, high)
+}
 
 private fun ScrollDirection.isVertical(): Boolean = this == ScrollDirection.UP || this == ScrollDirection.DOWN
