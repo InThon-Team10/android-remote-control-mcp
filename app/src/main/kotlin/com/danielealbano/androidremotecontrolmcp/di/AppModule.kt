@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnectionImpl
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
+import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarterImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
@@ -241,6 +245,14 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindAccessibilityServiceProvider(impl: AccessibilityServiceProviderImpl): AccessibilityServiceProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindAssistantMcpConnection(impl: AssistantMcpConnectionImpl): AssistantMcpConnection
+
+    @Binds
+    @Singleton
+    abstract fun bindAssistantServerStarter(impl: AssistantServerStarterImpl): AssistantServerStarter
 
     @Binds
     @Singleton

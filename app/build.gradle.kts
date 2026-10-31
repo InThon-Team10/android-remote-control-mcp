@@ -373,6 +373,7 @@ dependencies {
     // Raw OkHttp: the free E2E tunnel control stream is an HTTP/2 duplex request body (not expressible
     // through the Ktor client), plus its /issue and Certificate Transparency calls.
     implementation(libs.okhttp)
+    implementation(libs.okhttp.tls)
     implementation(libs.tink.android)
 
     // Pin Netty to the latest 4.2.x patch release (Ktor 3.6.0's server engine ships 4.2.17); keeps the patched floor.
@@ -416,6 +417,9 @@ dependencies {
 
     // MCP SDK
     implementation(libs.mcp.kotlin.sdk.server)
+    // On-device assistant: MCP client (+ its SSE plugin) talking to this app's own server
+    implementation(libs.mcp.kotlin.sdk.client)
+    implementation(libs.ktor.sse)
     runtimeOnly(libs.slf4j.android)
 
     // OAuth (JWT signing/verification)
@@ -464,11 +468,8 @@ dependencies {
     testImplementation(libs.bouncy.castle.pkix)
     testImplementation(libs.bouncy.castle.prov)
     testImplementation(libs.ktor.server.test.host)
-    testImplementation(libs.mcp.kotlin.sdk.client)
     testImplementation(libs.ktor.client.content.negotiation)
-    testImplementation(libs.ktor.sse)
     testImplementation(libs.okhttp.mockwebserver3)
-    testImplementation(libs.okhttp.tls)
 }
 
 dependencies {
