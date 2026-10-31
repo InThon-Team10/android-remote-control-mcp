@@ -27,7 +27,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -71,7 +70,7 @@ class FindNodesTool
             // Reverse any pseudonym placeholder so the search matches the real on-screen value.
             val value = substitutor.substitute(rawValue)
 
-            val exactMatch = arguments["exact_match"]?.jsonPrimitive?.booleanOrNull ?: false
+            val exactMatch = McpToolUtils.optionalBoolean(arguments, "exact_match", false)
             val visibleOnly = McpToolUtils.optionalBoolean(arguments, PARAM_VISIBLE_ONLY, false)
 
             val findBy =
