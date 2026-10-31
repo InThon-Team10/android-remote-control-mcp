@@ -219,7 +219,7 @@ The call waits up to 45 s (MCP client requests time out at 60 s). Answers (serve
 | Target gone (`isError`, nothing shown) | "That element is no longer on the screen: the screen changed since it was read, so its node_id is stale. Read the screen again (get_screen_state or find_nodes) and highlight it with the new id, or target it by name with by and value. This is not something to tell the user." |
 | Target mostly hidden (`isError`, nothing shown) | "That element is mostly hidden behind another control, so the user cannot touch it. First show the user how to bring it into view (for example scroll_node on its list, or a swipe), then highlight it again. This is not something to tell the user." |
 
-After a timeout the highlight stays on screen for up to 120 s ("lingering"): a slow user can still act, and calling the same tool with the same target waits again without showing the explanation twice. If the user already acted on it in the meantime, that call returns "user acted" at once.
+After a timeout the highlight stays on screen for up to 120 s ("lingering"): a slow user can still act, and calling the same tool with the same target waits again without re-announcing the step. If the user already acted on it in the meantime, that call returns "user acted" at once.
 
 Guided calls do not show the tool-call indicator (the user acts, not the AI).
 

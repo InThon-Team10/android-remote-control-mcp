@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.helper
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceTarget
+import com.danielealbano.androidremotecontrolmcp.services.guidance.ScreenPoint
 import com.danielealbano.androidremotecontrolmcp.ui.helper.GuidanceDisplay.Companion.CAPTION_SEPARATION_DP
 import com.danielealbano.androidremotecontrolmcp.ui.helper.GuidanceDisplay.Companion.CONTROLS_GAP_DP
 import com.danielealbano.androidremotecontrolmcp.ui.helper.GuidanceDisplay.Companion.CONTROLS_HEIGHT_DP
@@ -77,15 +78,30 @@ internal class GuidanceSceneRenderer(
         }
         val direction = target.scrollDirection ?: ScrollDirection.UP
         val pill = SwipePillSize(display.dp(ARROW_THICKNESS_DP), display.dp(ARROW_LENGTH_DP), display.dp(ARROW_GAP_DP))
-        swipeArrowRect(area, target.swipeStart, direction, pill, screen)?.let { arrow ->
-            windows.add(ARROW_ID, GuidanceWindowSpec(arrow, touchable = false)) { SwipeArrow(direction) }
-        }
-        windows.add(WATCHER_ID, GuidanceWindowSpec(WATCHER_RECT, touchable = true, watchOutside = true)) {}
+        val arrow = swipeArrowRect(area, target.swipeStart, direction, pill, screen)
+        arrow?.let { windows.add(ARROW_ID, GuidanceWindowSpec(it, touchable = false)) { SwipeArrow(direction) } }
+        val watcher = watcherRect(target.swipeStart, screen)
+        windows.add(WATCHER_ID, GuidanceWindowSpec(watcher, touchable = true, watchOutside = true)) {}
         detector.reset(setOf(WATCHER_ID))
         // The caption goes outside the whole swipe path (not just the small pill): a caption window under the
         // finger would take the swipe instead of the app.
-        showCaptionNear(area, caption, screen)
+        val path = arrow?.let { area.union(it) } ?: area
+        showCaptionNear(path, caption, screen)
     }
+
+    private fun PxRect.union(other: PxRect) =
+        PxRect(minOf(left, other.left), minOf(top, other.top), maxOf(right, other.right), maxOf(bottom, other.bottom))
+
+    /** The 1 px touch watcher sits on a corner pixel that is never the swipe start (a window there would swallow the touch). */
+    private fun watcherRect(
+        start: ScreenPoint?,
+        screen: PxSize,
+    ): PxRect =
+        if (start != null && start.x == 0 && start.y == 0) {
+            PxRect(screen.width - 1, screen.height - 1, screen.width, screen.height)
+        } else {
+            WATCHER_RECT
+        }
 
     /** Typing keeps the keyboard usable: outline and caption only, nothing dimmed or blocked. */
     private fun showTypeHint(
