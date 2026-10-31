@@ -50,6 +50,7 @@ import coil3.request.ImageRequest
 import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.LogoUrlPolicy
 import com.danielealbano.androidremotecontrolmcp.mcp.oauth.OAuthClient
+import com.danielealbano.androidremotecontrolmcp.mcp.oauth.clientInitials
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarBackButton
 import com.danielealbano.androidremotecontrolmcp.ui.components.TopBarTitle
 import com.danielealbano.androidremotecontrolmcp.ui.viewmodels.OAuthClientsViewModel
@@ -183,10 +184,7 @@ private fun ClientAvatar(client: OAuthClient) {
         }
     val badgeColor = Color(BADGE_COLOR_MASK or (client.clientId.hashCode() and BADGE_RGB_MASK))
     val initials =
-        (client.clientName ?: hostOf(client.redirectUris.firstOrNull()) ?: "?")
-            .trim()
-            .take(2)
-            .uppercase()
+        clientInitials(client.clientName ?: hostOf(client.redirectUris.firstOrNull()) ?: "?")
 
     // Decorative: the client's name is read next to it
     Box(
