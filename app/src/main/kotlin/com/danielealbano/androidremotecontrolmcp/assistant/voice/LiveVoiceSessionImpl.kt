@@ -4,51 +4,36 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.AgentOutcome
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.ElderGuidancePrompt
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.ElderToolFilter
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.GeminiErrorMapper
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.GeminiRequestFactory
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.GeminiToolCallRunner
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.McpToolSchemaMapper
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.RunContext
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.toMcpFailure
-import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
+import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiErrorMapper
+import com.danielealbano.androidremotecontrolmcp.assistant.guide.GuideSteps
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
 import com.danielealbano.androidremotecontrolmcp.assistant.session.appendLiveAssistantText
 import com.danielealbano.androidremotecontrolmcp.assistant.session.appendLiveUserText
 import com.danielealbano.androidremotecontrolmcp.assistant.session.endLiveTurn
-import com.danielealbano.androidremotecontrolmcp.assistant.session.reportStepLimit
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
-import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
 import com.danielealbano.androidremotecontrolmcp.di.IoDispatcher
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
-import com.google.genai.types.AudioTranscriptionConfig
-import com.google.genai.types.Content
-import com.google.genai.types.GenerateContentConfig
-import com.google.genai.types.LiveConnectConfig
-import com.google.genai.types.LiveServerMessage
-import com.google.genai.types.Modality
-import com.google.genai.types.Part
-import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Live voice conversation over the Gemini Live API. One [Job] per conversation: cancelling it (stop, session
+ * Live voice conversation over the OpenAI Realtime API. One [Job] per conversation: cancelling it (stop, session
  * stop/newChat, assistant disabled, error) ends the capture, the message loop and the tool calls, which run in a scope
  * tied to it, and releases everything.
  */
@@ -56,7 +41,7 @@ import kotlin.coroutines.cancellation.CancellationException
 class LiveVoiceSessionImpl
     @Inject
     constructor(
-        private val gateway: LiveGateway,
+        private val gateway: RealtimeGateway,
         private val capture: AudioCapture,
         private val playback: AudioPlayback,
         private val launcher: VoiceServiceLauncher,
@@ -65,6 +50,8 @@ class LiveVoiceSessionImpl
         private val startMutex = Mutex()
         private val _state = MutableStateFlow<LiveVoiceState>(LiveVoiceState.Idle)
         private var current: Job? = null
+
+        @Volatile private var handler: RealtimeEventHandler? = null
 
         override val state: StateFlow<LiveVoiceState> = _state.asStateFlow()
 
@@ -83,10 +70,14 @@ class LiveVoiceSessionImpl
         ): Result<Unit> {
             job.cancel()
             if (error is CancellationException || error is Error) throw error
-            val mapped = (error as? AssistantException)?.error ?: GeminiErrorMapper.map(error)
+            val mapped = (error as? AssistantException)?.error ?: OpenAiErrorMapper.map(error)
             _state.value = LiveVoiceState.Error(mapped)
             Logger.w(TAG, "Live voice start failed: ${error.javaClass.simpleName}")
             return Result.failure(AssistantException(mapped))
+        }
+
+        override fun sendText(text: String) {
+            text.takeIf { it.isNotBlank() }?.let { handler?.sendText(it) }
         }
 
         override suspend fun stop() {
@@ -104,39 +95,38 @@ class LiveVoiceSessionImpl
             val listener =
                 deps.session.beginLive(job)
                     ?: throw AssistantException(AssistantError.ModelRequestFailed("Assistant is busy"))
-            val deviceSlug = deps.settingsRepository.getServerConfig().deviceSlug
-            val tools = usableTools(deviceSlug)
             val scope = CoroutineScope(SupervisorJob() + deps.dispatcher)
             job.invokeOnCompletion { scope.cancel() }
-            val messages = Channel<LiveServerMessage>(Channel.UNLIMITED)
-            job.invokeOnCompletion { release(messages) }
-            val link = gateway.connect(apiKey, liveConfig(tools), { messages.trySend(it) }) { onClosed(job, it) }
+            val inbound = Channel<JsonObject>(Channel.UNLIMITED)
+            job.invokeOnCompletion { release(inbound) }
+            val link = gateway.connect(apiKey, { inbound.trySend(it) }) { onClosed(job, it) }
             job.invokeOnCompletion { link.close() }
-            val context =
-                RunContext(
-                    apiKey = apiKey,
-                    model = AssistantConfig.LIVE_MODEL,
-                    config = GenerateContentConfig.builder().build(),
-                    stepLimit = config.stepLimit,
-                    deviceSlug = deviceSlug,
-                    toolNames = tools.mapTo(HashSet()) { it.name },
-                )
             val events = Events(job)
-            val handler =
-                LiveMessageHandler(link, playback, LiveToolRunner(deps.runner, listener, context), scope, events)
+            val queue = RealtimeSendQueue(scope, link, SEND_TIMEOUT_MS) { onSendFailed(events, it) }
+            queue.enqueue(RealtimeProtocol.sessionUpdate())
+            val eventHandler = RealtimeEventHandler(queue::enqueue, playback, deps.guide, listener, scope, events)
+            handler = eventHandler
             playback.start()
             launcher.start()
-            scope.guarded(events) { for (message in messages) handler.handle(message) }
+            scope.guarded(events) { for (event in inbound) eventHandler.handle(event) }
             scope.guarded(events, AssistantError.VoiceRecordingFailed) {
-                val mic = MicTrace()
-                capture.chunks().collect { chunk -> mic.timed(chunk.size) { link.sendAudio(chunk) } }
+                capture.chunks().collect { chunk -> queue.enqueue(RealtimeProtocol.audioAppend(chunk)) }
+            }
+            scope.launch {
+                delay(SESSION_LIMIT_MS)
+                events.end(AgentOutcome.Completed)
             }
             _state.value = LiveVoiceState.Listening
-            Log.d(VOICE_TRACE, "live connected: ${tools.size} tools")
+            Log.d(VOICE_TRACE, "live connected")
         }
 
-        private suspend fun usableTools(deviceSlug: String): List<Tool> =
-            ElderToolFilter.usable(deps.connection.listTools().getOrElse { throw it.toMcpFailure() }, deviceSlug)
+        private fun onSendFailed(
+            events: LiveEvents,
+            error: Throwable,
+        ) {
+            Logger.w(TAG, "Live voice send failed: ${error.javaClass.simpleName}")
+            events.end(AgentOutcome.Failed(AssistantError.ModelUnavailable))
+        }
 
         private fun preflightError(
             config: AssistantConfig,
@@ -157,12 +147,14 @@ class LiveVoiceSessionImpl
                 events.end(AgentOutcome.Failed(AssistantError.MicrophonePermissionMissing))
             } else {
                 Logger.w(TAG, "Live voice failed: ${failure.javaClass.simpleName}")
-                events.end(AgentOutcome.Failed(fallback ?: GeminiErrorMapper.map(failure)))
+                events.end(AgentOutcome.Failed(fallback ?: OpenAiErrorMapper.map(failure)))
             }
         }
 
         private fun release(messages: Channel<*>) {
+            handler = null
             messages.close()
+            deps.guide.reset()
             playback.release()
             launcher.stop()
             if (_state.value !is LiveVoiceState.Error) _state.value = LiveVoiceState.Idle
@@ -175,20 +167,8 @@ class LiveVoiceSessionImpl
             if (!job.isActive) return
             Log.d(VOICE_TRACE, "live socket closed: ${error?.javaClass?.simpleName ?: "normally"}")
             val outcome =
-                if (error == null) AgentOutcome.Completed else AgentOutcome.Failed(GeminiErrorMapper.map(error))
+                if (error == null) AgentOutcome.Completed else AgentOutcome.Failed(OpenAiErrorMapper.map(error))
             Events(job).end(outcome)
-        }
-
-        private fun liveConfig(tools: List<Tool>): LiveConnectConfig {
-            val builder =
-                LiveConnectConfig
-                    .builder()
-                    .responseModalities(Modality(Modality.Known.AUDIO))
-                    .inputAudioTranscription(AudioTranscriptionConfig.builder())
-                    .outputAudioTranscription(AudioTranscriptionConfig.builder())
-                    .systemInstruction(Content.fromParts(Part.fromText(ElderGuidancePrompt.VOICE)))
-            if (tools.isNotEmpty()) builder.tools(listOf(McpToolSchemaMapper.toGeminiTool(tools)))
-            return builder.build()
         }
 
         private fun gateError(config: AssistantConfig): AssistantError? =
@@ -226,12 +206,8 @@ class LiveVoiceSessionImpl
                 if (!job.isActive) return
                 Log.d(VOICE_TRACE, "live end: ${outcome.javaClass.simpleName}")
                 when (outcome) {
-                    AgentOutcome.Completed -> {
+                    AgentOutcome.Completed, is AgentOutcome.StepLimitReached -> {
                         Unit
-                    }
-
-                    is AgentOutcome.StepLimitReached -> {
-                        deps.session.reportStepLimit(outcome.limit)
                     }
 
                     is AgentOutcome.Failed -> {
@@ -245,6 +221,12 @@ class LiveVoiceSessionImpl
 
         private companion object {
             const val TAG = "MCP:LiveVoice"
+
+            /** A send stuck this long means the link is dead (the connection has no ping). */
+            const val SEND_TIMEOUT_MS = 15_000L
+
+            /** Realtime sessions last 60 minutes at most: end gracefully just before. */
+            const val SESSION_LIMIT_MS = 59 * 60_000L
         }
     }
 
@@ -253,9 +235,7 @@ class LiveVoiceDependencies
     @Inject
     constructor(
         val settings: AssistantSettings,
-        val settingsRepository: SettingsRepository,
         val session: AssistantSession,
-        val connection: AssistantMcpConnection,
-        val runner: GeminiToolCallRunner,
+        val guide: GuideSteps,
         @IoDispatcher val dispatcher: CoroutineDispatcher,
     )

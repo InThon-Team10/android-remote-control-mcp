@@ -3,39 +3,16 @@ package com.danielealbano.androidremotecontrolmcp.assistant.voice
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.AssistantAgent
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.ElderGuidancePrompt
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.GeminiToolCallRunner
-import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
+import com.danielealbano.androidremotecontrolmcp.assistant.guide.GuideSteps
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
-import com.danielealbano.androidremotecontrolmcp.assistant.session.NoticeKind
 import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
-import com.danielealbano.androidremotecontrolmcp.assistant.session.ToolCallStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
-import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
-import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
-import com.danielealbano.androidremotecontrolmcp.data.repository.SettingsRepository
-import com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
-import com.google.genai.types.Blob
-import com.google.genai.types.Content
-import com.google.genai.types.FunctionCall
-import com.google.genai.types.FunctionResponse
-import com.google.genai.types.LiveConnectConfig
-import com.google.genai.types.LiveServerContent
-import com.google.genai.types.LiveServerGoAway
-import com.google.genai.types.LiveServerMessage
-import com.google.genai.types.LiveServerToolCall
-import com.google.genai.types.LiveServerToolCallCancellation
-import com.google.genai.types.Part
-import com.google.genai.types.Transcription
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
-import io.modelcontextprotocol.kotlin.sdk.types.Tool
-import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
@@ -43,29 +20,26 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings as Settings
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("LiveVoiceSessionImpl")
 class LiveVoiceSessionImplTest {
     private val configFlow = MutableStateFlow(READY)
     private val settings =
-        mockk<AssistantSettings> {
+        mockk<Settings> {
             every { config } returns configFlow
             coEvery { getConfig() } answers { configFlow.value }
             coEvery { getApiKey() } returns "key"
-        }
-    private val settingsRepository =
-        mockk<SettingsRepository> { coEvery { getServerConfig() } returns ServerConfig() }
-    private val connection =
-        mockk<AssistantMcpConnection> {
-            coEvery { listTools() } returns Result.success(listOf(tool("android_tap"), tool("android_close_app")))
-            coEvery { callTool(any(), any()) } returns Result.success(McpToolUtils.textResult("ok"))
         }
     private val mic = Channel<ByteArray>(Channel.UNLIMITED)
     private val capture =
@@ -75,25 +49,34 @@ class LiveVoiceSessionImplTest {
         }
     private val playback = mockk<AudioPlayback>(relaxed = true)
     private val launcher = mockk<VoiceServiceLauncher>(relaxed = true)
-    private val link = mockk<LiveConnection>(relaxed = true)
-    private val connectConfig = slot<LiveConnectConfig>()
-    private lateinit var onMessage: (LiveServerMessage) -> Unit
+    private val guide = mockk<GuideSteps>(relaxed = true)
+    private val sent = mutableListOf<JsonObject>()
+    private var closed = false
+    private var sendBlock: suspend () -> Unit = {}
+    private lateinit var onEvent: (JsonObject) -> Unit
     private lateinit var onClosed: (Throwable?) -> Unit
     private val gateway =
-        object : LiveGateway {
+        object : RealtimeGateway {
             var connects = 0
 
             override suspend fun connect(
                 apiKey: String,
-                config: LiveConnectConfig,
-                onMessage: (LiveServerMessage) -> Unit,
+                onEvent: (JsonObject) -> Unit,
                 onClosed: (Throwable?) -> Unit,
-            ): LiveConnection {
+            ): RealtimeLink {
                 connects++
-                connectConfig.captured = config
-                this@LiveVoiceSessionImplTest.onMessage = onMessage
+                this@LiveVoiceSessionImplTest.onEvent = onEvent
                 this@LiveVoiceSessionImplTest.onClosed = onClosed
-                return link
+                return object : RealtimeLink {
+                    override suspend fun send(event: JsonObject) {
+                        sendBlock()
+                        sent += event
+                    }
+
+                    override fun close() {
+                        closed = true
+                    }
+                }
             }
         }
 
@@ -105,15 +88,7 @@ class LiveVoiceSessionImplTest {
     private fun TestScope.fixture(): Fixture {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val session = AssistantSession(mockk<AssistantAgent>(relaxed = true), settings, dispatcher)
-        val deps =
-            LiveVoiceDependencies(
-                settings,
-                settingsRepository,
-                session,
-                connection,
-                GeminiToolCallRunner(connection),
-                dispatcher,
-            )
+        val deps = LiveVoiceDependencies(settings, session, guide, dispatcher)
         return Fixture(LiveVoiceSessionImpl(gateway, capture, playback, launcher, deps), session).also { runCurrent() }
     }
 
@@ -121,27 +96,7 @@ class LiveVoiceSessionImplTest {
         assertTrue(live.start().isSuccess)
     }
 
-    private fun content(build: LiveServerContent.Builder.() -> Unit): LiveServerMessage =
-        LiveServerMessage.builder().serverContent(LiveServerContent.builder().apply(build).build()).build()
-
-    private fun transcription(text: String) = Transcription.builder().text(text).build()
-
-    private fun toolMessage(name: String): LiveServerMessage =
-        LiveServerMessage
-            .builder()
-            .toolCall(
-                LiveServerToolCall
-                    .builder()
-                    .functionCalls(
-                        listOf(
-                            FunctionCall
-                                .builder()
-                                .name(name)
-                                .id("id-$name")
-                                .build(),
-                        ),
-                    ).build(),
-            ).build()
+    private fun types() = sent.map { it["type"]!!.jsonPrimitive.content }
 
     @Test
     fun `gates fail start with a typed error and never connect`() =
@@ -177,7 +132,7 @@ class LiveVoiceSessionImplTest {
         }
 
     @Test
-    fun `start connects with tools and audio config, stop releases everything`() =
+    fun `start connects and configures the session, stop releases everything`() =
         runTest {
             val fx = fixture()
 
@@ -186,15 +141,9 @@ class LiveVoiceSessionImplTest {
             runCurrent()
 
             assertEquals(1, gateway.connects)
+            assertEquals(listOf("session.update"), types())
             assertEquals(LiveVoiceState.Listening, fx.live.state.value)
             assertEquals(SessionState.Running, fx.session.state.value)
-            assertEquals(
-                1,
-                connectConfig.captured
-                    .tools()
-                    .get()
-                    .size,
-            )
             verify { playback.start() }
             verify { launcher.start() }
 
@@ -203,13 +152,14 @@ class LiveVoiceSessionImplTest {
 
             assertEquals(LiveVoiceState.Idle, fx.live.state.value)
             assertEquals(SessionState.Idle, fx.session.state.value)
-            verify { link.close() }
+            assertTrue(closed)
             verify { playback.release() }
             verify { launcher.stop() }
+            verify { guide.reset() }
         }
 
     @Test
-    fun `microphone chunks are forwarded to the live connection`() =
+    fun `microphone chunks are sent as audio appends after the session update`() =
         runTest {
             val fx = fixture()
             fx.begin()
@@ -217,210 +167,103 @@ class LiveVoiceSessionImplTest {
             mic.trySend(byteArrayOf(1, 2, 3))
             runCurrent()
 
-            coVerify { link.sendAudio(match { it.contentEquals(byteArrayOf(1, 2, 3)) }) }
+            assertEquals(listOf("session.update", "input_audio_buffer.append"), types())
+            assertEquals("AQID", sent[1]["audio"]!!.jsonPrimitive.content)
             fx.live.stop()
         }
 
     @Test
-    fun `transcripts coalesce into one item per side until the turn completes`() =
+    fun `events reach the handler and transcripts land in the session`() =
         runTest {
             val fx = fixture()
             fx.begin()
 
-            onMessage(content { inputTranscription(transcription("Hel")) })
-            onMessage(content { inputTranscription(transcription("lo")) })
-            onMessage(content { outputTranscription(transcription("Hi")) })
-            onMessage(content { outputTranscription(transcription(" you")) })
-            onMessage(content { turnComplete(true) })
-            onMessage(content { outputTranscription(transcription("More")) })
+            onEvent(RealtimeTestEvents.userSaid("안녕"))
+            onEvent(RealtimeTestEvents.transcript("r1", "네"))
             runCurrent()
 
             assertEquals(
-                listOf<ChatItem>(
-                    ChatItem.User(1, "Hello"),
-                    ChatItem.Assistant(2, "Hi you"),
-                    ChatItem.Assistant(3, "More"),
-                ),
+                listOf<ChatItem>(ChatItem.User(1, "안녕"), ChatItem.Assistant(2, "네")),
                 fx.session.items.value,
             )
             fx.live.stop()
         }
 
     @Test
-    fun `model audio is played, interruption flushes it and turn complete returns to listening`() =
+    fun `audio events move the state to speaking and a finished reply to listening`() =
         runTest {
             val fx = fixture()
             fx.begin()
-            val audio =
-                Blob
-                    .builder()
-                    .mimeType("audio/pcm;rate=24000")
-                    .data(byteArrayOf(9))
-                    .build()
-            val turn = Content.builder().parts(listOf(Part.builder().inlineData(audio).build())).build()
 
-            onMessage(content { modelTurn(turn) })
+            onEvent(RealtimeTestEvents.audio("r1", "i1", 960))
             runCurrent()
             assertEquals(LiveVoiceState.Speaking, fx.live.state.value)
-            verify { playback.write(match { it.contentEquals(byteArrayOf(9)) }) }
 
-            onMessage(content { interrupted(true) })
-            runCurrent()
-            verify { playback.flush() }
-
-            onMessage(content { turnComplete(true) })
+            onEvent(RealtimeTestEvents.done())
             runCurrent()
             assertEquals(LiveVoiceState.Listening, fx.live.state.value)
             fx.live.stop()
         }
 
     @Test
-    fun `allowed tool call runs the tool and sends the tool response`() =
+    fun `sendText sends the typed message and asks for a reply, and is ignored when stopped`() =
         runTest {
             val fx = fixture()
+            fx.live.sendText("ignored")
             fx.begin()
-            val sent = slot<List<FunctionResponse>>()
-            coEvery { link.sendToolResponse(capture(sent)) } returns Unit
 
-            onMessage(toolMessage("android_tap"))
+            fx.live.sendText("와이파이")
+            fx.live.sendText("  ")
             runCurrent()
 
-            assertEquals(
-                "android_tap",
-                sent.captured
-                    .single()
-                    .name()
-                    .get(),
-            )
-            assertEquals(
-                "id-android_tap",
-                sent.captured
-                    .single()
-                    .id()
-                    .get(),
-            )
-            val call =
-                fx.session.items.value
-                    .filterIsInstance<ChatItem.ToolCall>()
-                    .single()
-            assertEquals(ToolCallStatus.DONE, call.status)
+            assertEquals(listOf("session.update", "conversation.item.create", "response.create"), types())
             fx.live.stop()
+            runCurrent()
+            fx.live.sendText("after stop")
+            runCurrent()
+            assertEquals(3, sent.size)
         }
 
     @Test
-    fun `refused tools are not declared and a call to one is answered with an error`() =
+    fun `a link whose send is stuck ends the conversation as unavailable`() =
+        runTest {
+            val stuck = CompletableDeferred<Unit>()
+            sendBlock = { stuck.await() }
+            val fx = fixture()
+            fx.begin()
+
+            advanceTimeBy(15_001)
+            runCurrent()
+
+            assertEquals(LiveVoiceState.Error(AssistantError.ModelUnavailable), fx.live.state.value)
+            assertEquals(SessionState.Idle, fx.session.state.value)
+            verify { playback.release() }
+        }
+
+    @Test
+    fun `the conversation ends gracefully before the 60 minute session limit`() =
         runTest {
             val fx = fixture()
             fx.begin()
-            val sent = slot<List<FunctionResponse>>()
-            coEvery { link.sendToolResponse(capture(sent)) } returns Unit
 
-            onMessage(toolMessage("android_close_app"))
+            advanceTimeBy(58 * 60_000L)
             runCurrent()
-
-            val declared =
-                connectConfig.captured
-                    .tools()
-                    .get()
-                    .single()
-                    .functionDeclarations()
-                    .get()
-                    .map { it.name().get() }
-            assertEquals(listOf("android_tap"), declared)
-            assertEquals(SessionState.Running, fx.session.state.value)
-            assertTrue(
-                sent.captured
-                    .single()
-                    .response()
-                    .get()
-                    .containsKey("error"),
-            )
-            coVerify(exactly = 0) { connection.callTool("android_close_app", any()) }
-            fx.live.stop()
-        }
-
-    @Test
-    fun `live session uses the elder guidance prompt with the voice rules`() =
-        runTest {
-            fixture().begin()
-
-            assertTrue(ElderGuidancePrompt.VOICE.startsWith(ElderGuidancePrompt.TEXT))
-            assertEquals(
-                ElderGuidancePrompt.VOICE,
-                connectConfig.captured
-                    .systemInstruction()
-                    .get()
-                    .parts()
-                    .get()
-                    .single()
-                    .text()
-                    .get(),
-            )
-        }
-
-    @Test
-    fun `tool call cancellation cancels the matching in-flight call and sends no response`() =
-        runTest {
-            val fx = fixture()
-            fx.begin()
-            var cancelled = false
-            coEvery { connection.callTool("android_tap", any()) } coAnswers {
-                try {
-                    awaitCancellation()
-                } finally {
-                    cancelled = true
-                }
-            }
-
-            onMessage(toolMessage("android_tap"))
-            runCurrent()
-            onMessage(
-                LiveServerMessage
-                    .builder()
-                    .toolCallCancellation(
-                        LiveServerToolCallCancellation.builder().ids(listOf("id-android_tap")).build(),
-                    ).build(),
-            )
-            runCurrent()
-
-            assertTrue(cancelled)
-            coVerify(exactly = 0) { link.sendToolResponse(any()) }
             assertEquals(LiveVoiceState.Listening, fx.live.state.value)
-            fx.live.stop()
-        }
-
-    @Test
-    fun `step limit ends the conversation with a notice`() =
-        runTest {
-            configFlow.value = READY.copy(stepLimit = 1)
-            val fx = fixture()
-            fx.begin()
-
-            onMessage(toolMessage("android_tap"))
-            runCurrent()
-            onMessage(toolMessage("android_tap"))
+            advanceTimeBy(2 * 60_000L)
             runCurrent()
 
-            assertEquals(
-                NoticeKind.StepLimitReached(1),
-                (
-                    fx.session.items.value
-                        .last() as ChatItem.Notice
-                ).kind,
-            )
             assertEquals(LiveVoiceState.Idle, fx.live.state.value)
-            verify { link.close() }
+            verify { launcher.stop() }
         }
 
     @Test
-    fun `go away ends the conversation with an error and releases resources`() =
+    fun `a socket failure ends the conversation with an error and a clean close ends it quietly`() =
         runTest {
             val fx = fixture()
             fx.begin()
 
-            onMessage(LiveServerMessage.builder().goAway(LiveServerGoAway.builder().build()).build())
+            onClosed(java.io.IOException("lost"))
             runCurrent()
-
             assertEquals(LiveVoiceState.Error(AssistantError.ModelUnavailable), fx.live.state.value)
             assertEquals(
                 AssistantError.ModelUnavailable,
@@ -429,9 +272,35 @@ class LiveVoiceSessionImplTest {
                         .last() as ChatItem.Error
                 ).error,
             )
-            verify { playback.release() }
-            verify { launcher.stop() }
-            assertEquals(SessionState.Idle, fx.session.state.value)
+
+            fx.live.stop()
+            fx.begin()
+            onClosed(null)
+            runCurrent()
+            assertEquals(LiveVoiceState.Idle, fx.live.state.value)
+        }
+
+    @Test
+    fun `a cancelled pending wait_for_user does not leak when the conversation stops`() =
+        runTest {
+            var cancelled = false
+            coEvery { guide.waitForUser() } coAnswers {
+                try {
+                    awaitCancellation()
+                } finally {
+                    cancelled = true
+                }
+            }
+            val fx = fixture()
+            fx.begin()
+            onEvent(RealtimeTestEvents.call("wait_for_user", "w1"))
+            runCurrent()
+
+            fx.live.stop()
+            runCurrent()
+
+            assertTrue(cancelled)
+            assertEquals(listOf("session.update"), types())
         }
 
     @Test
@@ -450,8 +319,6 @@ class LiveVoiceSessionImplTest {
             runCurrent()
             assertEquals(LiveVoiceState.Idle, fx.live.state.value)
         }
-
-    private fun tool(name: String) = Tool(name = name, description = "d", inputSchema = ToolSchema())
 
     private companion object {
         val READY =

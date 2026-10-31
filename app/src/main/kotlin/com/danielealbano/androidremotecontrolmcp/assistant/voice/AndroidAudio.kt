@@ -44,7 +44,7 @@ class AndroidAudioCapture
                         echo = AcousticEchoCanceler.create(record.audioSessionId)?.also { it.enabled = true }
                     }
                     record.startRecording()
-                    val buffer = ByteArray(CHUNK_BYTES)
+                    val buffer = ByteArray(LiveAudio.CHUNK_BYTES)
                     while (currentCoroutineContext().isActive) {
                         val read = record.read(buffer, 0, buffer.size)
                         if (read < 0) throw IOException("AudioRecord read failed: $read")
@@ -62,18 +62,13 @@ class AndroidAudioCapture
                 ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED
             if (!granted) throw SecurityException("RECORD_AUDIO not granted")
-            val minimum = AudioRecord.getMinBufferSize(INPUT_RATE, AudioFormat.CHANNEL_IN_MONO, ENCODING)
+            val minimum = AudioRecord.getMinBufferSize(LiveAudio.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, ENCODING)
             return AudioRecord
                 .Builder()
                 .setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
-                .setAudioFormat(format(INPUT_RATE, AudioFormat.CHANNEL_IN_MONO))
-                .setBufferSizeInBytes(maxOf(minimum, CHUNK_BYTES * 2))
+                .setAudioFormat(format(LiveAudio.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO))
+                .setBufferSizeInBytes(maxOf(minimum, LiveAudio.CHUNK_BYTES * 2))
                 .build()
-        }
-
-        private companion object {
-            const val INPUT_RATE = 16_000
-            const val CHUNK_BYTES = INPUT_RATE * 2 / 10
         }
     }
 
@@ -87,12 +82,14 @@ class AndroidAudioPlayback
         private var track: AudioTrack? = null
         private var executor: ExecutorService? = null
         private var generation = 0
+        private var writtenFrames = 0L
+        private var headBase = 0L
 
         override fun start() {
             synchronized(lock) {
                 if (track != null) return
                 route.acquire()
-                val minimum = AudioTrack.getMinBufferSize(OUTPUT_RATE, AudioFormat.CHANNEL_OUT_MONO, ENCODING)
+                val minimum = AudioTrack.getMinBufferSize(LiveAudio.SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, ENCODING)
                 track =
                     AudioTrack
                         .Builder()
@@ -102,7 +99,7 @@ class AndroidAudioPlayback
                                 .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                                 .build(),
-                        ).setAudioFormat(format(OUTPUT_RATE, AudioFormat.CHANNEL_OUT_MONO))
+                        ).setAudioFormat(format(LiveAudio.SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO))
                         .setBufferSizeInBytes(minimum * 2)
                         .setTransferMode(AudioTrack.MODE_STREAM)
                         .build()
@@ -112,7 +109,11 @@ class AndroidAudioPlayback
         }
 
         override fun write(pcm: ByteArray) {
-            val queued = synchronized(lock) { generation }
+            val queued =
+                synchronized(lock) {
+                    writtenFrames += pcm.size / FRAME_BYTES
+                    generation
+                }
             executor?.execute {
                 val current = synchronized(lock) { track?.takeIf { queued == generation } } ?: return@execute
                 current.write(pcm, 0, pcm.size)
@@ -128,12 +129,22 @@ class AndroidAudioPlayback
                     flush()
                     play()
                 }
+                writtenFrames = 0
+                headBase = track?.playbackHeadPosition?.toLong() ?: 0L
             }
         }
+
+        override fun pendingMs(): Long =
+            synchronized(lock) {
+                val played = (track?.playbackHeadPosition?.toLong() ?: 0L) - headBase
+                (writtenFrames - played).coerceAtLeast(0) * MS_PER_SECOND / LiveAudio.SAMPLE_RATE
+            }
 
         override fun release() {
             synchronized(lock) {
                 generation++
+                writtenFrames = 0
+                headBase = 0
                 executor?.shutdownNow()
                 executor = null
                 track?.release()
@@ -141,12 +152,10 @@ class AndroidAudioPlayback
                 route.release()
             }
         }
-
-        private companion object {
-            const val OUTPUT_RATE = 24_000
-        }
     }
 
+private const val FRAME_BYTES = 2
+private const val MS_PER_SECOND = 1000L
 private const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
 
 private fun format(

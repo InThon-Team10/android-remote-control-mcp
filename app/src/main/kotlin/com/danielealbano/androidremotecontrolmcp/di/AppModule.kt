@@ -13,10 +13,10 @@ import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioPla
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidVoiceServiceLauncher
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioCapture
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioPlayback
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.GeminiSdkLiveGateway
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveGateway
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSessionImpl
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.OpenAiRealtimeGateway
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.RealtimeGateway
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceServiceLauncher
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
@@ -396,9 +396,9 @@ abstract class ServiceModule {
     @Binds
     abstract fun bindVoiceServiceLauncher(impl: AndroidVoiceServiceLauncher): VoiceServiceLauncher
 
-    /** Binds the Gemini Live API gateway. */
+    /** Binds the OpenAI Realtime API gateway. */
     @Binds
-    abstract fun bindLiveGateway(impl: GeminiSdkLiveGateway): LiveGateway
+    abstract fun bindRealtimeGateway(impl: OpenAiRealtimeGateway): RealtimeGateway
 
     /** Binds the speaker playback used by the live voice session. */
     @Binds

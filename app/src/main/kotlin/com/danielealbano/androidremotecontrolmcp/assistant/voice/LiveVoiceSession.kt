@@ -1,11 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.assistant.voice
 
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
-import com.google.genai.types.FunctionResponse
-import com.google.genai.types.LiveConnectConfig
-import com.google.genai.types.LiveServerMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonObject
 
 sealed interface LiveVoiceState {
     data object Idle : LiveVoiceState
@@ -33,9 +31,12 @@ interface LiveVoiceSession {
 
     /** Ends the conversation and releases microphone, speaker and foreground service; idempotent. */
     suspend fun stop()
+
+    /** Typed input inside the running conversation; ignored when no conversation is running. */
+    fun sendText(text: String)
 }
 
-/** Microphone seam (16 kHz mono PCM16). */
+/** Microphone seam ([LiveAudio.SAMPLE_RATE] mono PCM16). */
 interface AudioCapture {
     fun hasPermission(): Boolean
 
@@ -52,6 +53,9 @@ interface AudioPlayback {
     /** Drops everything queued (the user interrupted the model). */
     fun flush()
 
+    /** Milliseconds of audio written since the last [flush] that the speaker has not played yet. */
+    fun pendingMs(): Long
+
     fun release()
 }
 
@@ -62,21 +66,26 @@ interface VoiceServiceLauncher {
     fun stop()
 }
 
-/** Seam over the SDK's Live API. */
-interface LiveGateway {
-    /** Registers [onMessage] immediately after connecting; [onClosed] gets the failure, or null on a clean close. */
+/** Seam over the SDK's Realtime API; events travel as JSON in the API's wire format. */
+interface RealtimeGateway {
+    /** Registers [onEvent] immediately after connecting; [onClosed] gets the failure, or null on a clean close. */
     suspend fun connect(
         apiKey: String,
-        config: LiveConnectConfig,
-        onMessage: (LiveServerMessage) -> Unit,
+        onEvent: (JsonObject) -> Unit,
         onClosed: (Throwable?) -> Unit,
-    ): LiveConnection
+    ): RealtimeLink
 }
 
-interface LiveConnection {
-    suspend fun sendAudio(pcm: ByteArray)
-
-    suspend fun sendToolResponse(responses: List<FunctionResponse>)
+interface RealtimeLink {
+    /** The caller MUST NOT send concurrently (the connection allows one send in flight). */
+    suspend fun send(event: JsonObject)
 
     fun close()
+}
+
+/** Audio format shared by the capture, the playback and the session configuration. */
+object LiveAudio {
+    const val SAMPLE_RATE = 24_000
+    const val CHUNK_BYTES = SAMPLE_RATE * 2 / 10
+    const val BYTES_PER_MS = SAMPLE_RATE * 2 / 1000
 }
