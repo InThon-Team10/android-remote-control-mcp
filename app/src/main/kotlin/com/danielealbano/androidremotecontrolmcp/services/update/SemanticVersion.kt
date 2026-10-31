@@ -74,16 +74,26 @@ private fun compareIdentifier(
     a: String,
     b: String,
 ): Int {
-    val aNum = a.toIntOrNull()
-    val bNum = b.toIntOrNull()
+    val aNum = a.isNotEmpty() && a.all { it in '0'..'9' }
+    val bNum = b.isNotEmpty() && b.all { it in '0'..'9' }
     return when {
-        aNum != null && bNum != null -> aNum.compareTo(bNum)
+        aNum && bNum -> compareDigitStrings(a, b)
 
         // A numeric identifier always has lower precedence than an alphanumeric one.
-        aNum != null -> -1
+        aNum -> -1
 
-        bNum != null -> 1
+        bNum -> 1
 
         else -> a.compareTo(b)
     }
+}
+
+// Numeric comparison of arbitrarily long digit strings (no Int/Long overflow).
+private fun compareDigitStrings(
+    a: String,
+    b: String,
+): Int {
+    val aTrim = a.trimStart('0')
+    val bTrim = b.trimStart('0')
+    return if (aTrim.length != bTrim.length) aTrim.length.compareTo(bTrim.length) else aTrim.compareTo(bTrim)
 }
