@@ -31,6 +31,14 @@ Gradle Plugin, ...) are not part of the app and are not listed.
 | Accompanist | Apache-2.0 | https://github.com/google/accompanist |
 | Google Play services client libraries (`com.google.android.gms`, `gms` flavor only) | Android Software Development Kit License | https://developer.android.com/studio/terms |
 | Guava (`guava`, `failureaccess`, `listenablefuture`) | Apache-2.0 | https://github.com/google/guava |
+| Google Gen AI Java SDK (`com.google.genai:google-genai`) | Apache-2.0 | https://github.com/googleapis/java-genai |
+| Google API Common (`com.google.api:api-common`) | BSD-3-Clause | https://github.com/googleapis/sdk-platform-java |
+| Google Auth Library (`google-auth-library-oauth2-http`, `google-auth-library-credentials`) | BSD-3-Clause | https://github.com/googleapis/google-auth-library-java |
+| Google HTTP Client (`google-http-client`, `google-http-client-gson`) and Gson | Apache-2.0 | https://github.com/googleapis/google-http-java-client and https://github.com/google/gson |
+| Protocol Buffers Java (`com.google.protobuf:protobuf-java`) | BSD-3-Clause | https://github.com/protocolbuffers/protobuf |
+| Apache HttpComponents (`httpclient`, `httpcore`), Commons Codec, Commons Logging | Apache-2.0 | https://hc.apache.org/ and https://commons.apache.org/ |
+| OpenCensus (`opencensus-api`, `opencensus-contrib-http-util`) and gRPC Context (`grpc-context`) | Apache-2.0 | https://github.com/census-instrumentation/opencensus-java and https://github.com/grpc/grpc-java |
+| Jakarta Annotations API and `javax.annotation-api` | EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0 (Jakarta); CDDL-1.1 OR GPL-2.0-only WITH Classpath-exception-2.0 (javax) | https://github.com/jakartaee/common-annotations-api |
 | J2ObjC annotations | Apache-2.0 | https://github.com/google/j2objc |
 | Error Prone annotations | Apache-2.0 | https://github.com/google/error-prone |
 | AutoValue annotations | Apache-2.0 | https://github.com/google/auto |
@@ -39,7 +47,7 @@ Gradle Plugin, ...) are not part of the app and are not listed.
 | ONNX Runtime (Android) | MIT; bundles third-party code listed in its ThirdPartyNotices.txt | https://github.com/microsoft/onnxruntime |
 | MCP Kotlin SDK | MIT | https://github.com/modelcontextprotocol/kotlin-sdk |
 | java-jwt | MIT | https://github.com/auth0/java-jwt |
-| Jackson (`jackson-core`, `jackson-databind`, `jackson-annotations`) | Apache-2.0 | https://github.com/FasterXML/jackson |
+| Jackson (`jackson-core`, `jackson-databind`, `jackson-annotations`, `jackson-datatype-jdk8`, `jackson-datatype-jsr310`) | Apache-2.0 | https://github.com/FasterXML/jackson |
 | Bouncy Castle (`bcprov`, `bcpkix`, `bcutil`) | Bouncy Castle Licence (MIT-style) | https://www.bouncycastle.org/licence.html |
 | Checker Framework qualifiers (`checker-qual`) | MIT | https://github.com/typetools/checker-framework |
 | SLF4J (`slf4j-api`, `slf4j-android`) | MIT | https://www.slf4j.org/license.html |

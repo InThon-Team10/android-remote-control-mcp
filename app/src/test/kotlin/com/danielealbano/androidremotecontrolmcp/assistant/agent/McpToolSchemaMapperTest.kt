@@ -1,0 +1,85 @@
+package com.danielealbano.androidremotecontrolmcp.assistant.agent
+
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import kotlin.jvm.optionals.getOrNull
+import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpTool
+
+class McpToolSchemaMapperTest {
+    private fun tool(
+        name: String,
+        description: String? = null,
+        schema: ToolSchema = ToolSchema(),
+    ) = McpTool(name = name, description = description, inputSchema = schema)
+
+    private fun schemaOf(tool: McpTool): Map<*, *> {
+        val declaration = McpToolSchemaMapper.toDeclaration(tool)
+        return declaration.parametersJsonSchema().get() as Map<*, *>
+    }
+
+    @Test
+    fun `maps name and description and defaults null description to empty`() {
+        val declaration = McpToolSchemaMapper.toDeclaration(tool("android_tap", "Taps"))
+        val bare = McpToolSchemaMapper.toDeclaration(tool("android_x"))
+
+        assertEquals("android_tap", declaration.name().getOrNull())
+        assertEquals("Taps", declaration.description().getOrNull())
+        assertEquals("", bare.description().getOrNull())
+    }
+
+    @Test
+    fun `schema contains type object, properties and required`() {
+        val properties =
+            buildJsonObject {
+                putJsonObject("x") {
+                    put("type", "integer")
+                }
+            }
+
+        val schema = schemaOf(tool("t", schema = ToolSchema(properties = properties, required = listOf("x"))))
+
+        assertEquals("object", schema["type"])
+        assertEquals(mapOf("x" to mapOf("type" to "integer")), schema["properties"])
+        assertEquals(listOf("x"), schema["required"])
+    }
+
+    @Test
+    fun `missing properties yield empty properties map and no required key`() {
+        val schema = schemaOf(tool("t", schema = ToolSchema(properties = null, required = emptyList())))
+
+        assertEquals("object", schema["type"])
+        assertEquals(emptyMap<String, Any?>(), schema["properties"])
+        assertFalse(schema.containsKey("required"))
+    }
+
+    @Test
+    fun `toGeminiTool keeps order of tools`() {
+        val geminiTool = McpToolSchemaMapper.toGeminiTool(listOf(tool("a"), tool("b"), tool("c")))
+
+        val names = geminiTool.functionDeclarations().get().map { it.name().get() }
+        assertEquals(listOf("a", "b", "c"), names)
+    }
+
+    @Test
+    fun `JsonBridge round trips plain json types`() {
+        val json =
+            buildJsonObject {
+                put("s", "a")
+                put("b", true)
+                put("n", 5)
+                put("d", 1.5)
+            }
+
+        val back: JsonObject = JsonBridge.toJsonObject(JsonBridge.toMap(json))
+
+        assertEquals(json, back)
+        assertTrue(JsonBridge.toMap(json)["n"] is Number)
+    }
+}
