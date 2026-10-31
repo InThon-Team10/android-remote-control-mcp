@@ -38,7 +38,9 @@ internal object RealtimeProtocol {
                             put("type", "semantic_vad")
                             put("eagerness", "low")
                             put("create_response", true)
-                            put("interrupt_response", true)
+                            // The microphone is muted while the assistant speaks (EchoGate); a leak of its own
+                            // voice must never cancel the reply mid-sentence.
+                            put("interrupt_response", false)
                         }
                     }
                     putJsonObject("output") {

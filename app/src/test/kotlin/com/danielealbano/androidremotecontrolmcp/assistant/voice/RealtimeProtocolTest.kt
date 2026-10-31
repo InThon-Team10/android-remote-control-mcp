@@ -25,6 +25,20 @@ class RealtimeProtocolTest {
     }
 
     @Test
+    fun `turn detection answers the user but never cuts the assistant off`() {
+        val turn =
+            RealtimeProtocol
+                .sessionUpdate()["session"]!!
+                .jsonObject["audio"]!!
+                .jsonObject["input"]!!
+                .jsonObject["turn_detection"]!!
+                .jsonObject
+
+        assertEquals("true", turn["create_response"]!!.jsonPrimitive.content)
+        assertEquals("false", turn["interrupt_response"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `session update configures audio, tools and the voice prompt`() {
         val session = RealtimeProtocol.sessionUpdate()["session"]!!.jsonObject
         val input = session["audio"]!!.jsonObject["input"]!!.jsonObject

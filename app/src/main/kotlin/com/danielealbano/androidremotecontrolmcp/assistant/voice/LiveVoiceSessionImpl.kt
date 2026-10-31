@@ -123,7 +123,10 @@ class LiveVoiceSessionImpl
             launcher.start()
             scope.guarded(events) { for (event in inbound) eventHandler.handle(event) }
             scope.guarded(events, AssistantError.VoiceRecordingFailed) {
-                capture.chunks().collect { chunk -> queue.enqueue(RealtimeProtocol.audioAppend(chunk)) }
+                val gate = EchoGate(playback::pendingMs, { System.nanoTime() / NANOS_PER_MS })
+                capture.chunks().collect { chunk ->
+                    if (gate.allows()) queue.enqueue(RealtimeProtocol.audioAppend(chunk))
+                }
             }
             scope.launch { LinkWatchdog.run(heard, queue::enqueue, events) }
             scope.launch {
@@ -238,6 +241,7 @@ class LiveVoiceSessionImpl
 
             /** A send stuck this long means the link is dead (the connection has no ping). */
             const val SEND_TIMEOUT_MS = 15_000L
+            const val NANOS_PER_MS = 1_000_000L
 
             /** Realtime sessions last 60 minutes at most: end gracefully just before. */
             const val SESSION_LIMIT_MS = 59 * 60_000L
