@@ -9,6 +9,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
@@ -103,8 +104,12 @@ class SendIntentHandler
                 }
             }
 
-        private fun convertPrimitive(value: JsonPrimitive): Any =
+        private fun convertPrimitive(value: JsonPrimitive): Any? =
             when {
+                value is JsonNull -> {
+                    null
+                }
+
                 value.isString -> {
                     value.content
                 }
@@ -113,20 +118,20 @@ class SendIntentHandler
                     value.content.toBooleanStrict()
                 }
 
-                value.content.contains('.') -> {
-                    value.content.toDoubleOrNull()
-                        ?: throw IllegalArgumentException(
-                            "Cannot parse numeric extra: '${value.content}'",
-                        )
-                }
-
                 else -> {
-                    value.content.toLongOrNull()
-                        ?: throw IllegalArgumentException(
-                            "Cannot parse numeric extra: '${value.content}'",
-                        )
+                    convertNumber(value.content)
                 }
             }
+
+        private fun convertNumber(content: String): Any {
+            content.toLongOrNull()?.let { return it }
+            val isIntegerLiteral = content.all { it.isDigit() || it == '-' }
+            val doubleValue = content.toDoubleOrNull()
+            if (isIntegerLiteral || doubleValue == null || !doubleValue.isFinite()) {
+                throw McpToolException.InvalidParams("Cannot parse numeric extra: '$content'")
+            }
+            return doubleValue
+        }
 
         private fun convertStringArray(
             key: String,
