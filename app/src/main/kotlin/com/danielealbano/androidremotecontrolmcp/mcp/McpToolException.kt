@@ -7,11 +7,14 @@ package com.danielealbano.androidremotecontrolmcp.mcp
  * this exception and returns it as `CallToolResult(isError = true)`.
  *
  * Each subclass classifies a specific failure mode.
+ *
+ * Messages routinely echo client-supplied values, so control characters and line separators are
+ * replaced by a visible unicode escape: an error message is always a single line.
  */
 sealed class McpToolException(
     message: String,
     cause: Throwable? = null,
-) : Exception(message, cause) {
+) : Exception(message.escapeControlCharacters(), cause) {
     class InvalidParams(
         message: String,
         cause: Throwable? = null,
@@ -59,3 +62,22 @@ sealed class McpToolException(
         cause: Throwable? = null,
     ) : McpToolException(message, cause)
 }
+
+private fun Char.isLineBreaking(): Boolean = isISOControl() || this == '\u2028' || this == '\u2029'
+
+private fun String.escapeControlCharacters(): String {
+    if (none { it.isLineBreaking() }) return this
+    val escaped = StringBuilder(length + ESCAPE_HEADROOM)
+    for (c in this) {
+        if (c.isLineBreaking()) {
+            escaped.append("\\u").append(c.code.toString(HEX_RADIX).padStart(HEX_WIDTH, '0'))
+        } else {
+            escaped.append(c)
+        }
+    }
+    return escaped.toString()
+}
+
+private const val ESCAPE_HEADROOM = 16
+private const val HEX_RADIX = 16
+private const val HEX_WIDTH = 4
