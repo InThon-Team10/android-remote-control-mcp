@@ -132,33 +132,28 @@ class ScreenshotEncoder
             val originalWidth = bitmap.width
             val originalHeight = bitmap.height
 
+            // Integer arithmetic: a Float scale can leave the constraining side one pixel short of its bound
+            val limitWidth = (maxWidth ?: Int.MAX_VALUE).toLong()
+            val limitHeight = (maxHeight ?: Int.MAX_VALUE).toLong()
             val (targetWidth, targetHeight) =
                 when {
-                    maxWidth != null && maxHeight != null -> {
-                        // Fit within bounding box: scale based on the side that needs more
-                        // reduction, but never upscale beyond the original size
-                        val widthRatio = maxWidth.toFloat() / originalWidth
-                        val heightRatio = maxHeight.toFloat() / originalHeight
-                        val scale = minOf(widthRatio, heightRatio, 1f)
-                        Pair((originalWidth * scale).toInt(), (originalHeight * scale).toInt())
+                    originalWidth <= limitWidth && originalHeight <= limitHeight -> {
+                        Pair(originalWidth.toLong(), originalHeight.toLong())
                     }
 
-                    maxWidth != null -> {
-                        // Scale to width (as an upper bound), proportional height; never upscale
-                        val scale = (maxWidth.toFloat() / originalWidth).coerceAtMost(1f)
-                        Pair((originalWidth * scale).toInt(), (originalHeight * scale).toInt())
+                    // Width is the constraining side (never upscale, hence the checks above)
+                    limitWidth * originalHeight <= limitHeight * originalWidth -> {
+                        Pair(limitWidth, originalHeight * limitWidth / originalWidth)
                     }
 
                     else -> {
-                        // maxHeight != null: scale to height (as an upper bound); never upscale
-                        val scale = (maxHeight!!.toFloat() / originalHeight).coerceAtMost(1f)
-                        Pair((originalWidth * scale).toInt(), (originalHeight * scale).toInt())
+                        Pair(originalWidth * limitHeight / originalHeight, limitHeight)
                     }
                 }
 
             // Guard: ensure dimensions are at least 1
-            val safeWidth = targetWidth.coerceAtLeast(1)
-            val safeHeight = targetHeight.coerceAtLeast(1)
+            val safeWidth = targetWidth.coerceAtLeast(1).toInt()
+            val safeHeight = targetHeight.coerceAtLeast(1).toInt()
 
             if (safeWidth == originalWidth && safeHeight == originalHeight) return bitmap
 
