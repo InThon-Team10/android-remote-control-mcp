@@ -1,7 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.services.tunnel.arctunnel
 
+import org.bouncycastle.asn1.DERUTF8String
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers
+import org.bouncycastle.asn1.x500.RDN
 import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x500.style.BCStyle
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.ExtensionsGenerator
@@ -53,7 +56,9 @@ object ArcTunnelCsr {
                     return signature.sign()
                 }
             }
-        val builder = JcaPKCS10CertificationRequestBuilder(X500Name("CN=$cn"), pub)
+        // The name comes from the tunnel service: it must stay one CN value, never be parsed as a DN string.
+        val subject = X500Name(arrayOf(RDN(BCStyle.CN, DERUTF8String(cn))))
+        val builder = JcaPKCS10CertificationRequestBuilder(subject, pub)
         if (sanDns != null) {
             val extensions = ExtensionsGenerator()
             extensions.addExtension(
