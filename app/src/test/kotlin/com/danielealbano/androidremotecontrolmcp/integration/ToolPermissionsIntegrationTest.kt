@@ -296,6 +296,7 @@ class ToolPermissionsIntegrationTest {
                 "type_replace_text",
                 "type_clear_text",
                 "press_key",
+                "get_accessibility_status",
                 "get_clipboard",
                 "set_clipboard",
                 "wait_for_node",
