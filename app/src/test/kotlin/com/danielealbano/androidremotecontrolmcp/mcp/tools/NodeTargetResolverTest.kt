@@ -248,11 +248,19 @@ class NodeTargetResolverTest {
             }
 
         @Test
-        fun `a bare hex node id resolves to the prefixed node id`() =
+        fun `a selector value that looks like a bare node id is matched as text, not prefixed`() =
             runTest {
-                val target = resolver.parse(buildJsonObject { put("node_id", "cc18f32c") })
+                val tree = node("node_root", children = listOf(node("node_hex_label", text = "cafe")))
+                val hexWindows = listOf(WindowData(windowId = 0, windowType = "APPLICATION", tree = tree))
+                val target =
+                    resolver.parse(
+                        buildJsonObject {
+                            put("by", "text")
+                            put("value", "cafe")
+                        },
+                    )
 
-                assertEquals(NodeResolution.Resolved("node_cc18f32c"), resolver.resolve(target, windows))
+                assertEquals(NodeResolution.Resolved("node_hex_label"), resolver.resolve(target, hexWindows))
             }
 
         @Test

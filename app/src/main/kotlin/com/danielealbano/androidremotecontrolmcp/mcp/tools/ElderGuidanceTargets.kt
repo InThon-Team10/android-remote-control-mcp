@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeCache
@@ -102,8 +103,9 @@ internal class ElderGuidanceTargets(
 
     /**
      * Highlights the resolved node, or for a tap-like step on a label its clickable row (see
-     * [ElderGuidanceTouchTarget.actionableNode]). A target the user could not touch because something else is drawn
-     * over most of it is not highlighted: the model is told to bring it into view first.
+     * [ElderGuidanceTouchTarget.actionableNode]). A tap-like or type target the user could not touch because something
+     * else is drawn over most of it (see [ElderGuidanceTouchTarget.hiddenCoverage]) is not highlighted: the model is
+     * told to bring it into view first, and the coverage (no device text) is logged.
      */
     private suspend fun nodeStep(
         arguments: JsonObject?,
@@ -120,10 +122,12 @@ internal class ElderGuidanceTargets(
         val screen = accessibilityServiceProvider.getScreenInfo()
         val shown = ElderGuidanceTouchTarget.actionableNode(windows, node, kind, screen.height)
         val bounds = onScreen(shown.bounds, screen)
-        val hidden =
-            kind in ElderGuidanceTouchTarget.COVERAGE_CHECKED_KINDS &&
-                ElderGuidanceTouchTarget.isMostlyHidden(windows, shown, bounds)
-        return if (hidden) {
+        val hidden = ElderGuidanceTouchTarget.hiddenCoverage(windows, shown, bounds, kind)
+        return if (hidden != null) {
+            Log.i(
+                TAG,
+                "$kind target mostly hidden (${hidden.clearPoints}/5 clear, covered by ${hidden.coveringWindowTypes})",
+            )
             GuidanceStep.Answer(McpToolUtils.textResult(ElderToolGuidance.HIDDEN_TARGET_TEXT).copy(isError = true))
         } else {
             GuidanceStep.Show(bounds, kind, direction)
@@ -143,6 +147,11 @@ internal class ElderGuidanceTargets(
         return nodeStep(arguments, GuidanceKind.SCROLL, direction)
     }
 
+    /**
+     * A node the user can already touch (visible and not mostly drawn over) is answered as already on screen;
+     * otherwise its nearest scrollable ancestor is highlighted, so a highlight refused as hidden is not followed by
+     * an "already on screen" answer.
+     */
     private suspend fun scrollToNodeStep(arguments: JsonObject?): GuidanceStep {
         val target = nodeTargetResolver.parse(arguments)
         val direction = requireScrollDirection(arguments)
@@ -152,13 +161,18 @@ internal class ElderGuidanceTargets(
                 is Found.Node -> found.node
                 is Found.Answer -> return GuidanceStep.Answer(found.result)
             }
-        return if (node.visible) {
+        val screen = accessibilityServiceProvider.getScreenInfo()
+        val inView =
+            node.visible &&
+                ElderGuidanceGeometry
+                    .clamp(node.bounds, screen.width, screen.height)
+                    ?.let { !ElderGuidanceTouchTarget.isMostlyHidden(windows, node, it) } == true
+        return if (inView) {
             GuidanceStep.Answer(McpToolUtils.textResult(ALREADY_ON_SCREEN_TEXT))
         } else {
             val container =
                 ElderGuidanceGeometry.scrollableAncestor(windows, node.id)
                     ?: throw McpToolException.ActionFailed("No scrollable container found for node '${node.id}'")
-            val screen = accessibilityServiceProvider.getScreenInfo()
             GuidanceStep.Show(onScreen(container.bounds, screen), GuidanceKind.SCROLL, direction)
         }
     }
@@ -200,6 +214,8 @@ internal class ElderGuidanceTargets(
     private fun freshWindows() = getFreshWindows(treeParser, accessibilityServiceProvider, nodeCache)
 
     companion object {
+        private const val TAG = "MCP:ElderGuidance"
+
         const val ALREADY_ON_SCREEN_TEXT =
             "The target is already on screen, nothing to scroll. Call get_screen_state to see it and guide the " +
                 "user to it with a highlight."

@@ -2,6 +2,7 @@
 
 package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
+import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
@@ -127,6 +128,7 @@ class NodeActionToolsTest {
         every { mockWindowInfo.layer } returns 0
         every { mockWindowInfo.isFocused } returns true
         every { mockWindowInfo.recycle() } returns Unit
+        every { mockWindowInfo.getBoundsInScreen(any()) } returns Unit
         every { mockRootNode.refresh() } returns true
         every { mockRootNode.packageName } returns "com.example"
         every {
@@ -140,6 +142,22 @@ class NodeActionToolsTest {
     @AfterEach
     fun tearDown() {
         unmockkAll()
+    }
+
+    @Test
+    @DisplayName("getFreshWindows records the touchable bounds of each window")
+    fun getFreshWindowsRecordsTouchableBounds() {
+        every { mockWindowInfo.getBoundsInScreen(any()) } answers {
+            val rect = firstArg<Rect>()
+            rect.left = 0
+            rect.top = 1600
+            rect.right = 1080
+            rect.bottom = 2400
+        }
+
+        val result = getFreshWindows(mockTreeParser, mockAccessibilityServiceProvider, mockNodeCache)
+
+        assertEquals(BoundsData(0, 1600, 1080, 2400), result.windows.single().touchableBounds)
     }
 
     @Test

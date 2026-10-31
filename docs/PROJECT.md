@@ -232,7 +232,7 @@ The MCP server exposes 59 tools across 14 categories. For full JSON-RPC schemas,
 
 ### 3. Node Action Tools (6 tools)
 
-"Target" = exactly one of `node_id` (string) or a selector: `by` (string: text/content_desc/resource_id/class_name) + `value` (string), optional `exact_match` (boolean, default false). A selector is resolved in the tool's own fresh screen read among on-screen nodes (`android_scroll_to_node`: on- and off-screen); more than one match returns an untrusted `isError` result listing up to 5 candidates, never a guess.
+"Target" = exactly one of `node_id` (string; a bare lowercase hex id of 1-16 characters gets the `node_` prefix) or a selector: `by` (string: text/content_desc/resource_id/class_name) + `value` (string), optional `exact_match` (boolean, default false). A selector is resolved in the tool's own fresh screen read among on-screen nodes (`android_scroll_to_node`: on- and off-screen); more than one match returns an untrusted `isError` result listing up to 5 candidates, never a guess.
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|

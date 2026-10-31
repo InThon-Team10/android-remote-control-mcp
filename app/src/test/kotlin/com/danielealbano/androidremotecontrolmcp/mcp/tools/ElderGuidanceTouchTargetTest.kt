@@ -4,7 +4,10 @@ import com.danielealbano.androidremotecontrolmcp.services.accessibility.Accessib
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceKind
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -53,6 +56,15 @@ class ElderGuidanceTouchTargetTest {
 
             assertSame(row, actionable(windows, label, GuidanceKind.TAP))
             assertSame(row, actionable(windows, label, GuidanceKind.DOUBLE_TAP))
+        }
+
+        @Test
+        fun `the nearest clickable ancestor is used`() {
+            val label = node("node_label", labelBounds)
+            val row = node("node_row", rowBounds, clickable = true, children = listOf(label))
+            val card = node("node_card", BoundsData(0, 1200, 1080, 1500), clickable = true, children = listOf(row))
+
+            assertSame(row, actionable(screen(card), label, GuidanceKind.TAP))
         }
 
         @Test
@@ -183,6 +195,69 @@ class ElderGuidanceTouchTargetTest {
             val elsewhere = node("node_elsewhere", rowBounds, clickable = true)
 
             assertFalse(hidden(screen(node("node_other", rowBounds)), elsewhere))
+        }
+
+        @Test
+        fun `a keyboard window taller than its keys hides only what is under its keys`() {
+            // The keyboard root reaches above its keys; only the keys take touches
+            val field = node("node_field", BoundsData(40, 1100, 1040, 1300))
+            val app = window(0, node("node_app", fullScreen, children = listOf(field)))
+            val keys = node("node_keys", BoundsData(0, 1600, 1080, 2400))
+            val imeRoot = node("node_ime", BoundsData(0, 1000, 1080, 2400), children = listOf(keys))
+            val keyboard = WindowData(windowId = 5, windowType = "INPUT_METHOD", layer = 5, tree = imeRoot)
+            val touchable = keyboard.copy(touchableBounds = BoundsData(0, 1600, 1080, 2400))
+
+            assertTrue(hidden(listOf(app, keyboard), field), "without touchable bounds the root covers the field")
+            assertFalse(hidden(listOf(app, touchable), field))
+        }
+    }
+
+    @Nested
+    @DisplayName("hiddenCoverage and coverage")
+    inner class HiddenCoverage {
+        /** The Samsung Settings row under the floating search bar: 2 of 5 points clear. */
+        private val row = node("node_sound", BoundsData(28, 2083, 1052, 2229), clickable = true)
+        private val searchBar = node("node_search", BoundsData(197, 2124, 883, 2270), clickable = true)
+        private val windows = screen(row, searchBar)
+
+        @Test
+        fun `tap-like and type highlights of a mostly hidden target are refused, scroll ones are not`() {
+            val refused = listOf(GuidanceKind.TAP, GuidanceKind.DOUBLE_TAP, GuidanceKind.LONG_PRESS, GuidanceKind.TYPE)
+
+            for (kind in refused) {
+                assertNotNull(ElderGuidanceTouchTarget.hiddenCoverage(windows, row, row.bounds, kind), kind.name)
+            }
+            assertNull(ElderGuidanceTouchTarget.hiddenCoverage(windows, row, row.bounds, GuidanceKind.SCROLL))
+        }
+
+        @Test
+        fun `a target that is mostly clear is not refused`() {
+            val clear = screen(searchBar, row)
+
+            assertNull(ElderGuidanceTouchTarget.hiddenCoverage(clear, row, row.bounds, GuidanceKind.TAP))
+        }
+
+        @Test
+        fun `coverage counts the clear points and names the windows on top at the others`() {
+            val field = node("node_field", BoundsData(40, 1520, 1040, 1700))
+            val app = window(0, node("node_app", fullScreen, children = listOf(field)))
+            val keys = node("node_keys", BoundsData(0, 1600, 1080, 2400))
+            val ime = node("node_ime", BoundsData(0, 1500, 1080, 2400), children = listOf(keys))
+            val keyboard = WindowData(windowId = 5, windowType = "INPUT_METHOD", layer = 5, tree = ime)
+            val offScreen = BoundsData(28, 2300, 1052, 2700)
+
+            assertEquals(
+                Coverage(2, setOf("APPLICATION")),
+                ElderGuidanceTouchTarget.coverage(windows, row, row.bounds),
+            )
+            assertEquals(
+                Coverage(0, setOf("INPUT_METHOD")),
+                ElderGuidanceTouchTarget.coverage(listOf(app, keyboard), field, field.bounds),
+            )
+            assertEquals(
+                Coverage(0, setOf(ElderGuidanceTouchTarget.NO_WINDOW)),
+                ElderGuidanceTouchTarget.coverage(windows, row, offScreen),
+            )
         }
     }
 }

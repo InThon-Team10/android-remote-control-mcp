@@ -73,6 +73,9 @@ data class AccessibilityNodeData(
  * @property layer Window layer (z-order from Android).
  * @property focused Whether this window currently has input focus.
  * @property tree The parsed accessibility node tree for this window.
+ * @property touchableBounds Bounds of the part of the window that takes touches (the bounds of its touchable region,
+ *   [AccessibilityWindowInfo.getBoundsInScreen]), which can be smaller than its root (a keyboard window taller than
+ *   its keys); null when unknown.
  */
 @Serializable
 data class WindowData(
@@ -84,6 +87,7 @@ data class WindowData(
     val layer: Int = 0,
     val focused: Boolean = false,
     val tree: AccessibilityNodeData,
+    val touchableBounds: BoundsData? = null,
 )
 
 /**

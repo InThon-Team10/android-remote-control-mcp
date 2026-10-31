@@ -124,6 +124,31 @@ class ElderGuidanceGeometryTest {
     }
 
     @Test
+    fun `topmostPathAt skips a window whose touchable bounds do not contain the point`() {
+        // A keyboard window whose root reaches above the keys that take its touches
+        val field = node("field", BoundsData(0, 1100, 1080, 1300))
+        val app = window(0, node("app", BoundsData(0, 0, 1080, 2400), children = listOf(field)))
+        val keys = node("keys", BoundsData(0, 1600, 1080, 2400))
+        val keyboard =
+            window(5, node("ime", BoundsData(0, 1000, 1080, 2400), children = listOf(keys)))
+                .copy(touchableBounds = BoundsData(0, 1600, 1080, 2400))
+        val windows = listOf(app, keyboard)
+
+        assertEquals(listOf("app", "field"), ElderGuidanceGeometry.topmostPathAt(windows, 500f, 1200f)?.map { it.id })
+        assertEquals(listOf("ime", "keys"), ElderGuidanceGeometry.topmostPathAt(windows, 500f, 2000f)?.map { it.id })
+    }
+
+    @Test
+    fun `topmostPathAt skips a window whose root is not visible`() {
+        val child = node("child", BoundsData(0, 0, 9, 9))
+        val below = node("below", BoundsData(0, 0, 1080, 2400), children = listOf(child))
+        val hidden = node("hidden", BoundsData(0, 0, 1080, 2400), visible = false)
+        val windows = listOf(window(0, below), window(5, hidden))
+
+        assertEquals(listOf("below", "child"), ElderGuidanceGeometry.topmostPathAt(windows, 5f, 5f)?.map { it.id })
+    }
+
+    @Test
     fun `pathTo returns the root-to-node path in the first window that has the node`() {
         val screen = BoundsData(0, 0, 1080, 2400)
         val small = BoundsData(0, 0, 9, 9)

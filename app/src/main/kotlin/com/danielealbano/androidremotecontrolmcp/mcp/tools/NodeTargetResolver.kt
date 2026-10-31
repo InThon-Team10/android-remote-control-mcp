@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
@@ -209,7 +210,7 @@ class NodeTargetResolver
         /** [nodeId] with the `node_` prefix when it is a bare node id hash (some clients drop the prefix). */
         private fun withNodeIdPrefix(nodeId: String): String {
             val bare = BARE_NODE_ID.matches(nodeId)
-            return if (bare) "$NODE_ID_PREFIX$nodeId" else nodeId
+            return if (bare) "${AccessibilityTreeParser.NODE_ID_PREFIX}$nodeId" else nodeId
         }
 
         private fun invalid(message: String): Nothing = throw McpToolException.InvalidParams(message)
@@ -220,7 +221,6 @@ class NodeTargetResolver
             const val PARAM_VALUE = "value"
             const val PARAM_EXACT_MATCH = "exact_match"
             const val MAX_CANDIDATES = 5
-            private const val NODE_ID_PREFIX = "node_"
             private val BARE_NODE_ID = Regex("[0-9a-f]{1,16}")
         }
     }

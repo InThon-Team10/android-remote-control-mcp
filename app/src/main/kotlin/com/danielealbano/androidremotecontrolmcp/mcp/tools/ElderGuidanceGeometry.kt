@@ -76,8 +76,8 @@ internal object ElderGuidanceGeometry {
     }
 
     /**
-     * Bounds of the deepest visible node that contains the point, in the topmost window whose root contains it.
-     * Null when only the window's root does (highlighting a whole window is no guidance).
+     * Bounds of the deepest visible node that contains the point, in the topmost window that takes the touch there
+     * (see [topmostPathAt]). Null when only the window's root does (highlighting a whole window is no guidance).
      */
     fun nodeBoundsAt(
         windows: List<WindowData>,
@@ -86,8 +86,13 @@ internal object ElderGuidanceGeometry {
     ): BoundsData? = topmostPathAt(windows, x, y)?.takeIf { it.size > 1 }?.last()?.bounds
 
     /**
-     * Root-to-node path of what is drawn on top at the point: the deepest visible node that contains it (later
-     * children are drawn over earlier ones) in the topmost window whose root contains it. Null when no window does.
+     * Root-to-node path of what the user touches at the point: the deepest visible node that contains it, in the
+     * topmost window that takes the touch there (its root is visible and contains the point, and so does its
+     * [WindowData.touchableBounds] when known). Null when no window does.
+     *
+     * Among overlapping siblings the later one is taken as the one on top. That is an approximation: accessibility
+     * lists children in reading order, not in drawing order, so a sibling listed later but drawn below (elevation,
+     * custom drawing order) is wrongly taken as on top.
      */
     fun topmostPathAt(
         windows: List<WindowData>,
@@ -95,7 +100,11 @@ internal object ElderGuidanceGeometry {
         y: Float,
     ): List<AccessibilityNodeData>? {
         val window =
-            windows.sortedByDescending { it.layer }.firstOrNull { contains(it.tree.bounds, x, y) } ?: return null
+            windows.sortedByDescending { it.layer }.firstOrNull { window ->
+                window.tree.visible &&
+                    contains(window.tree.bounds, x, y) &&
+                    window.touchableBounds?.let { contains(it, x, y) } != false
+            } ?: return null
         val path =
             generateSequence(window.tree) { node ->
                 node.children.lastOrNull { it.visible && contains(it.bounds, x, y) }

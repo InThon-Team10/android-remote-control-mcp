@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.integration
 
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.ElderGuidanceTargets
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ElderToolGuidance
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceStatus
@@ -183,30 +184,59 @@ class ElderGuidanceIntegrationTest {
             }
         }
 
+    /** A visible, enabled node with no text. */
+    private fun plain(
+        id: String,
+        bounds: BoundsData,
+        clickable: Boolean = false,
+        children: List<AccessibilityNodeData> = emptyList(),
+    ) = AccessibilityNodeData(
+        id = id,
+        bounds = bounds,
+        clickable = clickable,
+        enabled = true,
+        visible = true,
+        children = children,
+    )
+
+    /** Samsung Settings: the text sits on a non-clickable label inside a clickable row without text. */
+    private val settingsLabel =
+        AccessibilityNodeData(
+            id = "node_label",
+            className = "android.widget.TextView",
+            text = "연결",
+            bounds = BoundsData(200, 1340, 280, 1405),
+            enabled = true,
+            visible = true,
+        )
+
+    /** The label's row; its sample points land on the icon, the summary and the switch, not on the label. */
+    private val settingsRow =
+        plain(
+            "node_row",
+            BoundsData(28, 1297, 1052, 1443),
+            clickable = true,
+            children =
+                listOf(
+                    plain("node_icon", BoundsData(28, 1297, 200, 1443)),
+                    settingsLabel,
+                    plain("node_summary", BoundsData(280, 1297, 780, 1443)),
+                    plain("node_switch", BoundsData(780, 1297, 1052, 1443)),
+                ),
+        )
+
+    /** Samsung Settings: the floating search bar drawn over the bottom rows of the list. */
+    private val searchBar =
+        plain("node_search", BoundsData(197, 2124, 883, 2270), clickable = true)
+            .copy(resourceId = "com.android.settings:id/search_plate")
+
+    /** Bounds of the bottom row, mostly under [searchBar]: 2 of its 5 sample points are clear. */
+    private val underSearchBar = BoundsData(28, 2083, 1052, 2229)
+
     @Test
     fun `tap_node on a label highlights its clickable row`() =
         runTest {
-            // Samsung Settings: the text sits on a non-clickable label inside a clickable row without text
-            val label =
-                AccessibilityNodeData(
-                    id = "node_label",
-                    className = "android.widget.TextView",
-                    text = "연결",
-                    bounds = BoundsData(200, 1340, 280, 1405),
-                    enabled = true,
-                    visible = true,
-                )
-            val row =
-                AccessibilityNodeData(
-                    id = "node_row",
-                    className = "android.widget.LinearLayout",
-                    bounds = BoundsData(28, 1297, 1052, 1443),
-                    clickable = true,
-                    enabled = true,
-                    visible = true,
-                    children = listOf(label),
-                )
-            val deps = depsWith(rootOf(row), label)
+            val deps = depsWith(rootOf(settingsRow), settingsLabel)
 
             McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
                 val result = client.callTool("android_tap_node", mapOf("node_id" to "node_label"))
@@ -223,24 +253,7 @@ class ElderGuidanceIntegrationTest {
     fun `a target mostly behind a floating search bar is refused and shows nothing`() =
         runTest {
             // Samsung Settings: the floating search bar is drawn over most of the bottom row
-            val row =
-                AccessibilityNodeData(
-                    id = "node_sound",
-                    className = "android.widget.LinearLayout",
-                    bounds = BoundsData(28, 2083, 1052, 2229),
-                    clickable = true,
-                    enabled = true,
-                    visible = true,
-                )
-            val searchBar =
-                AccessibilityNodeData(
-                    id = "node_search",
-                    resourceId = "com.android.settings:id/search_plate",
-                    bounds = BoundsData(197, 2124, 883, 2270),
-                    clickable = true,
-                    enabled = true,
-                    visible = true,
-                )
+            val row = plain("node_sound", underSearchBar, clickable = true)
             val deps = depsWith(rootOf(row, searchBar), row)
 
             McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
@@ -250,6 +263,122 @@ class ElderGuidanceIntegrationTest {
                 assertEquals(ElderToolGuidance.HIDDEN_TARGET_TEXT, textOf(result))
                 assertTrue(controller.targets.isEmpty())
                 coVerify(exactly = 0) { deps.actionExecutor.clickNode(any(), any()) }
+            }
+        }
+
+    @Test
+    fun `a label that is clear inside a row mostly behind a floating bar is refused`() =
+        runTest {
+            // The label is left of the bar, but its row (what the user is shown) is mostly under it
+            val label = plain("node_title", BoundsData(40, 2090, 180, 2220)).copy(text = "소리 및 진동")
+            val row = plain("node_sound", underSearchBar, clickable = true, children = listOf(label))
+            val deps = depsWith(rootOf(row, searchBar), label)
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result = client.callTool("android_tap_node", mapOf("node_id" to "node_title"))
+
+                assertEquals(true, result.isError)
+                assertEquals(ElderToolGuidance.HIDDEN_TARGET_TEXT, textOf(result))
+                assertTrue(controller.targets.isEmpty())
+            }
+        }
+
+    @Test
+    fun `type_clear_text on a field mostly behind a floating bar is refused`() =
+        runTest {
+            val field = plain("node_field", underSearchBar, clickable = true).copy(editable = true)
+            val deps = depsWith(rootOf(field, searchBar), field)
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result = client.callTool("android_type_clear_text", mapOf("node_id" to "node_field"))
+
+                assertEquals(true, result.isError)
+                assertEquals(ElderToolGuidance.HIDDEN_TARGET_TEXT, textOf(result))
+                assertTrue(controller.targets.isEmpty())
+                verify { deps.typeInputController wasNot Called }
+            }
+        }
+
+    @Test
+    fun `scroll_node on a list mostly behind a floating bar is still shown`() =
+        runTest {
+            // The user scrolls by swiping anywhere on the list, so a covered list is no reason to refuse
+            val list = plain("node_list", underSearchBar).copy(scrollable = true)
+            val deps = depsWith(rootOf(list, searchBar), list)
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result =
+                    client.callTool("android_scroll_node", mapOf("node_id" to "node_list", "direction" to "up"))
+
+                assertNotEquals(true, result.isError)
+                val target = controller.targets.single()
+                assertEquals(underSearchBar, target.bounds)
+                assertEquals(GuidanceKind.SCROLL, target.kind)
+                assertEquals(ScrollDirection.UP, target.scrollDirection)
+            }
+        }
+
+    @Test
+    fun `tap at a point on a label highlights the label, not its row`() =
+        runTest {
+            val deps = depsWith(rootOf(settingsRow))
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                client.callTool("android_tap", mapOf("x" to 240, "y" to 1370))
+
+                val target = controller.targets.single()
+                assertEquals(BoundsData(200, 1340, 280, 1405), target.bounds)
+                assertEquals(GuidanceKind.TAP, target.kind)
+            }
+        }
+
+    @Test
+    fun `a row reaching below the screen is checked and highlighted within the screen`() =
+        runTest {
+            // Sampling the row's full bounds would put every point below the 2400 px screen
+            val row = plain("node_last", BoundsData(28, 2300, 1052, 2700), clickable = true)
+            val deps = depsWith(rootOf(row), row)
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result = client.callTool("android_tap_node", mapOf("node_id" to "node_last"))
+
+                assertNotEquals(true, result.isError)
+                assertEquals(BoundsData(28, 2300, 1052, 2400), controller.targets.single().bounds)
+            }
+        }
+
+    @Test
+    fun `scroll_to_node on a node mostly behind a floating bar highlights its list`() =
+        runTest {
+            val row = plain("node_sound", underSearchBar, clickable = true)
+            val list =
+                plain("node_list", BoundsData(0, 300, 1080, 2400), children = listOf(row)).copy(scrollable = true)
+            val deps = depsWith(rootOf(list, searchBar), row)
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result =
+                    client.callTool("android_scroll_to_node", mapOf("node_id" to "node_sound", "direction" to "down"))
+
+                assertNotEquals(true, result.isError)
+                val target = controller.targets.single()
+                assertEquals(BoundsData(0, 300, 1080, 2400), target.bounds)
+                assertEquals(GuidanceKind.SCROLL, target.kind)
+                assertEquals(ScrollDirection.DOWN, target.scrollDirection)
+            }
+        }
+
+    @Test
+    fun `scroll_to_node on a node the user can touch answers that it is already on screen`() =
+        runTest {
+            val deps = depsWithScreen()
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result =
+                    client.callTool("android_scroll_to_node", mapOf("node_id" to "node_btn", "direction" to "down"))
+
+                assertNotEquals(true, result.isError)
+                assertEquals(ElderGuidanceTargets.ALREADY_ON_SCREEN_TEXT, textOf(result))
+                assertTrue(controller.targets.isEmpty())
             }
         }
 

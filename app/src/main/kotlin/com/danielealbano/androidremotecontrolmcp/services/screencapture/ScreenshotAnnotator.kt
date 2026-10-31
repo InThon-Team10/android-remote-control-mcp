@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import javax.inject.Inject
 
 /**
@@ -179,14 +180,13 @@ class ScreenshotAnnotator
          * Extracts the display label from a node ID by stripping the `node_` prefix.
          */
         internal fun extractLabel(nodeId: String): String =
-            if (nodeId.startsWith(NODE_ID_PREFIX)) {
-                nodeId.removePrefix(NODE_ID_PREFIX)
+            if (nodeId.startsWith(AccessibilityTreeParser.NODE_ID_PREFIX)) {
+                nodeId.removePrefix(AccessibilityTreeParser.NODE_ID_PREFIX)
             } else {
                 nodeId
             }
 
         companion object {
-            internal const val NODE_ID_PREFIX = "node_"
             private const val BOX_STROKE_WIDTH_DP = 2f
             private const val DASH_LENGTH_DP = 6f
             private const val DASH_GAP_DP = 3f

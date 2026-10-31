@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.accessibility
 import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -617,6 +618,43 @@ class AccessibilityTreeParserTest {
             val resultDefault = parser.parseTree(node1)
             val resultW0 = parser.parseTree(node2, "root_w0")
             assertNotEquals(resultDefault.id, resultW0.id)
+        }
+    }
+
+    @Nested
+    @DisplayName("touchableBounds")
+    inner class TouchableBounds {
+        private fun windowWithBounds(
+            left: Int,
+            top: Int,
+            right: Int,
+            bottom: Int,
+        ): AccessibilityWindowInfo {
+            val window = mockk<AccessibilityWindowInfo>()
+            val rectSlot = slot<Rect>()
+            every { window.getBoundsInScreen(capture(rectSlot)) } answers {
+                rectSlot.captured.left = left
+                rectSlot.captured.top = top
+                rectSlot.captured.right = right
+                rectSlot.captured.bottom = bottom
+            }
+            return window
+        }
+
+        @Test
+        @DisplayName("returns the bounds of the window's touchable region")
+        fun returnsTheWindowBounds() {
+            assertEquals(
+                BoundsData(0, 1600, 1080, 2400),
+                AccessibilityTreeParser.touchableBounds(windowWithBounds(0, 1600, 1080, 2400)),
+            )
+        }
+
+        @Test
+        @DisplayName("returns null for an empty region")
+        fun returnsNullForEmptyBounds() {
+            assertNull(AccessibilityTreeParser.touchableBounds(windowWithBounds(0, 0, 0, 0)))
+            assertNull(AccessibilityTreeParser.touchableBounds(windowWithBounds(100, 200, 100, 900)))
         }
     }
 

@@ -129,6 +129,7 @@ class TextInputToolsTest {
         every { mockWindowInfo.layer } returns 0
         every { mockWindowInfo.isFocused } returns true
         every { mockWindowInfo.recycle() } returns Unit
+        every { mockWindowInfo.getBoundsInScreen(any()) } returns Unit
         every { mockRootNode.refresh() } returns true
         every { mockRootNode.packageName } returns "com.example"
         every {
