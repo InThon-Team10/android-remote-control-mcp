@@ -90,10 +90,10 @@ class McpAccessibilityService : AccessibilityService() {
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                event.packageName?.toString()?.let { packageName ->
+                event.packageName?.toString()?.takeIf { it.isNotBlank() }?.let { packageName ->
                     currentPackageName = packageName
                 }
-                event.className?.toString()?.let { className ->
+                event.className?.toString()?.takeIf { it.isNotBlank() }?.let { className ->
                     currentActivityName = className
                 }
                 Log.d(
