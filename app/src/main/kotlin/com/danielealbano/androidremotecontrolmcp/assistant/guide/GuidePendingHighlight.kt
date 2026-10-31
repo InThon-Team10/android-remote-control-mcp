@@ -8,7 +8,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.JsonObject
+import kotlin.coroutines.cancellation.CancellationException
 
 /** The blocking highlight MCP call running in the background (at most one), and what `wait_for_user` awaits. */
 internal class GuidePendingHighlight(
@@ -62,14 +65,30 @@ internal class GuidePendingHighlight(
 
     /** Awaits the pending highlight; after a timeout the highlight stays and waiting again re-issues the call. */
     suspend fun await(): String {
-        val call = synchronized(lock) { current ?: relaunchTimedOut() }
-        if (call == null) return GuideOutcomeTexts.NOTHING_HIGHLIGHTED
-        val text = textOf(call.result.await())
-        synchronized(lock) {
-            if (current === call) current = null
-            timedOut = call.takeIf { GuideOutcomeTexts.isTimedOut(text) }
+        val call = synchronized(lock) { current ?: relaunchTimedOut() } ?: return GuideOutcomeTexts.NOTHING_HIGHLIGHTED
+        val replaced = awaitText(call)
+        return if (replaced == null) {
+            GuideOutcomeTexts.REPLACED
+        } else {
+            val text = replaced.value
+            synchronized(lock) {
+                if (current === call) current = null
+                timedOut = call.takeIf { GuideOutcomeTexts.isTimedOut(text) }
+            }
+            GuideOutcomeTexts.forVoice(text)
         }
-        return GuideOutcomeTexts.forVoice(text)
+    }
+
+    private class Text(
+        val value: String?,
+    )
+
+    /** The call's text, or null when a newer step cancelled it while the waiter itself is still active. */
+    private suspend fun awaitText(call: Call): Text? {
+        val outcome = runCatching { call.result.await() }
+        val failure = outcome.exceptionOrNull()
+        if (failure is CancellationException) currentCoroutineContext().ensureActive()
+        return if (failure is CancellationException) null else Text(textOf(outcome.getOrThrow()))
     }
 
     private fun relaunchTimedOut(): Call? {

@@ -240,6 +240,24 @@ class GuideStepsImplTest {
         }
 
     @Test
+    fun `wait_for_user answers when its highlight is superseded by a reset`() =
+        runTest {
+            setUp()
+            gateway.enqueue(calls(click))
+            val guide = guide()
+            val step = async { guide.showNextStep("g", listener) }
+            advanceUntilIdle()
+            step.await()
+            val waiting = async { guide.waitForUser() }
+            advanceUntilIdle()
+
+            guide.reset()
+            advanceUntilIdle()
+
+            assertEquals(GuideOutcomeTexts.REPLACED, waiting.await())
+        }
+
+    @Test
     fun `wait_for_user after a timeout waits again on the same highlight`() =
         runTest {
             setUp()

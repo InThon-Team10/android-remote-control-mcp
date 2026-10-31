@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
@@ -99,7 +100,19 @@ class LiveVoiceSessionImpl
             job.invokeOnCompletion { scope.cancel() }
             val inbound = Channel<JsonObject>(Channel.UNLIMITED)
             job.invokeOnCompletion { release(inbound) }
-            val link = gateway.connect(apiKey, { inbound.trySend(it) }) { onClosed(job, it) }
+            val heard = AtomicBoolean(true)
+            val link =
+                gateway.connect(
+                    apiKey,
+                    { heard.set(true) }.let { mark ->
+                        { e: JsonObject ->
+                            mark()
+                            inbound.trySend(e)
+                        }
+                    },
+                ) {
+                    onClosed(job, it)
+                }
             job.invokeOnCompletion { link.close() }
             val events = Events(job)
             val queue = RealtimeSendQueue(scope, link, SEND_TIMEOUT_MS) { onSendFailed(events, it) }
@@ -112,6 +125,7 @@ class LiveVoiceSessionImpl
             scope.guarded(events, AssistantError.VoiceRecordingFailed) {
                 capture.chunks().collect { chunk -> queue.enqueue(RealtimeProtocol.audioAppend(chunk)) }
             }
+            scope.launch { LinkWatchdog.run(heard, queue::enqueue, events) }
             scope.launch {
                 delay(SESSION_LIMIT_MS)
                 events.end(AgentOutcome.Completed)

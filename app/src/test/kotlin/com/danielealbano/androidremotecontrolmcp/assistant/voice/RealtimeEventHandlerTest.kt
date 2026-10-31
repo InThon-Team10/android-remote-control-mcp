@@ -124,6 +124,45 @@ class RealtimeEventHandlerTest {
         }
 
     @Test
+    fun `a response create rejected as already active is resent once that response is done`() =
+        runTest {
+            val handler = handler()
+            handler.sendText("hi")
+            sent.clear()
+
+            handler.handle(RealtimeTestEvents.error("conversation_already_has_active_response"))
+            handler.handle(RealtimeTestEvents.done())
+
+            assertEquals(listOf("response.create"), types())
+        }
+
+    @Test
+    fun `a cancelled response is forgotten once it is done`() =
+        runTest {
+            val handler = handler()
+            handler.handle(RealtimeTestEvents.created("r1"))
+            handler.handle(RealtimeTestEvents.type("input_audio_buffer.speech_started"))
+            handler.handle(RealtimeTestEvents.done("cancelled", responseId = "r1"))
+            handler.handle(RealtimeTestEvents.audio("r1", "i1", 960))
+
+            verify(exactly = 1) { playback.write(any()) }
+        }
+
+    @Test
+    fun `barge in truncates only the unplayed share of the current item when an earlier item is buffered`() =
+        runTest {
+            val handler = handler()
+            pending = 300
+            handler.handle(RealtimeTestEvents.created("r1"))
+            handler.handle(RealtimeTestEvents.audio("r1", "i2", 48 * 1000))
+            pending = 700
+
+            handler.handle(RealtimeTestEvents.type("input_audio_buffer.speech_started"))
+
+            assertEquals(600, sent.single()["audio_end_ms"]!!.jsonPrimitive.int)
+        }
+
+    @Test
     fun `barge in with nothing left to play sends no truncate`() =
         runTest {
             val handler = handler()

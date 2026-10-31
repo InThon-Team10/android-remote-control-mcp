@@ -19,10 +19,12 @@ object RealtimeTestEvents {
     fun done(
         status: String = "completed",
         errorCode: String? = null,
+        responseId: String? = null,
     ): JsonObject =
         buildJsonObject {
             put("type", "response.done")
             putJsonObject("response") {
+                if (responseId != null) put("id", responseId)
                 put("status", status)
                 if (errorCode != null) {
                     putJsonObject("status_details") { putJsonObject("error") { put("code", errorCode) } }

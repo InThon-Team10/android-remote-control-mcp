@@ -52,6 +52,7 @@ class LiveVoiceSessionImplTest {
     private val guide = mockk<GuideSteps>(relaxed = true)
     private val sent = mutableListOf<JsonObject>()
     private var closed = false
+    private var acks = true
     private var sendBlock: suspend () -> Unit = {}
     private lateinit var onEvent: (JsonObject) -> Unit
     private lateinit var onClosed: (Throwable?) -> Unit
@@ -71,6 +72,9 @@ class LiveVoiceSessionImplTest {
                     override suspend fun send(event: JsonObject) {
                         sendBlock()
                         sent += event
+                        if (acks && event["type"]?.jsonPrimitive?.content == "session.update") {
+                            this@LiveVoiceSessionImplTest.onEvent(RealtimeTestEvents.type("session.updated"))
+                        }
                     }
 
                     override fun close() {
@@ -228,6 +232,7 @@ class LiveVoiceSessionImplTest {
     fun `a link whose send is stuck ends the conversation as unavailable`() =
         runTest {
             val stuck = CompletableDeferred<Unit>()
+            acks = false
             sendBlock = { stuck.await() }
             val fx = fixture()
             fx.begin()
@@ -238,6 +243,20 @@ class LiveVoiceSessionImplTest {
             assertEquals(LiveVoiceState.Error(AssistantError.ModelUnavailable), fx.live.state.value)
             assertEquals(SessionState.Idle, fx.session.state.value)
             verify { playback.release() }
+        }
+
+    @Test
+    fun `a link that stops answering the heartbeat ends the conversation as unavailable`() =
+        runTest {
+            val fx = fixture()
+            fx.begin()
+            acks = false
+
+            advanceTimeBy(80_000)
+            runCurrent()
+
+            assertEquals(LiveVoiceState.Error(AssistantError.ModelUnavailable), fx.live.state.value)
+            assertTrue(types().count { it == "session.update" } >= 2)
         }
 
     @Test

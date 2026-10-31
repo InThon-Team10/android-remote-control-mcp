@@ -52,6 +52,13 @@ internal class ResponseGate(
         active = true
     }
 
+    /** The server refused a `response.create` because one is already running: resend it once that one is done. */
+    @Synchronized
+    fun rejected() {
+        active = true
+        queued = true
+    }
+
     @Synchronized
     fun done() {
         active = false
@@ -115,6 +122,7 @@ internal class RealtimeEventHandler(
     }
 
     private fun onResponseDone(event: JsonObject) {
+        audio.responseDone(event.obj("response")?.string("id"))
         activeResponse = null
         events.turnEnd()
         events.listening()
@@ -157,6 +165,7 @@ internal class RealtimeEventHandler(
     private fun onError(event: JsonObject) {
         val error = event.obj("error")
         Log.d(VOICE_TRACE, "realtime error: type=${error?.string("type")} code=${error?.string("code")}")
+        if (error?.string("code") == ACTIVE_RESPONSE_CODE) gate.rejected()
         errorOutcome(error)?.let(events::end)
     }
 }
@@ -172,6 +181,7 @@ private fun errorOutcome(error: JsonObject?): AgentOutcome? {
     }
 }
 
+private const val ACTIVE_RESPONSE_CODE = "conversation_already_has_active_response"
 private const val EXPIRED_CODE = "session_expired"
 private const val INVALID_KEY_CODE = "invalid_api_key"
 private const val SERVER_ERROR_TYPE = "server_error"
