@@ -83,23 +83,7 @@ internal object McpToolUtils {
                 "Parameter '$name' must be a number, got string: '${primitive.content}'",
             )
         }
-        val doubleVal =
-            primitive.content.toDoubleOrNull()
-                ?: throw McpToolException.InvalidParams(
-                    "Parameter '$name' must be a number, got: '${primitive.content}'",
-                )
-        if (doubleVal < Int.MIN_VALUE.toDouble() || doubleVal > Int.MAX_VALUE.toDouble()) {
-            throw McpToolException.InvalidParams(
-                "Parameter '$name' value exceeds integer range",
-            )
-        }
-        val intVal = doubleVal.toInt()
-        if (doubleVal != intVal.toDouble()) {
-            throw McpToolException.InvalidParams(
-                "Parameter '$name' must be an integer, got: '${primitive.content}'",
-            )
-        }
-        return intVal
+        return parseExactInt(primitive.content, name)
     }
 
     /**
@@ -203,19 +187,37 @@ internal object McpToolUtils {
         name: String,
     ): Long {
         content.toLongOrNull()?.let { return it }
-        val finite = content.toDoubleOrNull()?.takeIf { it.isFinite() }
-        if (finite == null) {
+        if (content.toDoubleOrNull()?.isFinite() != true) {
             throw McpToolException.InvalidParams(
                 "Parameter '$name' must be a finite number, got: '$content'",
             )
         }
-        return try {
-            java.math.BigDecimal(content).longValueExact()
-        } catch (_: ArithmeticException) {
-            throw McpToolException.InvalidParams(
+        // longValueExact fails with ArithmeticException for fractions/overflow, and BigDecimal itself rejects an
+        // exponent beyond Int range (e.g. 1e-99999999999) with NumberFormatException although it is a finite double.
+        val exact =
+            try {
+                java.math.BigDecimal(content).longValueExact()
+            } catch (_: ArithmeticException) {
+                null
+            } catch (_: NumberFormatException) {
+                null
+            }
+        return exact
+            ?: throw McpToolException.InvalidParams(
                 "Parameter '$name' must be an integer within the long range, got: '$content'",
             )
+    }
+
+    /** Parses [content] as an exact [Int]: integer-valued floats are accepted, anything inexact is rejected. */
+    private fun parseExactInt(
+        content: String,
+        name: String,
+    ): Int {
+        val value = parseExactLong(content, name)
+        if (value < Int.MIN_VALUE || value > Int.MAX_VALUE) {
+            throw McpToolException.InvalidParams("Parameter '$name' value exceeds integer range")
         }
+        return value.toInt()
     }
 
     /**
@@ -241,18 +243,7 @@ internal object McpToolUtils {
                 "Parameter '$name' must be a number, got string: '${primitive.content}'",
             )
         }
-        val doubleVal =
-            primitive.content.toDoubleOrNull()
-                ?: throw McpToolException.InvalidParams(
-                    "Parameter '$name' must be a number, got: '${primitive.content}'",
-                )
-        val intVal = doubleVal.toInt()
-        if (doubleVal != intVal.toDouble()) {
-            throw McpToolException.InvalidParams(
-                "Parameter '$name' must be an integer, got: '${primitive.content}'",
-            )
-        }
-        return intVal
+        return parseExactInt(primitive.content, name)
     }
 
     /**
