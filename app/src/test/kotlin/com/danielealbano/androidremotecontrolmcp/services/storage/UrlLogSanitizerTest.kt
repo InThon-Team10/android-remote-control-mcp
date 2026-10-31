@@ -33,4 +33,10 @@ class UrlLogSanitizerTest {
     fun `removes control characters`() {
         assertEquals("http://example.com/ab", sanitizeUrlForLog(URL("http://example.com/a\nb")))
     }
+
+    @Test
+    fun `removes C1 control characters`() {
+        assertEquals("http://example.com/ab", sanitizeUrlForLog(URL("http://example.com/a\u0085b")))
+        assertEquals("http://example.com/ab", sanitizeUrlForLog(URL("http://example.com/a\u0080b")))
+    }
 }

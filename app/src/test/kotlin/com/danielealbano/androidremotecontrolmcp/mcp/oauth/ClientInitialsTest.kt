@@ -47,4 +47,12 @@ class ClientInitialsTest {
         assertEquals(result, encoded)
         assertFalse(result.contains('?'))
     }
+
+    @Test
+    @DisplayName("caps the result at two characters when uppercasing expands a letter")
+    fun capsExpandedUppercase() {
+        val sharpS = "\u00DF"
+        assertEquals("SS", clientInitials("$sharpS$sharpS"))
+        assertEquals("SS", clientInitials("${sharpS}x"))
+    }
 }

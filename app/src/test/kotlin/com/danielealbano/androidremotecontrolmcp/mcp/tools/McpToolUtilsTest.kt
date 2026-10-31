@@ -744,4 +744,53 @@ class McpToolUtilsTest {
             assertEquals("android-remote-control-mcp-work_phone", McpToolUtils.buildServerName("work_phone"))
         }
     }
+
+    @Nested
+    @DisplayName("exact integer parsing")
+    inner class ExactIntegerTests {
+        private fun literal(content: String): JsonObject = Json.parseToJsonElement("""{"v":$content}""") as JsonObject
+
+        @Test
+        @DisplayName("requireLong rejects an exponent that overflows BigDecimal with InvalidParams")
+        fun requireLongHugeNegativeExponent() {
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireLong(literal("1.5E-2147483646"), "v")
+            }
+        }
+
+        @Test
+        @DisplayName("optionalLong rejects an exponent that overflows BigDecimal with InvalidParams")
+        fun optionalLongHugeNegativeExponent() {
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.optionalLong(literal("1.5E-99999999999"), "v", 0L)
+            }
+        }
+
+        @Test
+        @DisplayName("requireInt rejects a value that only rounds to an integer as a double")
+        fun requireIntRejectsNonIntegerThatRoundsToInteger() {
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireInt(literal("2147483647.0000000000000001"), "v")
+            }
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.requireInt(literal("1e-400"), "v")
+            }
+        }
+
+        @Test
+        @DisplayName("optionalInt rejects a value that only rounds to an integer as a double")
+        fun optionalIntRejectsNonIntegerThatRoundsToInteger() {
+            assertThrows<McpToolException.InvalidParams> {
+                McpToolUtils.optionalInt(literal("5.0000000000000000001"), "v", 0)
+            }
+        }
+
+        @Test
+        @DisplayName("int extractors still accept integer-valued floats and exponent forms")
+        fun intExtractorsAcceptIntegerValuedForms() {
+            assertEquals(5, McpToolUtils.requireInt(literal("5.0"), "v"))
+            assertEquals(100, McpToolUtils.optionalInt(literal("1e2"), "v", 0))
+            assertEquals(Int.MIN_VALUE, McpToolUtils.requireInt(literal("-2147483648"), "v"))
+        }
+    }
 }
