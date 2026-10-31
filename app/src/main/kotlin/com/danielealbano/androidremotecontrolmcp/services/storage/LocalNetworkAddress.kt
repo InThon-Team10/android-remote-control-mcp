@@ -71,6 +71,12 @@ private fun isLocalIpv6(bytes: ByteArray): Boolean {
             isLocalIpv4(bytes.copyOfRange(IPV4_EMBEDDED_START, IPV6_LENGTH))
         }
 
+        // 64:ff9b::a.b.c.d (NAT64): the gateway connects to the embedded IPv4 address
+        bytes.copyOfRange(0, NAT64_PREFIX.size).contentEquals(NAT64_PREFIX) &&
+            isZero(bytes, NAT64_PREFIX.size, IPV4_EMBEDDED_START) -> {
+            isLocalIpv4(bytes.copyOfRange(IPV4_EMBEDDED_START, IPV6_LENGTH))
+        }
+
         else -> {
             false
         }
@@ -113,3 +119,4 @@ private const val IPV4_MAPPED_PREFIX_END = 10
 private const val IPV4_EMBEDDED_START = 12
 private const val IPV6_LENGTH = 16
 private const val MAPPED_MARKER = 0xff.toByte()
+private val NAT64_PREFIX = byteArrayOf(0x00, 0x64, 0xff.toByte(), 0x9b.toByte())
