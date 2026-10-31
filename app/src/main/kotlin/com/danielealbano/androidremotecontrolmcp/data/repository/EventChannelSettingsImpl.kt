@@ -87,6 +87,10 @@ class EventChannelSettingsImpl
                 val parsed = URL(url)
                 if (parsed.protocol != "http" && parsed.protocol != "https") {
                     Result.failure(IllegalArgumentException("URL must use http or https protocol"))
+                } else if (parsed.host.isEmpty()) {
+                    Result.failure(IllegalArgumentException("URL must include a host"))
+                } else if (url != url.trim()) {
+                    Result.failure(IllegalArgumentException("URL must not start or end with whitespace"))
                 } else {
                     Result.success(url)
                 }

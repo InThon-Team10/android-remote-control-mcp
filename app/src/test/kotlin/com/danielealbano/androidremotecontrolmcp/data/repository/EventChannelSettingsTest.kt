@@ -131,6 +131,18 @@ class EventChannelSettingsTest {
         }
 
         @Test
+        fun `validateEndpointUrl rejects URL with empty host`() {
+            assertTrue(repo.validateEndpointUrl("http://").isFailure)
+            assertTrue(repo.validateEndpointUrl("https:///event").isFailure)
+        }
+
+        @Test
+        fun `validateEndpointUrl rejects URL with surrounding whitespace`() {
+            assertTrue(repo.validateEndpointUrl(" http://localhost:9090").isFailure)
+            assertTrue(repo.validateEndpointUrl("http://localhost:9090\n").isFailure)
+        }
+
+        @Test
         fun `validateEndpointUrl accepts valid HTTPS URL`() {
             val result = repo.validateEndpointUrl("https://example.com")
             assertTrue(result.isSuccess)
