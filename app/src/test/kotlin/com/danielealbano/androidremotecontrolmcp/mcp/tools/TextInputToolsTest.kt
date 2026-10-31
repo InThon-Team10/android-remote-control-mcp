@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -1597,6 +1598,28 @@ class TextInputToolsTest {
     @DisplayName("PressKeyTool")
     inner class PressKeyToolTests {
         private val tool = PressKeyTool(mockActionExecutor, mockAccessibilityServiceProvider)
+
+        @Test
+        fun `throws InvalidParams when key is a number`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("key", 123)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
+        fun `throws InvalidParams when key is an object`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        putJsonObject("key") {}
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
 
         @Test
         fun `presses BACK key`() =

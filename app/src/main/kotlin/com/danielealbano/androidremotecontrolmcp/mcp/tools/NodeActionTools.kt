@@ -29,8 +29,6 @@ import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
@@ -55,13 +53,8 @@ class FindNodesTool
         @Suppress("ThrowsCount")
         suspend fun execute(arguments: JsonObject?): CallToolResult {
             // Validate parameters
-            val byStr =
-                arguments?.get("by")?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'by'")
-
-            val rawValue =
-                arguments["value"]?.jsonPrimitive?.contentOrNull
-                    ?: throw McpToolException.InvalidParams("Missing required parameter 'value'")
+            val byStr = McpToolUtils.requireString(arguments, "by")
+            val rawValue = McpToolUtils.requireString(arguments, "value")
 
             if (rawValue.isEmpty()) {
                 throw McpToolException.InvalidParams("Parameter 'value' must be non-empty")
