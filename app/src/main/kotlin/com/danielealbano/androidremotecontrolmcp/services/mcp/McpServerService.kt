@@ -565,3 +565,15 @@ internal fun tunnelStatusLogMessage(status: TunnelStatus): String? =
         is TunnelStatus.Error -> "Tunnel error: ${status.message}"
         TunnelStatus.Disconnected -> null // Logged by TunnelManager.stop()
     }
+
+private const val TRIM_LEVEL_RUNNING_LOW = 10
+private const val TRIM_LEVEL_UI_HIDDEN = 20
+private const val TRIM_LEVEL_BACKGROUND = 40
+
+/**
+ * True for the [android.content.ComponentCallbacks2] trim levels at which recreatable caches are released:
+ * the system is running low (RUNNING_LOW and above) or the process is in the background list (BACKGROUND
+ * and above). UI_HIDDEN is excluded: it only reports that the UI went away, not memory pressure.
+ */
+internal fun shouldReleaseCachesOnTrim(level: Int): Boolean =
+    level >= TRIM_LEVEL_BACKGROUND || level in TRIM_LEVEL_RUNNING_LOW until TRIM_LEVEL_UI_HIDDEN
