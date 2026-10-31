@@ -1,12 +1,10 @@
 package com.danielealbano.androidremotecontrolmcp.assistant.agent
 
-import com.google.genai.types.FunctionDeclaration
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import com.google.genai.types.Tool as GeminiTool
 import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpTool
 
 /** Maps MCP tool definitions to the model providers' function declarations. */
@@ -24,20 +22,4 @@ internal object McpToolSchemaMapper {
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { put("required", JsonArray(it.map(::JsonPrimitive))) }
         }
-
-    /** One Gemini [GeminiTool] holding a declaration per MCP tool (order preserved). */
-    fun toGeminiTool(tools: List<McpTool>): GeminiTool =
-        GeminiTool
-            .builder()
-            .functionDeclarations(tools.map(::toDeclaration))
-            .build()
-
-    /** A Gemini declaration with the [parameters] schema. */
-    fun toDeclaration(tool: McpTool): FunctionDeclaration =
-        FunctionDeclaration
-            .builder()
-            .name(tool.name)
-            .description(tool.description.orEmpty())
-            .parametersJsonSchema(JsonBridge.toMap(parameters(tool)))
-            .build()
 }

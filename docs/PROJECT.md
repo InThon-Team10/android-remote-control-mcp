@@ -164,6 +164,11 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 
 ---
 
+### In-app assistant (OpenAI)
+
+- SDK `com.openai:openai-java` 4.95.0. Voice: `gpt-realtime-2.1` (Realtime API). Text and planner: `gpt-6.1-terra`, reasoning effort low (Responses API). Screen information and voice are sent to OpenAI.
+- Build-time key: `OPENAI_API_KEY` from the gitignored root `local.properties`, else the environment variable of the same name, embedded as `BuildConfig.OPENAI_API_KEY` (release and debug). A key saved in settings wins; a key saved for a previous provider is never used. CI must not define it.
+
 ## MCP Protocol Implementation
 
 ### Protocol Overview

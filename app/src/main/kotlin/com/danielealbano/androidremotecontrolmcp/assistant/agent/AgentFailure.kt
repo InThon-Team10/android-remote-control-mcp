@@ -2,7 +2,6 @@ package com.danielealbano.androidremotecontrolmcp.assistant.agent
 
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
-import com.google.genai.types.GenerateContentConfig
 import com.openai.models.responses.FunctionTool
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -10,16 +9,6 @@ import kotlin.coroutines.cancellation.CancellationException
 internal class AgentFailure(
     val error: AssistantError,
 ) : Exception(error.toString())
-
-/** Everything fixed for the duration of one run. Deliberately not a data class (no key in `toString`). */
-internal class RunContext(
-    val apiKey: String,
-    val model: String,
-    val config: GenerateContentConfig,
-    val stepLimit: Int,
-    val deviceSlug: String,
-    val toolNames: Set<String>,
-)
 
 /** Everything fixed for the duration of one OpenAI run. Deliberately not a data class (no key in `toString`). */
 internal class OpenAiRunContext(

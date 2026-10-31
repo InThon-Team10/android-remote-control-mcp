@@ -31,7 +31,6 @@ Gradle Plugin, ...) are not part of the app and are not listed.
 | Accompanist | Apache-2.0 | https://github.com/google/accompanist |
 | Google Play services client libraries (`com.google.android.gms`, `gms` flavor only) | Android Software Development Kit License | https://developer.android.com/studio/terms |
 | Guava (`guava`, `failureaccess`, `listenablefuture`) | Apache-2.0 | https://github.com/google/guava |
-| Google Gen AI Java SDK (`com.google.genai:google-genai`) | Apache-2.0 | https://github.com/googleapis/java-genai |
 | Google API Common (`com.google.api:api-common`) | BSD-3-Clause | https://github.com/googleapis/sdk-platform-java |
 | Google Auth Library (`google-auth-library-oauth2-http`, `google-auth-library-credentials`) | BSD-3-Clause | https://github.com/googleapis/google-auth-library-java |
 | Google HTTP Client (`google-http-client`, `google-http-client-gson`) and Gson | Apache-2.0 | https://github.com/googleapis/google-http-java-client and https://github.com/google/gson |

@@ -44,8 +44,8 @@ class TextToSpeechHelperSpeaker
             scope =
                 CoroutineScope(SupervisorJob() + Dispatchers.Default).also { scope ->
                     scope.launch { assistantSettings.config.map { it.helperSpeechEnabled }.collect(enabled::set) }
-                    // A live conversation speaks with Gemini's own voice; this engine's output is not echo-cancelled,
-                    // so speaking over it makes the live model hear itself, interrupt its reply and answer the echo.
+                    // A live conversation speaks with the model's own voice; this engine's output is not
+                    // echo-cancelled, so speaking over it makes the live model hear itself and answer the echo.
                     scope.launch {
                         liveVoice.state.map { it.isActive() }.distinctUntilChanged().collect { active ->
                             liveConversation.set(active)

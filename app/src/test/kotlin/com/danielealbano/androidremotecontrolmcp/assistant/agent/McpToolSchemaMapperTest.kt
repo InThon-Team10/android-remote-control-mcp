@@ -21,20 +21,7 @@ class McpToolSchemaMapperTest {
         schema: ToolSchema = ToolSchema(),
     ) = McpTool(name = name, description = description, inputSchema = schema)
 
-    private fun schemaOf(tool: McpTool): Map<*, *> {
-        val declaration = McpToolSchemaMapper.toDeclaration(tool)
-        return declaration.parametersJsonSchema().get() as Map<*, *>
-    }
-
-    @Test
-    fun `maps name and description and defaults null description to empty`() {
-        val declaration = McpToolSchemaMapper.toDeclaration(tool("android_tap", "Taps"))
-        val bare = McpToolSchemaMapper.toDeclaration(tool("android_x"))
-
-        assertEquals("android_tap", declaration.name().getOrNull())
-        assertEquals("Taps", declaration.description().getOrNull())
-        assertEquals("", bare.description().getOrNull())
-    }
+    private fun schemaOf(tool: McpTool): Map<*, *> = JsonBridge.toMap(McpToolSchemaMapper.parameters(tool))
 
     @Test
     fun `schema contains type object, properties and required`() {
@@ -84,14 +71,6 @@ class McpToolSchemaMapperTest {
         val value = JsonBridge.toJsonValue(json)
 
         assertEquals(json, Json.parseToJsonElement(jsonMapper().writeValueAsString(value)))
-    }
-
-    @Test
-    fun `toGeminiTool keeps order of tools`() {
-        val geminiTool = McpToolSchemaMapper.toGeminiTool(listOf(tool("a"), tool("b"), tool("c")))
-
-        val names = geminiTool.functionDeclarations().get().map { it.name().get() }
-        assertEquals(listOf("a", "b", "c"), names)
     }
 
     @Test

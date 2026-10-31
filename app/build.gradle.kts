@@ -313,14 +313,8 @@ android {
             excludes += "/META-INF/io.netty.*"
             excludes += "/META-INF/LICENSE.md"
             excludes += "/META-INF/LICENSE-notice.md"
-            // google-genai ships ~800 KB of GraalVM native-image metadata; unused on Android.
-            excludes += "/META-INF/native-image/com.google.genai/**"
             // openai-java-core ships ~5 MB of GraalVM native-image metadata at the top level; unused on Android.
             excludes += "/META-INF/native-image/*.json"
-            // google-genai's auth dependency brings Apache httpclient + httpcore, each with a Maven metadata file.
-            excludes += "/META-INF/DEPENDENCIES"
-            // jakarta.annotation-api and jakarta.inject-api (via google-genai) ship the same Eclipse notice.
-            pickFirsts += "/META-INF/NOTICE.md"
             // Ktor 3.6.0's Netty engine depends on the HTTP/3 codec, which brings desktop QUIC binaries
             // (Linux/macOS/Windows) Android cannot load; the app never enables HTTP/3. Their jars repeat the
             // same license texts: keep one copy.
@@ -448,8 +442,6 @@ dependencies {
     implementation(libs.ktor.sse)
     runtimeOnly(libs.slf4j.android)
 
-    // Gemini (on-device assistant): Google Gen AI Java SDK (async API driven from coroutines)
-    implementation(libs.google.genai)
     // OpenAI (on-device assistant): official Java SDK, blocking client driven from runInterruptible(Dispatchers.IO)
     implementation(libs.openai.java)
 
