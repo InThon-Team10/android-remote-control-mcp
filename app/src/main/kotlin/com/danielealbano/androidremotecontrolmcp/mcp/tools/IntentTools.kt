@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.mcp.escapeControlCharacters
 import com.danielealbano.androidremotecontrolmcp.services.intents.IntentDispatcher
 import com.danielealbano.androidremotecontrolmcp.services.intents.SendIntentRequest
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
@@ -69,7 +70,7 @@ class SendIntentHandler
                 intentDispatcher.sendIntent(
                     SendIntentRequest(type, action, data, component, packageName, extras, extrasTypes, flags),
                 )
-            val actionLabel = action ?: "(none)"
+            val actionLabel = action?.escapeControlCharacters() ?: "(none)"
             return McpToolUtils.handleActionResult(
                 result,
                 "Intent sent successfully: type=$type, action=$actionLabel",
@@ -296,7 +297,7 @@ class OpenUriHandler
 
             Logger.d(TAG, "Executing open_uri")
             val result = intentDispatcher.openUri(uri, packageName, mimeType)
-            return McpToolUtils.handleActionResult(result, "URI opened successfully: $uri")
+            return McpToolUtils.handleActionResult(result, "URI opened successfully: ${uri.escapeControlCharacters()}")
         }
 
         fun register(
