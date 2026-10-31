@@ -137,7 +137,7 @@ class LongPressTool
                                     put("description", "Y coordinate")
                                 }
                                 putJsonObject("duration") {
-                                    put("type", "number")
+                                    put("type", "integer")
                                     put("description", "Press duration in ms")
                                     put("default", DEFAULT_DURATION_MS)
                                 }
@@ -288,7 +288,7 @@ class SwipeTool
                                     put("description", "End Y coordinate")
                                 }
                                 putJsonObject("duration") {
-                                    put("type", "number")
+                                    put("type", "integer")
                                     put("description", "Swipe duration in ms")
                                     put("default", DEFAULT_DURATION_MS)
                                 }

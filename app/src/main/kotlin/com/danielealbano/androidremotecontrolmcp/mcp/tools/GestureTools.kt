@@ -96,7 +96,7 @@ class PinchTool
                                     put("description", "Scale factor (>1 = zoom in, <1 = zoom out)")
                                 }
                                 putJsonObject("duration") {
-                                    put("type", "number")
+                                    put("type", "integer")
                                     put("description", "Gesture duration in ms")
                                     put("default", DEFAULT_DURATION_MS)
                                 }
@@ -363,7 +363,7 @@ class CustomGestureTool
                                                     put("type", "number")
                                                 }
                                                 putJsonObject("time") {
-                                                    put("type", "number")
+                                                    put("type", "integer")
                                                     put("description", "Time offset in ms")
                                                 }
                                             }
