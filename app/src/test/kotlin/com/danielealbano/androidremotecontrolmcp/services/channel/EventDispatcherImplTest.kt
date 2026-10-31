@@ -10,6 +10,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.request.header
 import io.ktor.server.request.receiveText
+import io.ktor.server.request.uri
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -124,6 +125,45 @@ class EventDispatcherImplTest {
                     val parsed = Json.decodeFromString<ChannelEvent>(body!!)
                     assertEquals("notification", parsed.type)
                     assertEquals("2026-04-08T12:00:00Z", parsed.timestamp)
+
+                    dispatcher.stop()
+                } finally {
+                    server.stop(0, 0)
+                }
+            }
+
+        @Test
+        fun `dispatch and healthCheck with trailing slash endpoint request single-slash paths`() =
+            runTest {
+                val uris = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+                val server =
+                    embeddedServer(Netty, port = 0) {
+                        routing {
+                            post("{path...}") {
+                                uris.add(call.request.uri)
+                                call.respond(HttpStatusCode.OK, """{"status":"ok"}""")
+                            }
+                            get("{path...}") {
+                                uris.add(call.request.uri)
+                                call.respond(HttpStatusCode.OK, """{"status":"ok"}""")
+                            }
+                        }
+                    }
+                server.start(wait = false)
+                val port =
+                    server.engine
+                        .resolvedConnectors()
+                        .first()
+                        .port
+
+                try {
+                    val dispatcher = EventDispatcherImpl(RecordingServerLogRepository())
+                    dispatcher.start("http://localhost:$port//", "")
+                    dispatcher.dispatch(testEvent)
+                    dispatcher.healthCheck()
+
+                    assertEquals(listOf("/event", "/health"), uris.toList())
 
                     dispatcher.stop()
                 } finally {
