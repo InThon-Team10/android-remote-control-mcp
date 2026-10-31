@@ -94,7 +94,7 @@ class FileOperationProviderImpl
                         )
                     }
 
-                val hasMore = offset + cappedLimit < totalCount
+                val hasMore = offset.toLong() + cappedLimit < totalCount
                 FileListResult(files = files, totalCount = totalCount, hasMore = hasMore)
             }
         }

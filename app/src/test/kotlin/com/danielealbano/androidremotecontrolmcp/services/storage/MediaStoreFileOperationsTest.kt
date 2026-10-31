@@ -325,6 +325,29 @@ class MediaStoreFileOperationsTest {
             }
 
         @Test
+        fun `listFiles reports no more entries for an offset near Int MAX_VALUE`() =
+            runTest {
+                val rows =
+                    (1..5).map { i ->
+                        mapOf(
+                            "id" to i.toLong(),
+                            "name" to "file$i.txt",
+                            "relPath" to "Download/",
+                            "size" to 100L,
+                            "dateModified" to 1700000000L,
+                            "mimeType" to "text/plain",
+                        )
+                    }
+                stubQueryReturning(createMockCursor(rows))
+
+                val result = operations.listFiles("builtin:downloads", "", Int.MAX_VALUE, 200)
+
+                assertEquals(5, result.totalCount)
+                assertTrue(result.files.isEmpty())
+                assertFalse(result.hasMore)
+            }
+
+        @Test
         fun `listFiles returns all files in all-files mode`() =
             runTest {
                 every { BuiltinStorageLocation.DOWNLOADS.collections } returns

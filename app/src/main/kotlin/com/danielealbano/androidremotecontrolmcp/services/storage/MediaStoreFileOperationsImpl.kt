@@ -108,7 +108,7 @@ class MediaStoreFileOperationsImpl
                     )
                 val totalCount = sorted.size
                 val paginated = sorted.drop(offset).take(cappedLimit)
-                val hasMore = offset + cappedLimit < totalCount
+                val hasMore = offset.toLong() + cappedLimit < totalCount
 
                 FileListResult(files = paginated, totalCount = totalCount, hasMore = hasMore)
             }
