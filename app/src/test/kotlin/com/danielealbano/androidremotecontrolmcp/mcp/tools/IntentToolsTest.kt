@@ -7,10 +7,13 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonUnquotedLiteral
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -404,6 +407,145 @@ class IntentToolsTest {
                             extras = mapOf("valid" to "text"),
                         ),
                     )
+                }
+            }
+
+        @Test
+        fun `send_intent with exponent notation extra passes a double to dispatcher`() =
+            runTest {
+                val captured = slot<SendIntentRequest>()
+                coEvery { mockIntentDispatcher.sendIntent(capture(captured)) } returns Result.success(Unit)
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        putJsonObject("extras") {
+                            put("big", JsonUnquotedLiteral("1e5"))
+                        }
+                    }
+
+                handler.execute(params)
+
+                assertEquals(mapOf<String, Any?>("big" to 100000.0), captured.captured.extras)
+            }
+
+        @Test
+        fun `send_intent with integer extra beyond the long range throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        putJsonObject("extras") {
+                            put("big", JsonUnquotedLiteral("99999999999999999999"))
+                        }
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with decimal extra that overflows to infinity throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        putJsonObject("extras") {
+                            put("huge", JsonUnquotedLiteral("1.0e999"))
+                        }
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with null extra skips the value`() =
+            runTest {
+                val captured = slot<SendIntentRequest>()
+                coEvery { mockIntentDispatcher.sendIntent(capture(captured)) } returns Result.success(Unit)
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        putJsonObject("extras") {
+                            put("valid", "text")
+                            put("empty", JsonNull)
+                        }
+                    }
+
+                handler.execute(params)
+
+                assertEquals(mapOf<String, Any?>("valid" to "text"), captured.captured.extras)
+            }
+
+        @Test
+        fun `send_intent with non-object extras throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras", JsonPrimitive("key=value"))
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-array flags throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("flags", JsonPrimitive("FLAG_ACTIVITY_CLEAR_TOP"))
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-string flag element throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("flags", buildJsonArray { add(JsonPrimitive(5)) })
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-object extras_types throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras_types", JsonPrimitive("long"))
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-string extras_types value throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras_types", buildJsonObject { put("id", 5) })
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
                 }
             }
 

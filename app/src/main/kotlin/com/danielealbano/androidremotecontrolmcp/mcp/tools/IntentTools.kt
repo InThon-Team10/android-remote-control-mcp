@@ -9,6 +9,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
@@ -76,7 +77,7 @@ class SendIntentHandler
         }
 
         private fun extractExtras(arguments: JsonObject?): Map<String, Any?>? {
-            val extrasObj = (arguments?.get("extras") as? JsonObject) ?: return null
+            val extrasObj = optionalObject(arguments, "extras") ?: return null
             val result = mutableMapOf<String, Any?>()
             for ((key, value) in extrasObj) {
                 convertExtra(key, value)?.let { result[key] = it }
@@ -103,8 +104,12 @@ class SendIntentHandler
                 }
             }
 
-        private fun convertPrimitive(value: JsonPrimitive): Any =
+        private fun convertPrimitive(value: JsonPrimitive): Any? =
             when {
+                value is JsonNull -> {
+                    null
+                }
+
                 value.isString -> {
                     value.content
                 }
@@ -113,20 +118,20 @@ class SendIntentHandler
                     value.content.toBooleanStrict()
                 }
 
-                value.content.contains('.') -> {
-                    value.content.toDoubleOrNull()
-                        ?: throw IllegalArgumentException(
-                            "Cannot parse numeric extra: '${value.content}'",
-                        )
-                }
-
                 else -> {
-                    value.content.toLongOrNull()
-                        ?: throw IllegalArgumentException(
-                            "Cannot parse numeric extra: '${value.content}'",
-                        )
+                    convertNumber(value.content)
                 }
             }
+
+        private fun convertNumber(content: String): Any {
+            content.toLongOrNull()?.let { return it }
+            val isIntegerLiteral = content.all { it.isDigit() || it == '-' }
+            val doubleValue = content.toDoubleOrNull()
+            if (isIntegerLiteral || doubleValue == null || !doubleValue.isFinite()) {
+                throw McpToolException.InvalidParams("Cannot parse numeric extra: '$content'")
+            }
+            return doubleValue
+        }
 
         private fun convertStringArray(
             key: String,
@@ -144,22 +149,43 @@ class SendIntentHandler
         }
 
         private fun extractExtrasTypes(arguments: JsonObject?): Map<String, String>? {
-            val obj = (arguments?.get("extras_types") as? JsonObject) ?: return null
+            val obj = optionalObject(arguments, "extras_types") ?: return null
             val result = mutableMapOf<String, String>()
             for ((key, value) in obj) {
-                val primitive = value as? JsonPrimitive ?: continue
+                val primitive = value as? JsonPrimitive
+                if (primitive == null || !primitive.isString) {
+                    throw McpToolException.InvalidParams("Parameter 'extras_types.$key' must be a string")
+                }
                 result[key] = primitive.content
             }
             return result.ifEmpty { null }
         }
 
         private fun extractFlags(arguments: JsonObject?): List<String>? {
-            val array = (arguments?.get("flags") as? JsonArray) ?: return null
+            val element = arguments?.get("flags")
+            if (element == null || element is JsonNull) return null
+            val array =
+                element as? JsonArray
+                    ?: throw McpToolException.InvalidParams("Parameter 'flags' must be an array of strings")
             val result =
-                array.mapNotNull { item ->
-                    (item as? JsonPrimitive)?.content
+                array.map { item ->
+                    val primitive = item as? JsonPrimitive
+                    if (primitive == null || !primitive.isString) {
+                        throw McpToolException.InvalidParams("Parameter 'flags' must be an array of strings")
+                    }
+                    primitive.content
                 }
             return result.ifEmpty { null }
+        }
+
+        private fun optionalObject(
+            arguments: JsonObject?,
+            name: String,
+        ): JsonObject? {
+            val element = arguments?.get(name)
+            if (element == null || element is JsonNull) return null
+            return element as? JsonObject
+                ?: throw McpToolException.InvalidParams("Parameter '$name' must be an object")
         }
 
         fun register(
