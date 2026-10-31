@@ -28,4 +28,23 @@ class ContentTypeUtilTest {
         listOf("image", "", "*/*", "a/b/c", "text/plain; charset=utf-8", "this is not a mime")
             .forEach { input -> assertNotNull(contentTypeOrOctetStream(input), "must not throw for: '$input'") }
     }
+
+    @Test
+    @DisplayName("falls back to application/octet-stream for a MIME type with control characters")
+    fun fallsBackForControlCharacters() {
+        // ContentType.parse accepts these, but the value cannot be sent as a response header
+        listOf(
+            "text/plain; charset=\u0000",
+            "\u0000/\u0000",
+            "text/plain; a=\u0007",
+            "a/b\u007f",
+            "image/png\u0001",
+        ).forEach { input ->
+            assertEquals(
+                ContentType.Application.OctetStream,
+                contentTypeOrOctetStream(input),
+                "must fall back for: ${input.map { it.code }}",
+            )
+        }
+    }
 }
