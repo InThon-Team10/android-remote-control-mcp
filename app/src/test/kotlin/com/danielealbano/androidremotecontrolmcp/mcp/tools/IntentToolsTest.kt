@@ -480,6 +480,76 @@ class IntentToolsTest {
             }
 
         @Test
+        fun `send_intent with non-object extras throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras", JsonPrimitive("key=value"))
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-array flags throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("flags", JsonPrimitive("FLAG_ACTIVITY_CLEAR_TOP"))
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-string flag element throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("flags", buildJsonArray { add(JsonPrimitive(5)) })
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-object extras_types throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras_types", JsonPrimitive("long"))
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
+        fun `send_intent with non-string extras_types value throws InvalidParams`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("type", "activity")
+                        put("extras_types", buildJsonObject { put("id", 5) })
+                    }
+
+                assertThrows<McpToolException.InvalidParams> {
+                    handler.execute(params)
+                }
+            }
+
+        @Test
         fun `send_intent with all parameters passes combined request to dispatcher`() =
             runTest {
                 coEvery {
