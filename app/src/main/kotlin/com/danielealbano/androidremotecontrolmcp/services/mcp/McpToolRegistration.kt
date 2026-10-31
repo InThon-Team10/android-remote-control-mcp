@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.services.mcp
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.ServerLogRepository
 import com.danielealbano.androidremotecontrolmcp.mcp.InFlightToolCalls
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.CompositeToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.LoggedToolRegistrar
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.ReferenceCountedToolCallIndicator
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.registerAppManagementTools
@@ -47,7 +48,11 @@ class McpToolRegistration
             toolCallIndicatorEnabled: Boolean,
             currentBaseUrl: () -> String,
         ) {
-            val toolCallIndicator = ReferenceCountedToolCallIndicator(AccessibilityToolCallIndicator())
+            val toolCallIndicator =
+                CompositeToolCallIndicator(
+                    visual = ReferenceCountedToolCallIndicator(AccessibilityToolCallIndicator()),
+                    activity = accessibility.inFlightToolCallSignal,
+                )
             toolCallIndicator.setEnabled(toolCallIndicatorEnabled)
             val registrar =
                 LoggedToolRegistrar(
