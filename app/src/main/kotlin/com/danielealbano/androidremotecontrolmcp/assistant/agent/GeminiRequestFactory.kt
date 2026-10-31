@@ -24,8 +24,6 @@ internal object GeminiRequestFactory {
             "purchasing, sharing data) ask the user to confirm in plain words unless they explicitly asked for " +
             "exactly that. Reply concisely, in the language the user writes or speaks."
 
-    const val VOICE_PROMPT = "The user sent this voice message. Listen to it and do what it asks."
-
     fun config(tools: List<McpTool>): GenerateContentConfig {
         val builder =
             GenerateContentConfig
@@ -47,16 +45,8 @@ internal object GeminiRequestFactory {
         return builder.build()
     }
 
-    fun userContent(input: AgentInput): Content {
-        val parts =
-            when (input) {
-                is AgentInput.Text -> listOf(Part.fromText(input.text))
-                is AgentInput.Voice -> listOf(Part.fromText(VOICE_PROMPT), Part.fromBytes(input.audio, input.mimeType))
-            }
-        return Content
-            .builder()
-            .role(USER_ROLE)
-            .parts(parts)
-            .build()
-    }
+    fun userContent(input: AgentInput): Content =
+        when (input) {
+            is AgentInput.Text -> Content.builder().role(USER_ROLE).parts(listOf(Part.fromText(input.text))).build()
+        }
 }

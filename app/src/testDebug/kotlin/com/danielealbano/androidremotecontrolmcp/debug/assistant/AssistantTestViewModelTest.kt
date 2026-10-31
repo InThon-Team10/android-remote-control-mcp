@@ -7,8 +7,8 @@ import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerSt
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
 import com.danielealbano.androidremotecontrolmcp.assistant.session.NoticeKind
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceClip
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceRecorder
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import io.mockk.coEvery
@@ -34,8 +34,7 @@ class AssistantTestViewModelTest {
     private val settings = mockk<AssistantSettings>(relaxed = true)
     private val session = mockk<AssistantSession>(relaxed = true)
     private val starter = mockk<AssistantServerStarter>()
-    private val recorder = mockk<VoiceRecorder>(relaxed = true)
-    private val maxDuration = MutableStateFlow(false)
+    private val liveVoice = mockk<LiveVoiceSession>(relaxed = true)
     private val activity = mockk<Activity>()
     private lateinit var viewModel: AssistantTestViewModel
 
@@ -43,9 +42,8 @@ class AssistantTestViewModelTest {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         every { settings.config } returns flowOf(AssistantConfig())
-        every { recorder.isRecording } returns MutableStateFlow(false)
-        every { recorder.maxDurationReached } returns maxDuration
-        viewModel = AssistantTestViewModel(settings, session, starter, recorder)
+        every { liveVoice.state } returns MutableStateFlow(LiveVoiceState.Idle)
+        viewModel = AssistantTestViewModel(settings, session, starter, liveVoice)
     }
 
     @AfterEach
@@ -101,49 +99,50 @@ class AssistantTestViewModelTest {
     }
 
     @Test
-    fun `stopVoice sends the clip`() {
-        coEvery { recorder.stop() } returns Result.success(VoiceClip(byteArrayOf(1), 2_000L))
+    fun `startTalk ensures the server is running then starts the live session`() {
+        coEvery { starter.ensureRunning(activity) } returns Result.success(Unit)
+        coEvery { liveVoice.start() } returns Result.success(Unit)
 
-        viewModel.stopVoice()
+        viewModel.startTalk(activity)
 
-        verify { session.sendVoice(any(), 2_000L) }
+        coVerifyOrder {
+            starter.ensureRunning(activity)
+            liveVoice.start()
+        }
+        verify(exactly = 0) { session.reportError(any()) }
     }
 
     @Test
-    fun `voice start and stop failures are reported`() {
-        coEvery { recorder.start() } returns Result.failure(IllegalStateException())
-        coEvery { recorder.stop() } returns Result.failure(IllegalStateException())
+    fun `startTalk reports a live start failure`() {
+        coEvery { starter.ensureRunning(activity) } returns Result.success(Unit)
+        coEvery { liveVoice.start() } returns Result.failure(AssistantException(AssistantError.VoiceDisabled))
 
-        viewModel.startVoice()
-        viewModel.stopVoice()
+        viewModel.startTalk(activity)
 
-        verify(exactly = 2) { session.reportError(AssistantError.VoiceRecordingFailed) }
+        verify { session.reportError(AssistantError.VoiceDisabled) }
     }
 
     @Test
-    fun `reaching the max duration stops the recording`() {
-        coEvery { recorder.stop() } returns Result.success(VoiceClip(byteArrayOf(1), 60_000L))
+    fun `startTalk does not start the live session when the server cannot start`() {
+        coEvery { starter.ensureRunning(activity) } returns
+            Result.failure(AssistantException(AssistantError.BearerDisabled))
 
-        maxDuration.value = true
+        viewModel.startTalk(activity)
 
-        coVerify { recorder.stop() }
-        verify { session.sendVoice(any(), 60_000L) }
+        coVerify(exactly = 0) { liveVoice.start() }
+        verify { session.reportError(AssistantError.BearerDisabled) }
     }
 
     @Test
-    fun `onCleared cancels the recorder`() {
-        viewModel.javaClass
-            .getDeclaredMethod("onCleared")
-            .apply { isAccessible = true }
-            .invoke(viewModel)
+    fun `endTalk stops the live session`() {
+        viewModel.endTalk()
 
-        coVerify { recorder.cancel() }
+        coVerify { liveVoice.stop() }
     }
 
     @Test
     fun `rowText renders each item kind`() {
         assertEquals("You: a", ChatItem.User(1, "a").rowText())
-        assertEquals("Voice (12 s)", ChatItem.UserVoice(2, 12_000L).rowText())
         assertEquals("Notice: stopped", ChatItem.Notice(3, NoticeKind.Stopped).rowText())
         assertEquals("Confirm t: PENDING", ChatItem.Confirmation(4, "c", "t", null).rowText())
     }

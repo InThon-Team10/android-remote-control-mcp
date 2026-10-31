@@ -11,6 +11,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,18 +100,58 @@ class AssistantSessionTest {
         }
 
     @Test
-    fun `sendVoice appends voice item with m4a audio and ignores empty audio`() =
+    fun `beginLive marks the session running, refuses a second live and returns to idle when the job ends`() =
+        runTest {
+            val session = newSession()
+            val job = Job()
+
+            assertTrue(session.beginLive(job) != null)
+            assertEquals(SessionState.Running, session.state.value)
+            assertEquals(null, session.beginLive(Job()))
+            job.cancel()
+
+            assertEquals(SessionState.Idle, session.state.value)
+        }
+
+    @Test
+    fun `stop and newChat cancel the live job`() =
+        runTest {
+            val session = newSession()
+            val first = Job()
+            session.beginLive(first)
+            session.stop()
+            val second = Job()
+            session.beginLive(second)
+            session.newChat()
+
+            assertTrue(first.isCancelled)
+            assertTrue(second.isCancelled)
+        }
+
+    @Test
+    fun `live transcript chunks coalesce per side until the turn ends or another item is appended`() =
         runTest {
             val session = newSession()
 
-            session.sendVoice(ByteArray(0), 10)
-            session.sendVoice(byteArrayOf(1, 2), 1500)
-            runCurrent()
+            session.appendLiveUserText("Hel")
+            session.appendLiveUserText("lo")
+            session.appendLiveAssistantText("Hi")
+            session.appendLiveAssistantText(" there")
+            session.endLiveTurn()
+            session.appendLiveAssistantText("Next")
+            session.reportError(AssistantError.GeminiUnavailable)
+            session.appendLiveAssistantText("After")
 
-            assertEquals(ChatItem.UserVoice(1, 1500), session.items.value.first())
-            val input = agent.inputs.single() as AgentInput.Voice
-            assertEquals("audio/m4a", input.mimeType)
-            assertEquals(2, input.audio.size)
+            assertEquals(
+                listOf<ChatItem>(
+                    ChatItem.User(1, "Hello"),
+                    ChatItem.Assistant(2, "Hi there"),
+                    ChatItem.Assistant(3, "Next"),
+                    ChatItem.Error(4, AssistantError.GeminiUnavailable),
+                    ChatItem.Assistant(5, "After"),
+                ),
+                session.items.value,
+            )
         }
 
     @Test
@@ -131,13 +172,6 @@ class AssistantSessionTest {
                 assertEquals(expected, (session.last() as ChatItem.Error).error)
                 assertEquals(SessionState.Idle, session.state.value)
             }
-            configFlow.value = READY.copy(voiceEnabled = false)
-            val session = newSession()
-            session.sendVoice(byteArrayOf(1), 1)
-            runCurrent()
-
-            assertEquals(AssistantError.VoiceDisabled, (session.last() as ChatItem.Error).error)
-            assertTrue(agent.inputs.isEmpty())
         }
 
     @Test

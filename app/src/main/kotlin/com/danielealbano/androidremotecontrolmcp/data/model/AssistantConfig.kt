@@ -14,6 +14,7 @@ data class AssistantConfig(
 ) {
     companion object {
         const val DEFAULT_MODEL = "gemini-3.8-flash"
+        const val LIVE_MODEL = "gemini-3.8-live"
         const val DEFAULT_STEP_LIMIT = 30
         const val MIN_STEP_LIMIT = 1
         const val MAX_STEP_LIMIT = 100

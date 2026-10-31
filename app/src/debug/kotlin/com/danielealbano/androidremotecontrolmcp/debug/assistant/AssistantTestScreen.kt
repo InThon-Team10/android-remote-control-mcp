@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
 import com.danielealbano.androidremotecontrolmcp.assistant.session.NoticeKind
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 
 private val MinTarget = Modifier.heightIn(min = 48.dp)
@@ -41,18 +42,18 @@ private val MinTarget = Modifier.heightIn(min = 48.dp)
 fun AssistantTestScreen(
     viewModel: AssistantTestViewModel,
     onSend: (String) -> Unit,
-    onRecord: () -> Unit,
+    onTalk: () -> Unit,
 ) {
     val config by viewModel.config.collectAsState()
     val items by viewModel.session.items.collectAsState()
-    val recording by viewModel.recording.collectAsState()
+    val liveState by viewModel.liveState.collectAsState()
     val message by viewModel.message.collectAsState()
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSection(config, message, viewModel)
         LazyColumn(Modifier.weight(1f)) {
             items(items, key = { it.id }) { item -> TranscriptRow(item, viewModel) }
         }
-        InputSection(recording, viewModel, onSend, onRecord)
+        InputSection(liveState, viewModel, onSend, onTalk)
     }
 }
 
@@ -131,10 +132,10 @@ private fun TranscriptRow(
 
 @Composable
 private fun InputSection(
-    recording: Boolean,
+    liveState: LiveVoiceState,
     viewModel: AssistantTestViewModel,
     onSend: (String) -> Unit,
-    onRecord: () -> Unit,
+    onTalk: () -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     OutlinedTextField(
@@ -143,10 +144,11 @@ private fun InputSection(
         label = { Text("Message") },
         modifier = Modifier.fillMaxWidth(),
     )
+    Text("Live voice: ${liveState.javaClass.simpleName}")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = { onSend(text).also { text = "" } }, modifier = MinTarget) { Text("Send") }
-        Button(onClick = if (recording) viewModel::stopVoice else onRecord, modifier = MinTarget) {
-            Text(if (recording) "Stop rec" else "Record")
+        Button(onClick = if (liveState.isActive()) viewModel::endTalk else onTalk, modifier = MinTarget) {
+            Text(if (liveState.isActive()) "End talk" else "Talk")
         }
         Button(onClick = viewModel.session::stop, modifier = MinTarget) { Text("Stop") }
         Button(onClick = viewModel.session::newChat, modifier = MinTarget) { Text("New chat") }
@@ -156,7 +158,6 @@ private fun InputSection(
 internal fun ChatItem.rowText(): String =
     when (this) {
         is ChatItem.User -> "You: $text"
-        is ChatItem.UserVoice -> "Voice (${durationMs / MS_PER_SECOND} s)"
         is ChatItem.Assistant -> "Assistant: $text"
         is ChatItem.ToolCall -> "Tool $toolName: ${status.name}"
         is ChatItem.Confirmation -> "Confirm $toolName: ${answered.answerText()}"
@@ -177,4 +178,4 @@ private fun NoticeKind.noticeText(): String =
         NoticeKind.Stopped -> "stopped"
     }
 
-private const val MS_PER_SECOND = 1_000L
+private fun LiveVoiceState.isActive(): Boolean = this !is LiveVoiceState.Idle && this !is LiveVoiceState.Error

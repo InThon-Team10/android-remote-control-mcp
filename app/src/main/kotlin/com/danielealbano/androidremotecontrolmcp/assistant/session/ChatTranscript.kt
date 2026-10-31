@@ -13,6 +13,8 @@ internal class ChatTranscript {
     private val _chatVisible = MutableStateFlow(false)
     private val _attention = MutableStateFlow(false)
     private var nextId = 1L
+    private var liveId: Long? = null
+    private var liveUser = false
 
     val items: StateFlow<List<ChatItem>> = _items.asStateFlow()
     val chatVisible: StateFlow<Boolean> = _chatVisible.asStateFlow()
@@ -26,8 +28,38 @@ internal class ChatTranscript {
 
     @Synchronized
     fun append(create: (Long) -> ChatItem) {
+        liveId = null
         _items.value = _items.value + create(nextId++)
         refresh()
+    }
+
+    /** Appends [text] to the open live item of the same side, or opens a new one (closed by any other append). */
+    @Synchronized
+    fun appendLive(
+        user: Boolean,
+        text: String,
+    ) {
+        val open = liveId
+        if (open != null && liveUser == user) {
+            update { item ->
+                when {
+                    item.id != open -> item
+                    item is ChatItem.User -> item.copy(text = item.text + text)
+                    item is ChatItem.Assistant -> item.copy(text = item.text + text)
+                    else -> item
+                }
+            }
+            return
+        }
+        append { id -> if (user) ChatItem.User(id, text) else ChatItem.Assistant(id, text) }
+        liveId = _items.value.last().id
+        liveUser = user
+    }
+
+    /** Closes the open live item so the next chunk starts a new one. */
+    @Synchronized
+    fun endLiveTurn() {
+        liveId = null
     }
 
     /** Applies [transform] to every item; transforms MUST preserve the item id. */
@@ -39,6 +71,7 @@ internal class ChatTranscript {
 
     @Synchronized
     fun clear() {
+        liveId = null
         _items.value = emptyList()
         refresh()
     }

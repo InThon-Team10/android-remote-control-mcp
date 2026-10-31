@@ -11,11 +11,6 @@ sealed interface ChatItem {
         val text: String,
     ) : ChatItem
 
-    data class UserVoice(
-        override val id: Long,
-        val durationMs: Long,
-    ) : ChatItem
-
     data class Assistant(
         override val id: Long,
         val text: String,

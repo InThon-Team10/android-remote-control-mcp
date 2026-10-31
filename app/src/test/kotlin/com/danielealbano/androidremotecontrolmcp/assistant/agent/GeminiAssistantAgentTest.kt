@@ -460,38 +460,14 @@ class GeminiAssistantAgentTest {
         }
 
     @Test
-    fun `voice input sends text part and inline audio, model and step limit come from settings`() =
+    fun `model and step limit come from settings`() =
         runTest {
             config = config.copy(model = "gemini-3.5-flash-lite", stepLimit = 5)
             gateway.enqueue(text("ok"))
-            val bytes = byteArrayOf(1, 2)
 
-            agent.run(AgentInput.Voice(bytes, "audio/m4a"), listener)
+            agent.run(userText("hi"), listener)
 
-            val call = gateway.calls.single()
-            assertEquals("gemini-3.5-flash-lite", call.model)
-            val parts =
-                call.history
-                    .single()
-                    .parts()
-                    .get()
-            assertEquals(GeminiRequestFactory.VOICE_PROMPT, parts[0].text().get())
-            assertEquals(
-                "audio/m4a",
-                parts[1]
-                    .inlineData()
-                    .get()
-                    .mimeType()
-                    .get(),
-            )
-            assertArrayEquals(
-                bytes,
-                parts[1]
-                    .inlineData()
-                    .get()
-                    .data()
-                    .get(),
-            )
+            assertEquals("gemini-3.5-flash-lite", gateway.calls.single().model)
         }
 
     @Test

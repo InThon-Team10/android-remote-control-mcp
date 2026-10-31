@@ -7,7 +7,8 @@ import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceRecorder
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +16,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -29,17 +29,13 @@ class AssistantTestViewModel
         private val settings: AssistantSettings,
         val session: AssistantSession,
         private val serverStarter: AssistantServerStarter,
-        private val recorder: VoiceRecorder,
+        private val liveVoice: LiveVoiceSession,
     ) : ViewModel() {
         val config: StateFlow<AssistantConfig> =
             settings.config.stateIn(viewModelScope, SharingStarted.Eagerly, AssistantConfig())
-        val recording: StateFlow<Boolean> = recorder.isRecording
+        val liveState: StateFlow<LiveVoiceState> = liveVoice.state
         private val _message = MutableStateFlow<String?>(null)
         val message: StateFlow<String?> = _message.asStateFlow()
-
-        init {
-            viewModelScope.launch { recorder.maxDurationReached.filter { it }.collect { stopVoice() } }
-        }
 
         /** A blank [key] clears the stored key. */
         fun saveApiKey(key: String) = launchSetting { if (key.isBlank()) settings.clearApiKey() else settings.setApiKey(key) }
@@ -76,23 +72,20 @@ class AssistantTestViewModel
             }
         }
 
-        fun startVoice() {
+        /** Starts the live voice conversation; [activity] is only used during the call (server start, D8). */
+        fun startTalk(activity: Activity) {
             viewModelScope.launch {
-                recorder.start().onFailure { session.reportError(AssistantError.VoiceRecordingFailed) }
+                serverStarter
+                    .ensureRunning(activity)
+                    .fold(
+                        onSuccess = { liveVoice.start().exceptionOrNull() },
+                        onFailure = { it },
+                    )?.let { session.reportError(it.toAssistantError()) }
             }
         }
 
-        fun stopVoice() {
-            viewModelScope.launch {
-                recorder.stop().fold(
-                    onSuccess = { session.sendVoice(it.bytes, it.durationMs) },
-                    onFailure = { session.reportError(AssistantError.VoiceRecordingFailed) },
-                )
-            }
-        }
-
-        override fun onCleared() {
-            runBlocking { recorder.cancel() }
+        fun endTalk() {
+            viewModelScope.launch { liveVoice.stop() }
         }
 
         private fun launchSetting(block: suspend () -> Unit) {

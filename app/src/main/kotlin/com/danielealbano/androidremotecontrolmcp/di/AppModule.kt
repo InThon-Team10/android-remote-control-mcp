@@ -1,7 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.di
 
 import android.content.Context
-import android.os.SystemClock
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
@@ -9,11 +8,16 @@ import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConne
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnectionImpl
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarterImpl
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioRecordingSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioRecordingSessionFactory
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.ElapsedClock
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.MediaRecorderVoiceRecorder
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceRecorder
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioCapture
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioPlayback
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidVoiceServiceLauncher
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioCapture
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioPlayback
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.GeminiSdkLiveGateway
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveGateway
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSessionImpl
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceServiceLauncher
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettings
 import com.danielealbano.androidremotecontrolmcp.data.repository.ArcTunnelSettingsImpl
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
@@ -177,16 +181,6 @@ object AppModule {
     fun providePrivacyModelStore(
         @ApplicationContext context: Context,
     ): PrivacyModelStore = PrivacyModelStore(context.filesDir)
-
-    /** Provides the factory creating one platform recording session per voice message. */
-    @Provides
-    fun provideAudioRecordingSessionFactory(
-        @ApplicationContext context: Context,
-    ): AudioRecordingSessionFactory = AudioRecordingSessionFactory { AndroidAudioRecordingSession(context) }
-
-    /** Provides the monotonic clock used to measure voice message duration. */
-    @Provides
-    fun provideElapsedClock(): ElapsedClock = ElapsedClock { SystemClock.elapsedRealtime() }
 }
 
 @Module
@@ -387,8 +381,24 @@ abstract class ServiceModule {
     @Singleton
     abstract fun bindArcTunnelCtAlerts(impl: ArcTunnelCtAlertsImpl): ArcTunnelCtAlerts
 
-    /** Binds the assistant voice recorder. */
+    /** Binds the assistant live voice session. */
     @Binds
     @Singleton
-    abstract fun bindVoiceRecorder(impl: MediaRecorderVoiceRecorder): VoiceRecorder
+    abstract fun bindLiveVoiceSession(impl: LiveVoiceSessionImpl): LiveVoiceSession
+
+    /** Binds the microphone capture used by the live voice session. */
+    @Binds
+    abstract fun bindAudioCapture(impl: AndroidAudioCapture): AudioCapture
+
+    /** Binds the foreground service launcher of the live voice session. */
+    @Binds
+    abstract fun bindVoiceServiceLauncher(impl: AndroidVoiceServiceLauncher): VoiceServiceLauncher
+
+    /** Binds the Gemini Live API gateway. */
+    @Binds
+    abstract fun bindLiveGateway(impl: GeminiSdkLiveGateway): LiveGateway
+
+    /** Binds the speaker playback used by the live voice session. */
+    @Binds
+    abstract fun bindAudioPlayback(impl: AndroidAudioPlayback): AudioPlayback
 }

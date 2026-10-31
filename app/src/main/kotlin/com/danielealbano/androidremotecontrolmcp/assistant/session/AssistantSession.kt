@@ -5,7 +5,6 @@ import com.danielealbano.androidremotecontrolmcp.assistant.agent.AgentInput
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.AgentListener
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.AgentOutcome
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.AssistantAgent
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceClip
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.di.DefaultDispatcher
@@ -51,7 +50,7 @@ class AssistantSession
         private val scope = CoroutineScope(SupervisorJob() + dispatcher)
         private val runMutex = Mutex()
         private val lock = Any()
-        private val transcript = ChatTranscript()
+        internal val transcript = ChatTranscript()
         private val _state = MutableStateFlow<SessionState>(SessionState.Idle)
         private val _collapseRequests =
             MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -84,14 +83,25 @@ class AssistantSession
             startRun(AgentInput.Text(text)) { id -> ChatItem.User(id, text) }
         }
 
-        /** Ignored when not [SessionState.Idle] or [audio] is empty. */
-        fun sendVoice(
-            audio: ByteArray,
-            durationMs: Long,
-        ) {
-            if (audio.isEmpty()) return
-            startRun(AgentInput.Voice(audio, VoiceClip.MIME_TYPE_M4A)) { id -> ChatItem.UserVoice(id, durationMs) }
-        }
+        /**
+         * Marks [job] (a live voice conversation) as the active run and returns its tool-call listener, or null
+         * when not [SessionState.Idle]. The session returns to Idle when [job] completes; [stop]/[newChat] cancel it.
+         */
+        fun beginLive(job: Job): AgentListener? =
+            synchronized(lock) {
+                if (_state.value != SessionState.Idle) return null
+                runJob = job
+                _state.value = SessionState.Running
+                job.invokeOnCompletion {
+                    synchronized(lock) {
+                        if (runJob === job) {
+                            runJob = null
+                            _state.value = SessionState.Idle
+                        }
+                    }
+                }
+                RunListener(job)
+            }
 
         /** Unknown or already answered [callId] is ignored. */
         fun answerConfirmation(
@@ -154,7 +164,7 @@ class AssistantSession
             val job = currentCoroutineContext().job
             val outcome =
                 runCatching {
-                    gateError(settings.getConfig(), input)?.let { AgentOutcome.Failed(it) }
+                    gateError(settings.getConfig())?.let { AgentOutcome.Failed(it) }
                         ?: agent.run(input, RunListener(job))
                 }.getOrElse { error ->
                     if (error is Error) throw error
@@ -275,14 +285,10 @@ class AssistantSession
         }
     }
 
-private fun gateError(
-    config: AssistantConfig,
-    input: AgentInput,
-): AssistantError? =
+private fun gateError(config: AssistantConfig): AssistantError? =
     when {
         !config.enabled -> AssistantError.AssistantDisabled
         !config.privacyNoticeAccepted -> AssistantError.PrivacyNoticeNotAccepted
-        input is AgentInput.Voice && !config.voiceEnabled -> AssistantError.VoiceDisabled
         !config.apiKeyConfigured -> AssistantError.ApiKeyMissing
         else -> null
     }

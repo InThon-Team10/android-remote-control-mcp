@@ -21,11 +21,6 @@ sealed interface AgentInput {
     data class Text(
         val text: String,
     ) : AgentInput
-
-    class Voice(
-        val audio: ByteArray,
-        val mimeType: String,
-    ) : AgentInput
 }
 
 interface AgentListener {

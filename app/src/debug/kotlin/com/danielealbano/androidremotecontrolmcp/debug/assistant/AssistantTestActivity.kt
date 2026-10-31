@@ -22,7 +22,7 @@ class AssistantTestActivity : ComponentActivity() {
     private val micPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                viewModel.startVoice()
+                viewModel.startTalk(this)
             } else {
                 viewModel.session.reportError(AssistantError.MicrophonePermissionMissing)
             }
@@ -36,7 +36,7 @@ class AssistantTestActivity : ComponentActivity() {
                 AssistantTestScreen(
                     viewModel = viewModel,
                     onSend = { text -> viewModel.send(this, text) },
-                    onRecord = ::startRecording,
+                    onTalk = ::startTalk,
                 )
             }
         }
@@ -52,10 +52,10 @@ class AssistantTestActivity : ComponentActivity() {
         super.onStop()
     }
 
-    private fun startRecording() {
+    private fun startTalk() {
         val granted =
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
-        if (granted) viewModel.startVoice() else micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        if (granted) viewModel.startTalk(this) else micPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
 }

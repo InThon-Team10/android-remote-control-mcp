@@ -44,7 +44,7 @@ class GeminiSdkModelGateway
                 .generateContent(model, history, config)
                 .await()
 
-        private fun clientFor(apiKey: String): Client =
+        internal fun clientFor(apiKey: String): Client =
             synchronized(lock) {
                 cachedClient?.takeIf { cachedKey == apiKey } ?: run {
                     cachedClient?.close()
