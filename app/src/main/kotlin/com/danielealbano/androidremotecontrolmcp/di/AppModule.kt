@@ -105,6 +105,10 @@ import com.danielealbano.androidremotecontrolmcp.services.update.GithubReleaseCh
 import com.danielealbano.androidremotecontrolmcp.services.update.GithubReleaseCheckerImpl
 import com.danielealbano.androidremotecontrolmcp.services.update.UpdateNotifier
 import com.danielealbano.androidremotecontrolmcp.services.update.UpdateNotifierImpl
+import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperConversationControl
+import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperServerSwitch
+import com.danielealbano.androidremotecontrolmcp.ui.helper.LiveHelperConversationControl
+import com.danielealbano.androidremotecontrolmcp.ui.helper.McpHelperServerSwitch
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -387,6 +391,14 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindLiveVoiceSession(impl: LiveVoiceSessionImpl): LiveVoiceSession
+
+    /** Binds the entry screens' view of the live conversation. */
+    @Binds
+    abstract fun bindHelperConversationControl(impl: LiveHelperConversationControl): HelperConversationControl
+
+    /** Binds the entry screens' MCP server switch. */
+    @Binds
+    abstract fun bindHelperServerSwitch(impl: McpHelperServerSwitch): HelperServerSwitch
 
     /** Binds the microphone capture used by the live voice session. */
     @Binds
