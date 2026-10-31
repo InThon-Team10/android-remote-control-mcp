@@ -16,6 +16,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.ContentBlock
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -207,6 +208,8 @@ class ShareFileViaWebHandler(
         // configured file-size limit and the registry's total in-memory budget.
         val maxBytes = minOf(fileSizeLimitMb.toLong() * BYTES_PER_MB, EphemeralFileLinkService.MAX_TOTAL_BYTES)
         fileOperationProvider.readFileBytes(locationId, path, maxBytes)
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: McpToolException) {
         throw e
     } catch (e: Exception) {
