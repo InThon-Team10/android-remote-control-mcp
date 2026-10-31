@@ -443,6 +443,27 @@ class McpServerService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onLowMemory() {
+        super.onLowMemory()
+        Log.i(TAG, "Low memory reported, releasing recreatable caches")
+        nerCache.clear()
+    }
+
+    /**
+     * Releases only caches rebuilt on demand with identical results (the NER detection cache). Not released:
+     * the screen-state snapshot cache (clearing it invalidates pagination cursors), the pseudonym store
+     * (pseudonyms must stay stable), the ephemeral file links (they back live links) and anything tied to
+     * the server or tunnel lifecycle.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        val release = shouldReleaseCachesOnTrim(level)
+        Log.i(TAG, "Trim memory: level=$level, releaseCaches=$release")
+        if (release) {
+            nerCache.clear()
+        }
+    }
+
     private fun updateStatus(status: ServerStatus) {
         _serverStatus.value = status
         serverLogRepository.log(ServerLogEntry.Type.SERVER, serverStatusLogMessage(status))
