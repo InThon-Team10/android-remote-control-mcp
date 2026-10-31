@@ -196,7 +196,7 @@ The app helps elderly users, so MCP tools never operate the phone by themselves 
 | Highlight | `tap`, `long_press`, `double_tap`, `swipe`, `click_node`, `long_click_node`, `tap_node`, `type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`, `scroll_node`, `scroll_to_node` | Validates its own parameters, highlights the target on screen and waits for the user to act. Never acts on the device |
 | Refused | every other tool (and any tool added later) | `isError` result telling the AI to explain the step to the user or use a highlight tool |
 
-Highlight tools take two extra optional strings: `instruction` (max 200 characters, one sentence telling the user what to do, in the user's language) and `explanation` (max 500 characters, what happens once they do it). Longer values are an invalid-params error; blank values are dropped (the overlay shows a default). Privacy placeholders in both are substituted before they are shown.
+Highlight tools take two extra optional strings: `instruction` (max 200 characters, one sentence telling the user what to do, in the user's language) and `explanation` (max 500 characters, what happens once they do it, shown as the second line of the caption while the highlight is up; there is no confirm step before a highlight). Longer values are an invalid-params error; blank values are dropped (the overlay shows a default). Privacy placeholders in both are substituted before they are shown.
 
 Targets: node tools highlight the node they would act on, except that:
 
