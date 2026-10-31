@@ -1,5 +1,6 @@
 package com.danielealbano.androidremotecontrolmcp.mcp.oauth
 
+import java.net.InetAddress
 import java.net.URI
 
 /**
@@ -35,6 +36,7 @@ object LogoUrlPolicy {
                 ?.lowercase()
                 ?.removePrefix("[")
                 ?.removeSuffix("]")
+                ?.removeSuffix(".")
                 ?.takeIf { it.isNotEmpty() } ?: return false
         return normalized != "localhost" && !isPrivateIp(normalized)
     }
@@ -46,7 +48,7 @@ object LogoUrlPolicy {
         if (octets.size != IPV4_OCTETS || octets.any { it !in 0..MAX_OCTET }) return false
         val a = octets[0]
         val b = octets[1]
-        return a == NET_10 || // 10/8
+        return a == 0 || a == NET_10 || // 0/8 unspecified, 10/8
             a == NET_127 || // 127/8 loopback
             (a == NET_172 && b in NET_172_LO..NET_172_HI) || // 172.16/12
             (a == NET_192 && b == NET_192_SECOND) || // 192.168/16
@@ -56,7 +58,9 @@ object LogoUrlPolicy {
     private fun isPrivateIpv6(host: String): Boolean {
         if (!host.contains(":")) return false
         val normalized = host.lowercase()
-        return normalized == "::1" || // loopback
+        return runCatching { InetAddress.getByName("[$normalized]") } // decodes IPv4-mapped / expanded forms
+            .map { it.isLoopbackAddress || it.isAnyLocalAddress || it.isSiteLocalAddress || it.isLinkLocalAddress }
+            .getOrDefault(true) ||
             normalized.startsWith("fc") || normalized.startsWith("fd") || // fc00::/7 ULA
             normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
             normalized.startsWith("fea") || normalized.startsWith("feb") // fe80::/10 link-local

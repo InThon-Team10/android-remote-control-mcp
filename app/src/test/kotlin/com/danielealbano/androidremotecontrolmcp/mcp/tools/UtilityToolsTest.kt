@@ -842,6 +842,18 @@ class UtilityToolsTest {
             }
 
         @Test
+        fun `throws error for match_percentage that wraps into the valid range as an Int`() =
+            runTest {
+                val params =
+                    buildJsonObject {
+                        put("timeout", 5000)
+                        put("match_percentage", 4294967396L)
+                    }
+
+                assertThrows<McpToolException.InvalidParams> { tool.execute(params) }
+            }
+
+        @Test
         fun `throws error for negative match_percentage`() =
             runTest {
                 val params =

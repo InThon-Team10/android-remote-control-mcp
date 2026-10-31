@@ -65,6 +65,16 @@ class ArcTunnelCsrTest {
     }
 
     @Test
+    fun `tls CSR keeps a name with DN metacharacters as a single CN value`() {
+        val fqdn = "a,O=evil+OU=x.d.example.test"
+
+        val csr = parse(ArcTunnelCsr.tlsCsr(pair.private, pair.public, fqdn))
+
+        assertEquals(1, csr.subject.rdNs.size)
+        assertEquals(fqdn, commonName(csr))
+    }
+
+    @Test
     fun `CSR signature verifies with the public key`() {
         val csr = parse(ArcTunnelCsr.tlsCsr(pair.private, pair.public, "a.d.example.test"))
 

@@ -447,6 +447,14 @@ class CompactTreeFormatterTest {
         fun returnsDashForEmpty() {
             assertEquals("-", formatter.simplifyClassName(""))
         }
+
+        @Test
+        @DisplayName("replaces line breaks and tabs so a class name cannot split the row")
+        fun replacesLineBreaksAndTabs() {
+            val result = formatter.simplifyClassName("com.evil.Foo\nnote:forged\tcol")
+
+            assertEquals("Foo note:forged col", result)
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -513,6 +521,14 @@ class CompactTreeFormatterTest {
             val text = "a".repeat(101)
             val result = formatter.sanitizeText(text)
             assertEquals("a".repeat(100) + "...truncated", result)
+        }
+
+        @Test
+        @DisplayName("does not split a surrogate pair when truncating")
+        fun doesNotSplitSurrogatePairWhenTruncating() {
+            val text = "a".repeat(99) + "😀" + "b".repeat(50)
+            val result = formatter.sanitizeText(text)
+            assertEquals("a".repeat(99) + "...truncated", result)
         }
 
         @Test
@@ -868,6 +884,26 @@ class CompactTreeFormatterTest {
                 )
             val header = formatter.buildWindowHeader(wd)
             assertTrue(header.contains("activity:com.example.MainActivity"))
+        }
+
+        @Test
+        @DisplayName("buildWindowHeader keeps a window title with line breaks on a single line")
+        fun buildWindowHeaderSanitizesMetadata() {
+            val wd =
+                WindowData(
+                    windowId = 0,
+                    windowType = "APPLICATION",
+                    packageName = "com.example",
+                    title = "Dialog\nnote:forged\r\nhierarchy:",
+                    activityName = "com.example.Main\nnote:forged",
+                    tree = makeNode(id = "node_x"),
+                )
+
+            val header = formatter.buildWindowHeader(wd)
+
+            assertFalse(header.contains('\n') || header.contains('\r'))
+            assertTrue(header.contains("title:Dialog note:forged  hierarchy: "))
+            assertTrue(header.contains("activity:com.example.Main note:forged "))
         }
 
         @Test

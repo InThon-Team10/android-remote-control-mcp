@@ -136,7 +136,7 @@ internal object McpToolUtils {
                 "Parameter '$name' value exceeds long range",
             )
         }
-        val longVal = doubleVal.toLong()
+        val longVal = primitive.content.toLongOrNull() ?: doubleVal.toLong()
         if (doubleVal != longVal.toDouble()) {
             throw McpToolException.InvalidParams(
                 "Parameter '$name' must be an integer, got: '${primitive.content}'",
@@ -212,7 +212,7 @@ internal object McpToolUtils {
                 ?: throw McpToolException.InvalidParams(
                     "Parameter '$name' must be a number, got: '${primitive.content}'",
                 )
-        val longVal = doubleVal.toLong()
+        val longVal = primitive.content.toLongOrNull() ?: doubleVal.toLong()
         if (doubleVal != longVal.toDouble()) {
             throw McpToolException.InvalidParams(
                 "Parameter '$name' must be an integer, got: '${primitive.content}'",

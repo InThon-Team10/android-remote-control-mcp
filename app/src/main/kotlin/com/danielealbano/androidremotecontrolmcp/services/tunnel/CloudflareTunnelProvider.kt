@@ -361,6 +361,7 @@ class CloudflareTunnelProvider
                 val args = mutableListOf<String>()
                 val current = StringBuilder()
                 var inQuote: Char? = null
+                var quoted = false
                 var escapeNext = false
 
                 for (ch in raw.trim()) {
@@ -377,16 +378,18 @@ class CloudflareTunnelProvider
                         }
                     } else if (ch == '\'' || ch == '"') {
                         inQuote = ch
+                        quoted = true
                     } else if (ch.isWhitespace()) {
-                        if (current.isNotEmpty()) {
+                        if (current.isNotEmpty() || quoted) {
                             args.add(current.toString())
                             current.clear()
+                            quoted = false
                         }
                     } else {
                         current.append(ch)
                     }
                 }
-                if (current.isNotEmpty()) {
+                if (current.isNotEmpty() || quoted) {
                     args.add(current.toString())
                 }
                 return args

@@ -23,6 +23,13 @@ class ArcTunnelWireTest {
     }
 
     @Test
+    fun `OpenPayload isValid rejects a token with control characters`() {
+        assertFalse(open("""{"token":"t\r\nX-Injected: 1","addr":"h:1"}""").isValid())
+        assertFalse(open("""{"token":"t\n\r\nGET / HTTP/1.1","addr":"h:1"}""").isValid())
+        assertFalse(open("""{"token":"t\u0000","addr":"h:1"}""").isValid())
+    }
+
+    @Test
     fun `ApiErrorBody defaults`() {
         val body = ArcTunnelJson.decodeFromString(ArcTunnelApiErrorBody.serializer(), "{}")
 

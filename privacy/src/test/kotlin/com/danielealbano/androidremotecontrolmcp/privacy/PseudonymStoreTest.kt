@@ -73,6 +73,18 @@ class PseudonymStoreTest {
     }
 
     @Test
+    fun `hashed placeholders stay unique and resolvable despite hash collisions`() {
+        val store = PseudonymStore()
+        val values = (0 until 40_000).map { "person$it@example.com" }
+
+        val placeholders = values.map { store.placeholderFor(it, PiiCategory.EMAILS, PlaceholderFormat.HASHED) }
+
+        assertEquals(values.size, placeholders.toSet().size)
+        values.forEachIndexed { index, value -> assertEquals(value, store.resolve(placeholders[index])) }
+        assertTrue(placeholders.all { Regex("EMAIL#[a-z0-9]{5}").matches(it) })
+    }
+
+    @Test
     fun `hashed placeholders differ across categories`() {
         val store = PseudonymStore()
         val asName = store.placeholderFor("Value", PiiCategory.NAMES, PlaceholderFormat.HASHED)

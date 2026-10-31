@@ -81,10 +81,14 @@ class PseudonymStore
         private fun hash5(
             value: String,
             category: PiiCategory,
+            salt: Int = 0,
         ): String {
-            val input = "$value|${category.name}".toByteArray(Charsets.UTF_8)
+            val input = "$value|${category.name}${"#".repeat(salt)}".toByteArray(Charsets.UTF_8)
             val digest = MessageDigest.getInstance("SHA-256").digest(input)
-            return BigInteger(1, digest).toString(BASE36).take(HASH_LENGTH)
+            val hash = BigInteger(1, digest).toString(BASE36).take(HASH_LENGTH)
+            // A colliding hash would make one placeholder resolve to two values: re-salt until it is free.
+            val taken = reverse.containsKey("${category.placeholderToken}#$hash")
+            return if (taken) hash5(value, category, salt + 1) else hash
         }
 
         companion object {

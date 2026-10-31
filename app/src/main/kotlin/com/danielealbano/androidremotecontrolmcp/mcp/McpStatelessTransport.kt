@@ -102,6 +102,12 @@ private suspend fun serveStatelessRequest(
     }
     try {
         cancelledOnClientDisconnect(nettyChannelOf(call)) { transport.handleRequest(null, call) }
+    } catch (e: StackOverflowError) {
+        // The SDK parses the body recursively: a deeply nested one overflows the stack instead of failing to parse
+        Log.w(TAG, "Request body nested too deeply to parse", e)
+        val parseError = RPCError(code = RPCError.ErrorCode.PARSE_ERROR, "Nested too deeply.")
+        val error = JSONRPCError(id = null, error = parseError)
+        call.respondText(McpJson.encodeToString(error), ContentType.Application.Json, HttpStatusCode.BadRequest)
     } finally {
         unbind()
         // A stateless session serves exactly one request: close it so the server's session registry does not grow.

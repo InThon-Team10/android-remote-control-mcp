@@ -32,4 +32,17 @@ class LogoUrlPolicyTest {
         assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://169.254.1.1/x.png"))
         assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://[::1]/x.png"))
     }
+
+    @Test
+    @DisplayName("rejects trailing-dot localhost, unspecified, expanded and IPv4-mapped private hosts")
+    fun rejectsEncodedPrivateHosts() {
+        assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://localhost./x.png"))
+        assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://0.0.0.0/x.png"))
+        assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://[::]/x.png"))
+        assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://[0:0:0:0:0:0:0:1]/x.png"))
+        assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://[::ffff:127.0.0.1]/x.png"))
+        assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://[::ffff:7f00:1]/x.png"))
+        assertFalse(LogoUrlPolicy.isSafeLogoUrl("https://[::ffff:192.168.1.1]/x.png"))
+        assertTrue(LogoUrlPolicy.isSafeLogoUrl("https://[2606:4700:4700::1111]/x.png"))
+    }
 }

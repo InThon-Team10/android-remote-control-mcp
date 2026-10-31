@@ -193,10 +193,10 @@ class CompactTreeFormatter
                 append("--- ")
                 append("window:${windowData.windowId} ")
                 append("type:${windowData.windowType} ")
-                append("pkg:${windowData.packageName ?: "unknown"} ")
-                append("title:${windowData.title ?: "unknown"} ")
+                append("pkg:${sanitizeText(windowData.packageName ?: "unknown", truncate = false)} ")
+                append("title:${sanitizeText(windowData.title ?: "unknown", truncate = false)} ")
                 if (windowData.activityName != null) {
-                    append("activity:${windowData.activityName} ")
+                    append("activity:${sanitizeText(windowData.activityName, truncate = false)} ")
                 }
                 append("layer:${windowData.layer} ")
                 append("focused:${windowData.focused}")
@@ -223,7 +223,7 @@ class CompactTreeFormatter
         internal fun simplifyClassName(className: String?): String {
             if (className.isNullOrEmpty()) return NULL_VALUE
             val lastDot = className.lastIndexOf('.')
-            return if (lastDot >= 0) className.substring(lastDot + 1) else className
+            return sanitizeText(className.substring(lastDot + 1), truncate = false)
         }
 
         /**
@@ -252,7 +252,8 @@ class CompactTreeFormatter
                 }
 
                 truncate && sanitized.length > MAX_TEXT_LENGTH -> {
-                    sanitized.substring(0, MAX_TEXT_LENGTH) + TRUNCATION_SUFFIX
+                    val splitsPair = sanitized[MAX_TEXT_LENGTH - 1].isHighSurrogate()
+                    sanitized.substring(0, if (splitsPair) MAX_TEXT_LENGTH - 1 else MAX_TEXT_LENGTH) + TRUNCATION_SUFFIX
                 }
 
                 else -> {

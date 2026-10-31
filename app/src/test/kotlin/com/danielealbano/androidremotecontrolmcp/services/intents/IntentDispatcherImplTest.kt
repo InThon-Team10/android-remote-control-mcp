@@ -165,6 +165,41 @@ class IntentDispatcherImplTest {
             }
 
         @Test
+        fun `sendIntent with integral extra beyond the Long range puts Double`() =
+            runTest {
+                val result =
+                    dispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                            extras = mapOf("huge" to 1.0e30),
+                        ),
+                    )
+
+                assertTrue(result.isSuccess)
+                verify { anyConstructed<Intent>().putExtra("huge", 1.0e30) }
+            }
+
+        @Test
+        fun `sendIntent with int override rejects a value beyond the Int range`() =
+            runTest {
+                val result =
+                    dispatcher.sendIntent(
+                        SendIntentRequest(
+                            type = "activity",
+                            action = "android.intent.action.VIEW",
+                            extras = mapOf("n" to 3000000000L),
+                            extrasTypes = mapOf("n" to "int"),
+                        ),
+                    )
+
+                assertTrue(result.isFailure)
+                assertTrue(
+                    result.exceptionOrNull()?.message?.contains("Failed to convert extra") == true,
+                )
+            }
+
+        @Test
         fun `sendIntent with string list extra puts StringArrayList`() =
             runTest {
                 val list = listOf("a", "b", "c")

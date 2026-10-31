@@ -59,7 +59,10 @@ data class ArcTunnelOpenPayload(
     @SerialName("use_https") val useHttps: Boolean = false,
     @SerialName("use_mtls") val useMtls: Boolean = false,
 ) {
-    fun isValid(): Boolean = token.isNotEmpty() && addr.isNotEmpty() && (useHttps || !useMtls)
+    fun isValid(): Boolean = hasHeaderSafeToken() && addr.isNotEmpty() && (useHttps || !useMtls)
+
+    /** The token is written into a request header: control characters would let the server inject headers/requests. */
+    private fun hasHeaderSafeToken(): Boolean = token.isNotEmpty() && token.none(Char::isISOControl)
 }
 
 @Serializable

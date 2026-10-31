@@ -235,6 +235,35 @@ class FileOperationProviderTest {
             }
 
         @Test
+        fun `listFiles reports no more entries for an offset near Int MAX_VALUE`() =
+            runTest {
+                // Arrange
+                setupAuthorizedLocation("loc1")
+                val mockDir = mockk<DocumentFile>()
+                setupRootDocument(mockDir)
+                every { mockDir.isDirectory } returns true
+                every { mockDir.listFiles() } returns
+                    arrayOf(
+                        mockk<DocumentFile> {
+                            every { name } returns "file.txt"
+                            every { isDirectory } returns false
+                            every { isFile } returns true
+                            every { length() } returns 100L
+                            every { lastModified() } returns 1000L
+                            every { type } returns "text/plain"
+                        },
+                    )
+
+                // Act
+                val result = provider.listFiles("loc1", "", Int.MAX_VALUE, 200)
+
+                // Assert
+                assertEquals(1, result.totalCount)
+                assertTrue(result.files.isEmpty())
+                assertFalse(result.hasMore)
+            }
+
+        @Test
         fun `listFiles caps limit at MAX_LIST_ENTRIES`() =
             runTest {
                 // Arrange

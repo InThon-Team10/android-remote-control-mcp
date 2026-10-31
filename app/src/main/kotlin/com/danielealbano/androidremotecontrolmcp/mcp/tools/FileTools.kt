@@ -132,6 +132,9 @@ class ListFilesHandler
                 val path = McpToolUtils.optionalString(arguments, "path", "")
                 val offset = McpToolUtils.optionalInt(arguments, "offset", 0)
                 val limit = McpToolUtils.optionalInt(arguments, "limit", FileOperationProvider.MAX_LIST_ENTRIES)
+                if (offset < 0 || limit < 1) {
+                    throw McpToolException.InvalidParams("'offset' must be >= 0 and 'limit' >= 1, got: $offset, $limit")
+                }
 
                 val result = fileOperationProvider.listFiles(locationId, path, offset, limit)
 
@@ -250,6 +253,9 @@ class ReadFileHandler
                 val path = McpToolUtils.requireString(arguments, "path")
                 val offset = McpToolUtils.optionalInt(arguments, "offset", 1)
                 val limit = McpToolUtils.optionalInt(arguments, "limit", FileOperationProvider.MAX_READ_LINES)
+                if (offset < 1 || limit < 1) {
+                    throw McpToolException.InvalidParams("'offset' and 'limit' must be >= 1, got: $offset, $limit")
+                }
 
                 val result = fileOperationProvider.readFile(locationId, path, offset, limit)
 

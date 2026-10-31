@@ -72,6 +72,17 @@ class LocalNetworkAddressTest {
         assertTrue(isLocalNetworkAddress(ipv6WithEmbedded(ipv4, mapped = false)))
     }
 
+    @ParameterizedTest(name = "NAT64 64:ff9b::{0} is local")
+    @ValueSource(strings = ["127.0.0.1", "10.1.2.3", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0"])
+    fun `NAT64 forms of local addresses are blocked`(ipv4: String) {
+        assertTrue(isLocalNetworkAddress(nat64WithEmbedded(ipv4)))
+    }
+
+    @Test
+    fun `NAT64 form of a public address is allowed`() {
+        assertFalse(isLocalNetworkAddress(nat64WithEmbedded("8.8.8.8")))
+    }
+
     @Test
     fun `IPv4-mapped and IPv4-compatible forms of public addresses are allowed`() {
         assertFalse(isLocalNetworkAddress(ipv6WithEmbedded("8.8.8.8", mapped = true)))
@@ -91,6 +102,16 @@ class LocalNetworkAddressTest {
             bytes[MAPPED_MARKER_INDEX] = MARKER
             bytes[MAPPED_MARKER_INDEX + 1] = MARKER
         }
+        InetAddress.getByName(ipv4).address.copyInto(bytes, EMBEDDED_START)
+        return Inet6Address.getByAddress(null, bytes, null)
+    }
+
+    /** Builds the 64:ff9b::/96 (NAT64) address that carries [ipv4] in its last 4 bytes. */
+    private fun nat64WithEmbedded(ipv4: String): Inet6Address {
+        val bytes = ByteArray(IPV6_LENGTH)
+        bytes[1] = 0x64
+        bytes[2] = 0xff.toByte()
+        bytes[3] = 0x9b.toByte()
         InetAddress.getByName(ipv4).address.copyInto(bytes, EMBEDDED_START)
         return Inet6Address.getByAddress(null, bytes, null)
     }
