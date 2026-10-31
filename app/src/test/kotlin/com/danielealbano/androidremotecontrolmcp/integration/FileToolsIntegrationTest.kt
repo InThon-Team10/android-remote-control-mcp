@@ -9,6 +9,7 @@ import com.danielealbano.androidremotecontrolmcp.services.storage.FileListResult
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileReadResult
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileReplaceResult
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -175,9 +176,61 @@ class FileToolsIntegrationTest {
             }
         }
 
+    @Test
+    fun `list_files with negative offset returns invalid params error without calling provider`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_list_files",
+                        arguments = mapOf("location_id" to "loc1", "offset" to -1),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("'offset' must be >= 0"))
+                coVerify(exactly = 0) { deps.fileOperationProvider.listFiles(any(), any(), any(), any()) }
+            }
+        }
+
+    @Test
+    fun `list_files with zero limit returns invalid params error without calling provider`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_list_files",
+                        arguments = mapOf("location_id" to "loc1", "limit" to 0),
+                    )
+                assertEquals(true, result.isError)
+                coVerify(exactly = 0) { deps.fileOperationProvider.listFiles(any(), any(), any(), any()) }
+            }
+        }
+
     // ─────────────────────────────────────────────────────────────────────────
     // read_file
     // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `read_file with zero limit returns invalid params error without calling provider`() =
+        runTest {
+            val deps = McpIntegrationTestHelper.createMockDependencies()
+
+            McpIntegrationTestHelper.withTestApplication(deps) { client, _ ->
+                val result =
+                    client.callTool(
+                        name = "android_read_file",
+                        arguments = mapOf("location_id" to "loc1", "path" to "a.txt", "limit" to 0),
+                    )
+                assertEquals(true, result.isError)
+                val text = (result.content[0] as TextContent).text
+                assertTrue(text.contains("must be >= 1"))
+                coVerify(exactly = 0) { deps.fileOperationProvider.readFile(any(), any(), any(), any()) }
+            }
+        }
 
     @Test
     fun `read_file returns text content with line numbers`() =
