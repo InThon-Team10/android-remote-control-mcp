@@ -192,10 +192,13 @@ class McpToolArgumentFuzzTest {
         return post(body.toString())
     }
 
-    private suspend fun ApplicationTestBuilder.post(text: String): ToolResponse {
+    private suspend fun ApplicationTestBuilder.post(
+        text: String,
+        timeoutMs: Long = CALL_TIMEOUT_MS,
+    ): ToolResponse {
         val outcome =
             runCatching {
-                withTimeout(CALL_TIMEOUT_MS) {
+                withTimeout(timeoutMs) {
                     val response =
                         client.post("/mcp") {
                             header("Authorization", "Bearer ${McpIntegrationTestHelper.TEST_BEARER_TOKEN}")
@@ -211,7 +214,7 @@ class McpToolArgumentFuzzTest {
         return outcome.getOrElse { e ->
             val problem =
                 if (e is TimeoutCancellationException) {
-                    "HANG after ${CALL_TIMEOUT_MS}ms: ${e.message}"
+                    "HANG after ${timeoutMs}ms: ${e.message}"
                 } else {
                     "TRANSPORT/SERVER EXCEPTION ${e::class.qualifiedName}: ${e.message}"
                 }
@@ -220,14 +223,16 @@ class McpToolArgumentFuzzTest {
     }
 
     private suspend fun ApplicationTestBuilder.listTools(): List<FuzzTool> {
-        val response = post("""{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}""")
+        // The first request also boots the test application: that one-time setup runs on its own budget, so the
+        // per-call hang budget measures only the fuzzed tool calls.
+        val response = post("""{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}""", SETUP_TIMEOUT_MS)
         val tools =
             response.body
                 ?.get("result")
                 ?.jsonObject
                 ?.get("tools")
                 ?.jsonArray
-                ?: error("tools/list failed: ${response.raw.take(PREVIEW)}")
+                ?: error("tools/list failed: ${response.problem ?: response.raw.take(PREVIEW)}")
         return tools.map { FuzzTool.parse(it.jsonObject) }
     }
 
@@ -240,6 +245,7 @@ class McpToolArgumentFuzzTest {
         const val CONFORMING_PER_TOOL = 4
         const val MUTATED_PER_TOOL = 20
         const val CALL_TIMEOUT_MS = 5_000L
+        const val SETUP_TIMEOUT_MS = 60_000L
         const val NANOS_PER_MILLI = 1_000_000L
         const val CONTROL_SENTINEL = 99_999L
         const val FRACTION_BASE = 7.0
