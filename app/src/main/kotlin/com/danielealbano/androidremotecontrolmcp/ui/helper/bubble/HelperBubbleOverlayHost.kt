@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -208,11 +209,18 @@ class HelperBubbleOverlayHost internal constructor(
     }
 
     private suspend fun observeLayout() {
-        combine(panelRequested, guidance.state.map { it != null }.distinctUntilChanged(), ::resolveLayout)
+        val guidanceActive = guidance.state.map { it != null }.distinctUntilChanged()
+        val thinking =
+            combine(awaiting(), guidanceActive, ::Pair)
+                .runningFold(ThinkingTracker()) { tracker, (waiting, guided) -> tracker.next(waiting, guided) }
+                .map { it.visible }
+                .distinctUntilChanged()
+        combine(panelRequested, guidanceActive, thinking, ::resolveLayout)
             .distinctUntilChanged()
             .collect { layout ->
-                Log.d(BUBBLE_TRACE, "layout panelOpen=${layout.panelOpen} bubbleVisible=${layout.bubbleVisible}")
+                Log.d(BUBBLE_TRACE, "layout $layout")
                 uiState.setLayout(layout)
+                windows?.setThinking(layout.thinking)
                 windows?.setPanelOpen(layout.panelOpen)
                 windows?.setBubbleVisible(layout.bubbleVisible)
                 session.setChatVisible(layout.panelOpen)

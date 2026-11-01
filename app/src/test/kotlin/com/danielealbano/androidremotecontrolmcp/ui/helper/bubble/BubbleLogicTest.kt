@@ -95,9 +95,43 @@ class BubbleLogicTest {
 
     @Test
     fun `guidance hides the bubble and collapses the panel`() {
-        assertEquals(BubbleLayoutState(panelOpen = false, bubbleVisible = false), resolveLayout(true, true))
-        assertEquals(BubbleLayoutState(panelOpen = true, bubbleVisible = true), resolveLayout(true, false))
-        assertEquals(BubbleLayoutState(panelOpen = false, bubbleVisible = true), resolveLayout(false, false))
+        val hidden = BubbleLayoutState(panelOpen = false, bubbleVisible = false, thinking = false)
+        assertEquals(hidden, resolveLayout(true, true, false))
+        assertEquals(BubbleLayoutState(true, true, false), resolveLayout(true, false, false))
+        assertEquals(BubbleLayoutState(false, true, false), resolveLayout(false, false, false))
+    }
+
+    @Test
+    fun `thinking replaces the panel and the bubble until guidance starts`() {
+        assertEquals(BubbleLayoutState(false, false, true), resolveLayout(true, false, true))
+        assertEquals(BubbleLayoutState(false, false, true), resolveLayout(false, false, true))
+    }
+
+    @Test
+    fun `guidance always wins over thinking`() {
+        assertEquals(BubbleLayoutState(false, false, false), resolveLayout(false, true, true))
+    }
+
+    @Test
+    fun `a step ends thinking for the rest of the request`() {
+        var tracker = ThinkingTracker().next(awaiting = true, guidanceActive = false)
+        assertTrue(tracker.visible)
+
+        tracker = tracker.next(awaiting = true, guidanceActive = true)
+        assertFalse(tracker.visible)
+        tracker = tracker.next(awaiting = true, guidanceActive = false)
+        assertFalse(tracker.visible)
+    }
+
+    @Test
+    fun `a new request shows thinking again`() {
+        var tracker = ThinkingTracker().next(true, false).next(true, true).next(true, false)
+        assertFalse(tracker.visible)
+
+        tracker = tracker.next(awaiting = false, guidanceActive = false)
+        tracker = tracker.next(awaiting = true, guidanceActive = false)
+
+        assertTrue(tracker.visible)
     }
 
     @Test
@@ -121,7 +155,8 @@ class BubbleLogicTest {
                 ChatItem.Confirmation(3, "c1", "close_app", null),
             )
         answers.forEach { assertFalse(awaitingTextAnswer(asked + it, SessionState.Running, liveActive = false)) }
-        assertTrue(awaitingTextAnswer(asked + ChatItem.ToolCall(3, "c", "tap", ToolCallStatus.RUNNING), SessionState.Running, false))
+        val running = asked + ChatItem.ToolCall(3, "c", "tap", ToolCallStatus.RUNNING)
+        assertTrue(awaitingTextAnswer(running, SessionState.Running, liveActive = false))
     }
 
     @Test

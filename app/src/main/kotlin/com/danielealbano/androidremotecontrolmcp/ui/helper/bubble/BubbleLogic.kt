@@ -5,7 +5,6 @@ import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
 import com.danielealbano.androidremotecontrolmcp.assistant.session.NoticeKind
-import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 
 /** The bubble is offered only while the assistant is usable (the built-in key counts as configured). */
@@ -17,29 +16,6 @@ internal fun sendEnabled(
     draft: String,
     running: Boolean,
 ): Boolean = !running && draft.isNotBlank()
-
-/** The 도움 버튼 shows "thinking" while a tool call runs or a typed request still waits for its answer. */
-internal fun bubbleBusy(
-    toolsInFlight: Boolean,
-    awaiting: Boolean,
-): Boolean = toolsInFlight || awaiting
-
-/**
- * True while a typed request has not been answered: the session runs, no live conversation is active (it keeps the
- * session Running for its whole duration), a user request exists and no reply, error, notice or confirmation follows it.
- */
-internal fun awaitingTextAnswer(
-    items: List<ChatItem>,
-    session: SessionState,
-    liveActive: Boolean,
-): Boolean {
-    if (session != SessionState.Running || liveActive) return false
-    val lastUser = items.indexOfLast { it is ChatItem.User }
-    if (lastUser < 0) return false
-    return items.drop(lastUser + 1).none {
-        it is ChatItem.Assistant || it is ChatItem.Error || it is ChatItem.Notice || it is ChatItem.Confirmation
-    }
-}
 
 /**
  * A helper window is visible and touchable only when it is shown, not hidden for a screenshot ([touchThrough]) and
@@ -106,17 +82,6 @@ internal fun latestAssistantId(items: List<ChatItem>): Long {
     val ids = items.filterIsInstance<ChatItem.Assistant>().map { it.id }
     return ids.maxOrNull() ?: -1L
 }
-
-/** The window layout once guidance is taken into account: while a step is shown nothing may cover the target. */
-internal data class BubbleLayoutState(
-    val panelOpen: Boolean,
-    val bubbleVisible: Boolean,
-)
-
-internal fun resolveLayout(
-    panelRequested: Boolean,
-    guidanceActive: Boolean,
-): BubbleLayoutState = BubbleLayoutState(panelOpen = panelRequested && !guidanceActive, bubbleVisible = !guidanceActive)
 
 @StringRes
 internal fun noticeTextRes(kind: NoticeKind): Int =

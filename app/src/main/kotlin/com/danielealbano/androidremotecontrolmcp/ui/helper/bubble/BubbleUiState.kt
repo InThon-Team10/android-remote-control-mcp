@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** What the Compose windows render; written by the host on the main thread. */
 internal class BubbleUiState {
-    private val _layout = MutableStateFlow(BubbleLayoutState(panelOpen = false, bubbleVisible = true))
+    private val _layout = MutableStateFlow(BubbleLayoutState(panelOpen = false, bubbleVisible = true, thinking = false))
     private val _items = MutableStateFlow<List<ChatItem>>(emptyList())
     private val _session = MutableStateFlow<SessionState>(SessionState.Idle)
     private val _voiceEnabled = MutableStateFlow(false)

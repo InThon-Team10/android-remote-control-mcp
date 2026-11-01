@@ -36,6 +36,17 @@ internal class BubbleWindowParams(
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
 
+    /** The thinking screen: touchable (it blocks the apps below) but never focusable, so Back reaches the app. */
+    fun thinking(): WindowManager.LayoutParams =
+        WindowManager
+            .LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT,
+            ).apply { title = OWN_OVERLAY_ACCESSIBILITY_TITLE }
+
     private fun base(
         width: Int,
         extraFlags: Int,

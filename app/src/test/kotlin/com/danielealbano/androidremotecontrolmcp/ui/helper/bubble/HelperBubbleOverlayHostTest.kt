@@ -319,6 +319,26 @@ class HelperBubbleOverlayHostTest {
         }
 
     @Test
+    fun `thinking window shows for a pending request and is removed when a step appears`() =
+        runTest {
+            val host = host()
+            host.attach(service)
+            advanceUntilIdle()
+
+            items.value = listOf(ChatItem.User(1, "q"))
+            sessionState.value = SessionState.Running
+            advanceUntilIdle()
+            guidanceState.value = mockk<GuidanceState>()
+            advanceUntilIdle()
+
+            verifyOrder {
+                controller.setThinking(true)
+                controller.setThinking(false)
+            }
+            verify { controller.setBubbleVisible(false) }
+        }
+
+    @Test
     fun `moving the bubble saves its position`() =
         runTest {
             var actions: BubbleActions? = null

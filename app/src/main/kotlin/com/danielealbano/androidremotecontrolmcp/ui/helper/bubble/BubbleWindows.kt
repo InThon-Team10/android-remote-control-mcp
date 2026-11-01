@@ -10,6 +10,9 @@ internal interface BubbleWindowController {
     /** Opens or closes the panel window; it is focusable only while open. */
     fun setPanelOpen(open: Boolean)
 
+    /** Adds or removes the full-screen thinking window (removed so its animation is disposed). */
+    fun setThinking(visible: Boolean)
+
     /** Makes the bubble (and an open panel) visible or invisible. */
     fun setBubbleVisible(visible: Boolean)
 
@@ -46,6 +49,9 @@ internal interface BubbleActions {
     fun onNewChat()
 
     fun onClosePanel()
+
+    /** Ends the wait for an answer: stops the run, closes the panel and restores the request. */
+    fun onCancelThinking()
 
     fun onToggleMic()
 

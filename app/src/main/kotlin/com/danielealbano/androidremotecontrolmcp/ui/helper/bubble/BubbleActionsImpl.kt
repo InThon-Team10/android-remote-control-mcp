@@ -43,6 +43,13 @@ internal class BubbleActionsImpl(
         panelRequested.value = false
     }
 
+    override fun onCancelThinking() {
+        Log.d(BUBBLE_TRACE, "thinking cancelled by the user")
+        session.stop()
+        panelRequested.value = false
+        state.setDraft(lastSent)
+    }
+
     override fun onSend(text: String) {
         val host = context() ?: return
         lastSent = text
