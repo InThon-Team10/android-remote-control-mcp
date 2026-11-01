@@ -1,605 +1,169 @@
-# Android Remote Control MCP
+# 여기콕 👆
 
-[![CI](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/danielealbano/android-remote-control-mcp/actions/workflows/ci.yml)
-[![License: GPL v3 or later](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](LICENSE.md)
+**“어디를 눌러야 할지 모르겠을 때, 여기콕.”**
+지금 보고 있는 휴대폰 화면에서 다음에 할 행동 하나를 알려주는 AI 스마트폰 도우미입니다.
 
-An Android application that runs as an **MCP (Model Context Protocol) server**, enabling AI models to **fully control an Android device** remotely using accessibility services and screenshot capture.
+> **시각 자료 삽입 — 로고·배너**
+> ‘여기콕’ 이름과 승인된 캐릭터 ‘콕콕이’를 함께 배치해주세요. 한 줄 소개는 “내 손으로 해낼 수 있도록, 한 단계씩 알려주는 스마트폰 도우미”를 사용합니다.
 
-The app runs directly on your Android device (or emulator) and exposes an HTTP server (with optional HTTPS) implementing the MCP protocol. AI models like Claude can connect to it and interact with any app on the device — reading UI elements, tapping buttons, typing text, swiping, capturing screenshots, managing files, launching apps, and more.
+> **시각 자료 삽입 — 대표 시연 GIF 또는 영상**
+> 실제 여기콕 빌드에서 ‘물어보기 → 말로 요청하기 → 누를 곳 강조 → 사용자가 직접 터치 → 다음 단계 안내’가 이어지는 장면을 넣어주세요. 화면을 읽고 안내한다는 점과 사용자가 직접 조작한다는 점이 보이면 좋습니다. 영상에는 안내 자막을 함께 넣어주세요.
 
-> **Warning:** This software is provided "as-is" without warranty of any kind, for **research and educational purposes only**. The authors do not condone the use of this tool for any illegal, unauthorized, or unethical activities. Users are solely responsible for ensuring their use complies with all applicable laws and regulations. By using this software, you agree to use it responsibly and at your own risk.
+| 바로 보기 | 링크·상태 |
+| --- | --- |
+| 시연 영상 | **추가 예정:** YouTube 또는 Loom 링크 |
+| 발표 자료 | **추가 예정:** PPT/PDF 링크 |
+| 소스 코드 | [InThon-Team10 / android-remote-control-mcp](https://github.com/InThon-Team10/android-remote-control-mcp) |
+| 실행 형태 | Android 앱 · API 키가 포함된 심사용 APK 별도 제공 |
 
----
+## 1. 💡 프로젝트 개요
 
-## Contents
+### 왜 만들었나요?
 
-- [Demo](#demo)
-- [Features](#features)
-- [Install](#install)
-- [Setup](#setup)
-- [Privacy Mode](#privacy-mode)
-- [Integrations](#integrations)
-- [Configuration](#configuration)
-- [Permissions Reference](#permissions-reference)
-- [Security](#security)
-- [Contributing](#contributing)
-- [License](#license)
+“와이파이를 켜고 싶어요.” “알람은 어디서 맞추나요?”
 
----
+하고 싶은 일은 분명해도, 스마트폰 화면에서 어떤 버튼을 눌러야 하는지 몰라 멈추는 순간이 있습니다. 설명을 검색해도 내 화면과 다르면 따라 하기 어렵고, 다른 사람이 대신 해주면 다음에도 같은 곳에서 막힐 수 있습니다.
 
-## Demo
+여기콕은 **휴대폰 사용 중 도움이 필요한 어르신을 주요 사용자로**, 디지털 경험과 사용 환경의 차이를 고려해 만들었습니다. 현재 화면을 읽고, 해야 할 행동을 쉬운 말과 화면 표시로 하나씩 안내합니다. 목표는 **사용자가 원하는 일을 스스로 끝내는 것**입니다.
 
-<table>
-  <tr>
-    <td align="center" width="33%" valign="top">
-      <a href="docs/assets/demo-reddit-post.gif" title="Click for full resolution"><img src="docs/assets/demo-reddit-post-small.gif" alt="Posting on Reddit through the MCP server" width="240"></a>
-      <br><em>Posting on Reddit (sped up, ~6 min original)</em>
-    </td>
-    <td align="center" width="33%" valign="top">
-      <a href="docs/assets/demo-install-booking.gif" title="Click for full resolution"><img src="docs/assets/demo-install-booking-small.gif" alt="Installing the booking.com app through the MCP server" width="240"></a>
-      <br><em>Installing the booking.com app</em>
-    </td>
-    <td align="center" width="33%" valign="top">
-      <a href="docs/assets/demo-flight-search.gif" title="Click for full resolution"><img src="docs/assets/demo-flight-search-small.gif" alt="Skyscanner flight search from Zurich to Istanbul through the MCP server" width="240"></a>
-      <br><em>Flight search on Skyscanner, Zurich &rarr; Istanbul (sped up, ~4 min original)</em>
-    </td>
-  </tr>
-</table>
+### 핵심 기능
 
-<p align="center"><em>An AI model controlling an Android device through the MCP server &mdash; click any clip for full resolution.</em></p>
+- **말로 요청하고, 대화 중에는 글로도 질문합니다.** 실시간 음성 대화를 기본으로 제공하며, 대화 중 입력창으로 요청할 수도 있습니다.
+- **현재 화면에 맞춰 한 단계씩 안내합니다.** 화면의 글자·버튼·위치를 읽고 다음 행동을 정합니다. 사용자가 행동하면 화면을 다시 확인합니다.
+- **누를 곳과 밀 방향을 눈으로 보여줍니다.** 누를 곳은 밝게 강조하고, 입력 칸은 테두리로, 스와이프는 화살표로 안내합니다. 화면에 표시할 대상이 없으면 글과 음성으로 설명합니다.
+- **도움 버튼으로 대화를 이어갑니다.** 대화 중 다른 앱 위에 도움 버튼이 나타납니다. 버튼은 오른쪽 가장자리를 따라 옮길 수 있고, 안내 중에는 조작할 곳을 가리지 않도록 숨깁니다.
+- **실제 설정을 바꾸지 않고 사용법을 연습합니다.** 처음에는 연습용 설정 화면에서 도움을 요청하고 따라 누르는 흐름을 익힙니다. 연습은 실제 앱 조작이나 AI 연결 없이 진행됩니다.
 
-## Features
+**콕콕이는 가리키고, 사용자가 직접 누릅니다.** 원본 MCP 프로젝트의 기기 제어 기반을 활용하되, 여기콕의 사용자 경험은 자동 조작이 아닌 단계별 안내에 초점을 맞췄습니다. 결제·전송·삭제 등 결과가 큰 행동에는 무슨 일이 일어나는지 설명을 함께 보여줍니다.
 
-### MCP Server
-- HTTP server running directly on Android (Ktor + Netty), with optional HTTPS
-- Streamable HTTP transport at `/mcp` (MCP specification compliant, JSON-only, no SSE)
-- Combined authentication: static bearer token and/or a self-contained OAuth 2.1 server (Claude.ai / Claude Desktop custom connectors, with on-device approval)
-- Auto-generated self-signed TLS certificates (or custom certificate upload)
-- Configurable binding: localhost (127.0.0.1), network (0.0.0.0) or a specific IP address of the device
-- Auto-start on boot
-- Remote access tunnels via the free end-to-end encrypted tunnel (no account), Cloudflare Quick Tunnels or ngrok (public HTTPS URL)
+> **시각 자료 삽입 — 핵심 화면 3장**
+> ① 콕콕이와 ‘물어보기’가 보이는 홈 ② 실제 앱에서 누를 곳을 강조하는 화면 ③ 스와이프 화살표와 안내 문구가 보이는 화면을 나란히 넣어주세요. 실제 여기콕 빌드 화면을 사용하고, 연습 화면을 넣는다면 ‘연습용 화면’이라고 표시해주세요.
 
-### 59 MCP Tools across 14 Categories
+## 2. 👥 팀원 및 역할 분담
 
-Screen introspection, system actions, touch actions, gestures, node actions, text input, utilities, file operations, app management, camera, intents, notifications, location, and sharing.
+**팀:** InThon-Team10 · 팀명 입력 예정
 
-All tool names use the `android_` prefix by default (e.g., `android_tap`). When a device slug is configured (e.g., `pixel7`), the prefix becomes `android_pixel7_` (e.g., `android_pixel7_tap`).
+아래 역할 구분은 작성용 예시입니다. 실제 팀원 수와 담당 업무에 맞게 채워주세요.
 
-See [docs/MCP_TOOLS.md](docs/MCP_TOOLS.md) for the full tool reference with input/output schemas and examples.
+| 이름 | GitHub 프로필 | 담당 역할 및 기여 |
+| --- | --- | --- |
+| 입력 예정 | 프로필 링크 입력 | 기획 · 문제 정의, 사용자 흐름, 발표 |
+| 입력 예정 | 프로필 링크 입력 | Android · 앱 화면, 권한 및 서비스 연결 |
+| 입력 예정 | 프로필 링크 입력 | AI · 음성 대화, 화면 분석, 단계별 안내 |
+| 입력 예정 | 프로필 링크 입력 | UI/UX · 캐릭터, 화면 디자인, 안내 오버레이 |
 
-### Android App
-- Material Design 3 UI with tabbed layout (Server / Settings / About) and dark mode
-- Server status monitoring (running/stopped) with permission warning banner
-- Connection info display (IP, port, token, tunnel URL)
-- Per-tool and per-parameter permissions (enable/disable individual MCP tools)
-- Permission management (Accessibility, Notifications, Camera, Microphone)
-- Remote access tunnel configuration (free E2E tunnel / Cloudflare / ngrok)
-- Storage location management (automatic locations + SAF authorization for file tools)
-- Server log viewer (MCP tool calls, tunnel events)
-- Headless setup via ADB (configure, grant permissions, start/stop server without UI)
+## 3. 🛠️ 기술 스택
 
-### Comparison with Alternatives
+| 영역 | 사용 기술 | 역할 |
+| --- | --- | --- |
+| Android 앱 | Kotlin, Jetpack Compose, Material 3 | 한국어 앱 화면과 도움 버튼 UI |
+| 화면 읽기·안내 | Android Accessibility Service, 접근성 오버레이 | 화면 요소 확인, 강조·화살표 표시, 사용자 행동 감지 |
+| AI 음성 대화 | OpenAI Realtime API, OkHttp | 실시간 음성 입출력과 대화 연결 |
+| AI 안내 계획 | OpenAI Responses API, OpenAI Java SDK | 현재 화면을 바탕으로 다음 단계 생성 |
+| 앱 내부 MCP | MCP Kotlin SDK, Ktor, Netty | 같은 휴대폰 안에서 화면 읽기와 안내 기능 연결 |
+| 상태·설정 | Kotlin Coroutines, Flow, DataStore Preferences | 비동기 처리, 상태 관찰, 설정 저장 |
+| 의존성 주입 | Hilt | 서비스와 구현체 연결 |
+| 빌드·품질 | Gradle, JUnit, MockK, ktlint, detekt | APK 빌드, 테스트, 정적 검사 |
 
-| Feature | This project | [mobile-mcp] | [Android-MCP] | [android-mcp-server] | [adb-mcp] | [droidrun-mcp] |
-|---------|:-:|:-:|:-:|:-:|:-:|:-:|
-| MCP tools | 59 | 21 | 11 | 5 | 10 | 11 |
-| Runs on the phone (no ADB) | :white_check_mark: | :x: | :x: | :x: | :x: | :x: |
-| Action latency | 10-100 ms | 1-4 s | 1-4 s | 1-4 s | 1-4 s | 1-4 s |
-| Works over the internet | :white_check_mark: | :x: | :x: | :x: | :x: | :x: |
-| Token-efficient screen state | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: | :white_check_mark: |
-| Annotated screenshots | :white_check_mark: | :x: | :white_check_mark: | :x: | :x: | :x: |
-| Configurable screenshot resolution/quality | :white_check_mark: | :x: | :x: | :x: | :x: | :x: |
-| Per-tool enable/disable | :white_check_mark: | :x: | :x: | :x: | :x: | :x: |
-| Multi-device support | :white_check_mark: | :white_check_mark: | :x: | :x: | :x: | :x: |
-| Camera, clipboard, files, downloads | :white_check_mark: | :x: | :x: | :x: | :x: | :x: |
-| iOS support | :x: | :white_check_mark: | :x: | :x: | :x: | :x: |
+현재 코드의 기본 모델 설정은 안내 계획용 `gpt-6-luna`, 실시간 대화용 `gpt-realtime-2.1`입니다. 설정과 의존성 버전은 각각 `AssistantConfig.kt`와 `gradle/libs.versions.toml`을 기준으로 합니다.
 
-[mobile-mcp]: https://github.com/mobile-next/mobile-mcp
-[Android-MCP]: https://github.com/CursorTouch/Android-MCP
-[android-mcp-server]: https://github.com/minhalvp/android-mcp-server
-[adb-mcp]: https://github.com/srmorete/adb-mcp
-[droidrun-mcp]: https://github.com/chukfinley/droidrun-mcp-server
+여기콕 안내 흐름은 **Android 앱과 외부 AI API**로 구성됩니다. 앱 설정은 기기에 저장하며, 별도의 웹 프론트엔드나 서비스용 데이터베이스를 준비할 필요는 없습니다.
 
-Most alternatives rely on ADB running on a host machine, which means a USB cable or local network connection and a computer sitting next to the phone. This project runs entirely on the device itself, so you can expose the MCP endpoint through a tunnel and control your phone from anywhere.
+## 4. 🧩 아키텍처 및 시스템 구성
 
-On the token efficiency side, ADB-based tools typically return raw `uiautomator` XML dumps which can easily be 10-50x more verbose than the compact representation used here. Combined with numbered screenshot annotations, configurable image quality, and the ability to disable tools you don't need (every tool definition costs tokens on every turn), this significantly reduces the per-interaction cost in agentic loops.
+### 한 단계가 만들어지는 흐름
 
----
+1. 사용자가 여기콕에서 ‘물어보기’를 누르고 원하는 일을 말합니다.
+2. 앱의 실시간 음성 대화가 요청을 받고, 화면 안내 계획을 요청합니다.
+3. 앱 내부 MCP 클라이언트가 같은 기기의 MCP 서버에 연결해 현재 화면 정보를 읽습니다.
+4. AI가 화면과 요청을 바탕으로 다음 행동 하나를 정합니다.
+5. 접근성 오버레이가 해당 위치를 강조하거나 스와이프 방향을 표시하고, 안내 문구를 보여줍니다.
+6. 사용자가 직접 행동하면 화면을 다시 확인하고 다음 안내를 이어갑니다.
 
-## Install
+> **시각 자료 삽입 — 시스템 아키텍처 다이어그램**
+> 큰 ‘Android 기기’ 상자 안에 `여기콕 UI`, `음성 대화·안내 계획`, `MCP 클라이언트`, `MCP 서버(Ktor)`, `접근성 서비스`, `안내 오버레이`, `사용 중인 앱`을 배치해주세요. MCP 클라이언트와 서버 사이에는 `127.0.0.1 / HTTP / MCP`를 표시합니다. 기기 밖의 `OpenAI Realtime API`와 `OpenAI Responses API`를 대화·안내 계획 모듈에 연결해주세요. 마지막에는 ‘사용자 직접 터치 → 화면 변경 → 다시 읽기’의 순환을 표시해주세요. AI에서 다른 앱으로 직접 조작하는 화살표는 넣지 않습니다.
 
-### Which build to download: GMS or FOSS
+**기기 내부 통신과 AI 처리는 구분됩니다.** MCP 서버는 휴대폰 안에서 실행되지만 AI 추론은 외부 API를 사용합니다. 음성, 입력한 글, 화면의 글자·버튼 이름·위치와 화면 사진이 OpenAI로 전송될 수 있으며, 첫 실행에서 이에 대한 동의를 받습니다.
 
-Each release provides two flavors of the APK — pick the one that matches your device:
+| 관련 문서 | 내용 |
+| --- | --- |
+| [제품 정의](PRODUCT.md) | 사용자, 제품 원칙, 현재 제약 |
+| [디자인 기준](DESIGN.md) | 안내 방식, 캐릭터, 접근성 설계 기준 |
+| [시작 화면 및 연결 흐름](docs/FRONTEND_START.md) | 첫 실행, 권한, 대화 시작·종료 |
+| [MCP 기반 아키텍처](docs/ARCHITECTURE.md) | 원본 기반의 내부 서버·서비스 구조 |
+| [MCP 도구 명세](docs/MCP_TOOLS.md) | 기반 도구의 입출력과 사용 예시 |
 
-- **GMS** (`…-gms-release.apk`) — the full build. **Requires Google Mobile Services (Google Play Services)** installed on the phone. Choose this on standard devices/emulators that ship with Google services.
-- **FOSS** (`…-foss-release.apk`) — a Google-free build with **no dependency on Google Mobile Services**. Works on **any** Android phone, including de-Googled ROMs and devices where Google services are unavailable.
+MCP 아키텍처·도구 문서는 기반 엔진에 대한 개발 자료이며, 여기에 설명된 모든 기능이 여기콕 사용자 화면에 노출되는 것은 아닙니다.
 
-If unsure, the GMS build is the right choice for a typical phone with the Play Store.
+## 5. 🚀 실행 방법
 
-### Option A: Download on your phone (easiest)
+**심사위원분들께 OpenAI API 키가 포함된 시연용 APK를 별도로 제공합니다.** APK를 휴대폰에 설치하면 별도의 API 키 발급·입력, 개발 환경 설정, 소스 코드 빌드 없이 체험할 수 있습니다.
 
-1. Open the [Releases](https://github.com/danielealbano/android-remote-control-mcp/releases) page on your phone's browser
-2. Download the APK from the latest release
-3. Open the downloaded APK and follow the prompts to install it (you may need to allow installation from unknown sources)
+### 준비 사항
 
-### Option B: Download on your PC and install via ADB
+- **Android 13 이상(API 33+) 휴대폰**
+- **인터넷 연결:** 실시간 음성 대화와 AI 화면 안내에 필요합니다.
+- **팀에서 전달받은 여기콕 시연용 APK**
 
-1. Download the APK from the [Releases](https://github.com/danielealbano/android-remote-control-mcp/releases) page
-2. Connect your phone via USB (with USB Debugging enabled)
-3. Install the APK (use the GMS or FOSS file you downloaded):
-```bash
-adb install android-remote-control-mcp-<version>-gms-release.apk
-```
+### ① APK 설치
 
-### Option C: Build from sources
+1. Android 휴대폰에서 팀이 전달한 APK 파일을 다운로드합니다.
+2. 다운로드한 APK 파일을 열고 **설치**를 누릅니다.
+3. ‘이 출처의 앱 설치 허용’ 안내가 나타나면, APK를 연 브라우저 또는 파일 앱의 설치 권한을 허용한 뒤 설치를 이어갑니다.
+4. 설치가 끝나면 **여기콕**을 실행합니다.
 
-```bash
-git clone https://github.com/danielealbano/android-remote-control-mcp.git
-cd android-remote-control-mcp
-make build
-make install  # installs on connected device/emulator
-```
+### ② 첫 실행 및 권한 설정
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for full build requirements and instructions.
+1. 환영 화면에서 연습용 설정 화면을 따라 사용법을 익힙니다. 연습 중에는 실제 휴대폰 설정이 바뀌지 않습니다.
+2. 화면 정보 전송 안내를 읽고 동의합니다. AI 안내를 위해 음성, 입력한 글, 화면 정보 등이 OpenAI로 전송될 수 있습니다.
+3. 앱의 안내에 따라 시스템 설정에서 **여기콕 접근성 서비스**를 켭니다. 현재 화면을 읽고 안내 표시를 띄우는 데 사용합니다.
+4. 앱으로 돌아와 **마이크 권한**을 허용합니다. 실시간 음성 대화에 필요합니다.
 
----
+접근성 설정이 비활성화되어 있다면 ‘설정 → 앱 → 여기콕 → 더보기 → 제한된 설정 허용’을 확인한 뒤 다시 접근성 서비스를 켜주세요. 메뉴 이름과 위치는 기기마다 다를 수 있습니다.
 
-## Setup
+### ③ 직접 체험하기
 
-1. **Open the app.** The Server tab shows a permission warning banner; grant permissions from there or via Settings > Permissions.
+1. 여기콕 홈에서 **물어보기**를 누릅니다.
+2. “와이파이를 켜고 싶어요”처럼 원하는 일을 말합니다.
+3. 화면에 나타나는 설명을 읽거나 듣고, 강조된 위치를 **직접** 누릅니다.
+4. 화면이 바뀌면 다음 단계 안내를 따라 진행합니다. 대화 중에는 도움 버튼을 통해 글로도 질문할 수 있습니다.
+5. 체험을 마치면 여기콕 홈에서 **도우미 종료**를 누릅니다.
 
-2. **Grant permissions:**
+> **시각 자료 삽입 — 설치·시연 안내**
+> ‘APK 설치 → 접근성·마이크 권한 허용 → 물어보기 → 강조된 곳 직접 누르기’의 4단계를 실제 화면 캡처와 짧은 설명으로 배치해주세요.
 
-   - **Accessibility Service** — **required.** Powers UI introspection, action execution, and screenshots; nothing works without it.
-     - **If the toggle is greyed out** (Android 13+, common on Samsung/One UI for apps installed from an APK): this is Android's "Restricted settings" protection. A dialog reads *"Restricted setting — For your security, this setting is currently unavailable."* To unblock it, go to **Settings → Apps → Android Remote Control MCP → App info**, tap the **⋮ menu** (top-right), choose **Allow restricted settings**, confirm with your PIN/pattern/biometric, then enable the Accessibility Service. (Play Store / F-Droid installs are not affected.)
-   - **Notifications** — **optional** (recommended for OAuth). OAuth sign-in approvals (Claude.ai / Claude Desktop, ChatGPT, or any third-party OAuth client) arrive as heads-up notifications you tap to confirm the 2-digit code and approve. It is **no longer required** for OAuth login, though: if you don't grant this permission, pending requests still appear as a **card on the app's Server screen** that you tap to review and approve/deny. The **Event Channel** push feature — e.g. pushing device events to Claude Code — runs as a foreground service that posts its status notification through this permission on Android 13+.
-   - **Other permissions** (optional) — Camera, Microphone, and Location enable their corresponding MCP tools. The app works without them; only the dependent features are disabled until granted. See the [Permissions Reference](#permissions-reference) below for the complete list.
-   - **Storage locations** — configure in Settings > Storage if you plan to use the file tools (automatic locations like Downloads, plus custom locations via SAF).
+### 실행이 원활하지 않을 때
 
-3. **Start the server.** Go back to the **Server tab** and tap **Start**.
+| 상황 | 확인할 내용 |
+| --- | --- |
+| APK 설치가 차단됩니다. | APK를 연 브라우저 또는 파일 앱의 ‘이 출처의 앱 설치 허용’ 설정을 확인해주세요. |
+| 접근성 서비스를 켤 수 없습니다. | 앱 정보에서 ‘제한된 설정 허용’을 확인해주세요. |
+| 음성 대화를 시작할 수 없습니다. | 인터넷 연결과 여기콕의 마이크 권한을 확인해주세요. |
+| AI 연결 오류가 계속됩니다. | 네트워크를 확인한 뒤 팀에 문의해주세요. 제공된 APK의 API 연결 상태는 팀에서 확인합니다. |
 
-The server starts on `http://127.0.0.1:8080` by default. The connection info (IP, port, token, URL) is displayed on the Server tab.
+현재 실시간 대화를 시작하려면 마이크 권한이 필요합니다. **대화 중 글 입력은 지원하지만, 마이크 없이 글만으로 새 대화를 시작하는 흐름은 아직 제공하지 않습니다.** 화면 정보 전송에 동의하지 않아도 연습과 홈 화면은 이용할 수 있습니다.
 
-> **Note**: `127.0.0.1` refers to the phone's localhost, not your computer. To connect from your computer, use [adb port forwarding](#using-with-adb-port-forwarding), bind to `0.0.0.0` (network mode), or enable a [remote access tunnel](#using-remote-access-tunnels).
+소스 코드에서 직접 빌드하려는 개발자는 [앱 연결·키 설정 안내](docs/FRONTEND_START.md)와 [개발 환경 및 네이티브 의존성 안내](CONTRIBUTING.md)를 참고해주세요.
+
+## 6. 🌱 향후 발전 방향
+
+아래는 앞으로 검증하거나 구현할 계획이며, 현재 제공되는 기능과 구분합니다.
+
+- **마이크 없이 시작하는 글 대화:** 말하기 어려운 상황에서도 처음부터 글로 도움을 요청할 수 있도록 개선합니다.
+- **다른 앱에서 도움 요청 시작:** 대화 중에만 나타나는 도움 버튼의 현재 제약을 보완하고, 다른 앱을 쓰다가 도움을 요청하는 진입 방식을 정합니다.
+- **다양한 사용자와 사용성 검증:** 어르신을 포함해 디지털 경험이 다양한 사용자와 과제 수행을 확인하고, 완료율·막히는 단계·안내 이해도를 바탕으로 개선합니다.
+- **접근성 및 기기 호환성 검증:** TalkBack, Switch Access, 200% 글자 확대, 작은 화면과 다양한 제조사 앱에서 안내를 확인합니다. 현재 사용자 테스트나 접근성 검증이 모두 완료된 상태는 아닙니다.
+- **배포용 AI 인증 구조:** APK에 장기 API 키를 포함하는 해커톤 방식을 개선하고, 서버 측 인증과 단기 자격 증명 등을 검토합니다.
 
 ---
 
-## Privacy Mode
+### 오픈소스 기반 및 라이선스
 
-Privacy Mode detects and hides personal data — emails, credit cards and IBANs, credentials, phone
-numbers, national IDs, addresses, and names — in everything the MCP tools return (screen content,
-notifications, clipboard, files, …) **before it leaves the device** for the AI provider. Detection
-runs fully on-device: fast rule-based checks (checksums, formats, field context) combined with a
-local NER model — no cloud calls. Detected values are either pseudonymized with consistent
-placeholders (`EMAIL#a1b2c`, so AI tools keep working across screens) or fully redacted. Detection
-is best-effort mitigation, not a guarantee.
+여기콕은 [Daniele Albano의 Android Remote Control MCP](https://github.com/danielealbano/android-remote-control-mcp)를 기반으로 개발했습니다. 원본의 Android MCP 서버와 접근성·화면 읽기 기반 위에 한국어 도우미 화면, 음성 대화, 단계별 안내 경험을 구성했습니다.
 
-The model is the [Ai4Privacy multilingual anonymiser](https://huggingface.co/ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii)
-(MIT license, Built with Llama), downloaded once on first enable (~150 MB) directly from the pinned
-Hugging Face revision and checksum-verified on device.
+- 라이선스: [GNU GPL v3.0 or later](LICENSE.md)
+- 서드파티 고지: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
+- 기존 MCP README: [README.upstream.md](README.upstream.md)
+- 기여 및 개발 참고: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-### Measured detection rates
-
-Share of personal data items detected per category by the full pipeline, measured with the in-repo
-effectiveness benchmark (`make privacy-benchmark`) on realistic UI-style content across 8 languages:
-
-| Category | Detected |
-|---|---|
-| Addresses | 77.9% |
-| Cards & IBANs | 75.3% |
-| Credentials | 90.9% |
-| Emails | 100.0% |
-| Names | 0.8% |
-| National IDs | 93.0% |
-| Phone numbers | 84.4% |
-
-Names are the on-device model's known weak spot (it recognizes common Western names far better than
-the globally diverse names in the benchmark); improving name detection with a fine-tuned model is on
-the roadmap. Actual results vary with content and language.
-
-### Enabling Privacy Mode
-
-- **From the main Server screen**: tap **Set up Privacy Mode** on the Privacy Mode card (shown while
-  the mode is off).
-- **Or via Settings → Privacy**: turn on **Enable Privacy Mode** and confirm the one-time model
-  download. After the download and warm-up, a short on-device benchmark measures the expected
-  per-screen overhead and shows it on the same screen.
-- Protected categories, pseudonymize-vs-redact, and the placeholder format are configurable in
-  **Settings → Privacy**.
-
----
-
-## Integrations
-
-### Claude Desktop / Claude Code
-
-Add the server to your `.mcp.json` configuration file:
-
-```json
-{
-  "mcpServers": {
-    "android-phone": {
-      "type": "http",
-      "url": "http://DEVICE_IP:PORT/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN"
-      }
-    }
-  }
-}
-```
-
-Replace `DEVICE_IP`, `PORT`, and `YOUR_TOKEN` with the values shown in the app's Server tab. If the server is bound to localhost (default), you'll need [adb port forwarding](#using-with-adb-port-forwarding) or a [remote access tunnel](#using-remote-access-tunnels) to connect.
-
-> **Note for clients without custom-header support:** if your MCP client cannot send an `Authorization` header and does not support OAuth, you can turn off both auth methods in the app (**Settings → Access** — disable Bearer token and OAuth). The app warns and asks you to confirm, because the server is then **open**: anyone who can reach it has full control. Only do this on a network you trust.
-
-### Connect from Claude.ai & Claude Desktop (Custom Connector, OAuth)
-
-Claude.ai (web) and Claude Desktop connect as a **custom connector** (remote MCP) using OAuth 2.1 — the app is its own OAuth Authorization Server, so no external account or pre-registration is needed. This requires the server to be reachable over a **public HTTPS URL**, so you must first enable a [remote access tunnel](#using-remote-access-tunnels) — a `localhost`/LAN address or `adb` port-forward will **not** work.
-
-1. **OAuth is enabled by default** — no action needed (if you previously disabled it, re-enable it under **Settings → Access**). The bearer token stays enabled too; both are accepted.
-2. Open **Settings → Tunnel**, enable **Remote Access** (the default free E2E tunnel needs no account; the first setup takes about 10–30 seconds), and start the server. Copy the public `https://…` URL from the Server tab and append `/mcp` (e.g. `https://<name>.d.arc-tunnel.io/mcp`).
-3. In Claude, open **[Customize → Connectors → Add custom connector](https://claude.ai/customize/connectors?modal=add-custom-connector)**, paste the `https://…/mcp` URL, and **leave the OAuth Client ID and Client Secret blank** (the app uses Dynamic Client Registration). Click **Add**.
-4. Claude opens a browser approval page showing a **2-digit code**. On the device, tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — to open the approval screen, confirm the code matches, and **Approve**.
-5. Manage or revoke connected clients any time under **Settings → Access → Connected clients**. Revoking immediately invalidates that client's tokens.
-
-> **Public URL override (optional):** if your tunnel/host topology needs a fixed public host (or you bind to `0.0.0.0` without a trusted proxy), set a **Public URL override** in Settings → Access so OAuth metadata and links use a stable host.
-
-Custom connectors are available on the Free (1 connector), Pro, Max, Team, and Enterprise plans (currently in beta).
-
-> ⚠️ **Security:** treat the public tunnel URL as sensitive, approve only connections you initiated (verify the 2-digit code), revoke clients you no longer use, and stop the tunnel and server when you are done. Never point it at a device holding sensitive data.
-
-### Connect from ChatGPT (Custom Connector, OAuth)
-
-ChatGPT connects to the server as a **custom MCP connector** using the same self-contained OAuth 2.1 flow. As with Claude, the server must be reachable over a **public HTTPS URL**, so enable a [remote access tunnel](#using-remote-access-tunnels) first — a `localhost`/LAN address or `adb` port-forward will **not** work. Custom connectors require a paid plan (Plus, Pro, Business, Enterprise, or Edu — not Free) and are set up from the **ChatGPT web app**.
-
-1. **Enable Developer mode** — in ChatGPT on the web, open **Settings → Connectors → Advanced settings** (labelled **Apps & Connectors** on some builds) and turn on **Developer mode**.
-2. **Start the tunnel** — same as the Claude flow above: OAuth stays enabled by default, turn on **Remote Access** under Settings → Tunnel, start the server, and copy the public `https://…/mcp` URL from the Server tab.
-3. **Add the connector** — open **Settings → Connectors → Create**, give it a name and description, paste the `https://…/mcp` URL, select **OAuth** as the authentication method, and leave any Client ID / Client Secret blank (the app self-registers clients via Dynamic Client Registration).
-4. **Approve on the device** — ChatGPT starts the OAuth flow. Tap the heads-up notification — or, if the Notifications permission is off, open the app's **Server** screen and tap the **pending approvals** card — confirm the 2-digit code matches, and **Approve** (identical to the Claude approval step).
-5. Manage or revoke the connected client any time under **Settings → Access → Connected clients** in the app.
-
-> ⚠️ **Security:** the same cautions apply — treat the tunnel URL as sensitive, approve only connections you initiated (verify the code), revoke unused clients, and stop the tunnel and server when you are done.
-
-### Other MCP Clients
-
-The MCP server exposes a standard Streamable HTTP endpoint at `/mcp` with combined authentication (static bearer token and/or OAuth 2.1). Any MCP-compatible client can connect to it — refer to your client's documentation for the specific configuration format.
-
-### Testing with MCP Inspector
-
-[MCP Inspector](https://github.com/modelcontextprotocol/inspector) is the official visual testing tool for MCP servers. It provides a browser-based UI to connect, list tools, fill parameters, and see responses:
-
-```bash
-npx @modelcontextprotocol/inspector
-```
-
-This opens a UI at `http://localhost:6274` where you can connect to your server and test tools interactively.
-
-### Testing with curl
-
-All requests are sent as JSON-RPC 2.0 via `POST /mcp` (Streamable HTTP transport). The server is stateless: every request stands alone, so there is no session to open and no `mcp-session-id` to send, and tools can be called directly:
-
-```bash
-# List available tools
-curl -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-
-# Get the current screen state (UI nodes + optional screenshot)
-curl -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"android_get_screen_state","arguments":{}}}'
-
-# Tap at coordinates
-curl -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"android_tap","arguments":{"x":540,"y":1200}}}'
-```
-
-The bearer token is shown in the app's connection info and can be copied directly. Bearer authentication is controlled by the **Bearer token** toggle in **Settings → Access** (not by clearing the value): with it enabled, every `/mcp` request must present the token (or a valid OAuth access token). The server accepts unauthenticated requests only when **both** the Bearer token and OAuth are disabled.
-
----
-
-## Configuration
-
-### Server Settings (via App UI)
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Port | `8080` | HTTP/HTTPS server port |
-| Binding Address | `127.0.0.1` | `127.0.0.1` (localhost, use with adb port forwarding), `0.0.0.0` (network, all interfaces) or a specific IP address of the device (IPv4 or IPv6, not IPv6 link-local, without a zone index such as `%3`; the server does not start while the device does not have it) |
-| Bearer Token | Enabled, auto-generated UUID | Static token for MCP requests (Settings → Access). Enforcement is set by the Bearer toggle, not by clearing the value. |
-| OAuth | Enabled | Self-contained OAuth 2.1 server for Claude.ai / Claude Desktop custom connectors (Settings → Access). |
-| Public URL override | Empty (auto-detect) | Pin the public host used for OAuth metadata and share links. |
-| HTTPS | Disabled | Enable HTTPS with auto-generated self-signed certificate (configurable hostname) or upload custom .p12/.pfx |
-| Auto-start on Boot | Disabled | Start MCP server automatically when device boots |
-| Device Slug | Empty | Optional device identifier for tool name prefix (e.g., `pixel7` makes tools `android_pixel7_tap`) |
-| Remote Access Tunnel | Disabled | Expose server via public HTTPS URL (free E2E tunnel by default; Cloudflare Quick Tunnels or ngrok) |
-| Tunnel Local Port | The server port on installs from before this setting (unless their HTTPS kept their Cloudflare/ngrok tunnel off), a random port of 61000-65535 otherwise | The port Cloudflare and ngrok forward to (`http://localhost:<port>`). When the server serves plain HTTP on `127.0.0.1` on that same port (Localhost, Network, or the Specific IP 127.0.0.1), the tunnel uses it; otherwise the server opens a plain HTTP listener of its own on `127.0.0.1:<port>`, with the same authentication. With HTTPS on and such a binding, choose a port other than the server port |
-| Tool Permissions | All enabled | Per-tool and per-parameter enable/disable (Settings > MCP Tools) |
-| File Size Limit | 50 MB | Maximum file size for file operations (range 1-500 MB) |
-| Allow HTTP Downloads | Disabled | Allow non-HTTPS downloads via `android_download_from_url` |
-| Allow Unverified HTTPS | Disabled | Accept unverified (self-signed or invalid) HTTPS certificates for `android_download_from_url` (less secure) |
-| Block Local Network Downloads | Disabled | `android_download_from_url` refuses to connect to this phone, the local network or VPN addresses (loopback, unspecified, private LAN, link-local, CGNAT/Tailscale, 192.0.0.0/24 and IPv6 unique-local/site-local addresses, including their IPv4-mapped/compatible IPv6 forms) |
-| Download Timeout | 60 seconds | Timeout for file downloads (range 10-300 seconds) |
-
-### Using with adb Port Forwarding
-
-When the server is bound to `127.0.0.1` (default, most secure):
-
-```bash
-# Forward device port to host
-adb forward tcp:8080 tcp:8080
-
-# Test connection from host
-curl -X POST http://localhost:8080/mcp \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
-```
-
-### Using over Network
-
-When the server is bound to `0.0.0.0`:
-
-1. Find the device's IP address (shown in the app's connection info)
-2. Connect directly via `POST http://DEVICE_IP:8080/mcp` with bearer token
-
-**Warning**: Binding to `0.0.0.0` exposes the server to all devices on the same network. Only use on trusted private networks.
-
-To listen on one address only (the device's address on a VPN such as Tailscale, for example), choose **Specific IP** and enter an IP address of the device: the server listens on that address alone (plus `127.0.0.1` when a tunnel is enabled, for the tunnel), so normally only the network of that address reaches it, and does not start while the device does not have it.
-
-### Using Remote Access Tunnels
-
-For connecting from outside the local network without port forwarding:
-
-1. **Free E2E tunnel** (default, no account required): end-to-end encrypted. The phone enrolls with hardware key attestation, gets a name under `d.arc-tunnel.io` and a public certificate (Let's Encrypt, Google Trust Services or ZeroSSL) issued to its own key, and terminates TLS itself — the tunnel service only relays ciphertext (unlike Cloudflare or ngrok, which read the traffic). The refresh icon next to the URL re-enrolls under a new name. A Certificate Transparency check (on by default) warns if a certificate for your name is ever issued to another key. Self-hosters change the base address.
-2. **Cloudflare Quick Tunnels** (no account required): Creates a temporary tunnel with a random `*.trycloudflare.com` HTTPS URL.
-3. **ngrok** (account required): Supports optional custom domains. Requires an ngrok authtoken (free tier available). Available on arm64-v8a and x86_64 devices.
-
-Cloudflare and ngrok forward to `http://localhost:<tunnel local port>` (Settings → Tunnel), so they also work while the server serves HTTPS: the server then gives them a plain HTTP listener of its own on `127.0.0.1`.
-
-Enable the tunnel in the app's "Remote Access" section. The public URL is displayed in the connection info and server logs.
-
-### Headless Setup via ADB
-
-The app can be fully configured and controlled from the command line without opening the UI. This is useful for automated setups, CI pipelines, or headless devices.
-
-Replace `<app-id>` with the application ID for your build:
-- **Debug (gms flavor)**: `com.danielealbano.androidremotecontrolmcp.gms.debug`
-- **Debug (foss flavor)**: `com.danielealbano.androidremotecontrolmcp.foss.debug`
-- **Release (both flavors)**: `com.danielealbano.androidremotecontrolmcp`
-
-#### Grant Permissions
-
-```bash
-# Enable Accessibility Service (required for UI introspection, actions, and screenshots)
-adb shell settings put secure enabled_accessibility_services \
-  <app-id>/com.danielealbano.androidremotecontrolmcp.services.accessibility.McpAccessibilityService
-
-# Enable Notification Listener Service (required for notification tools)
-adb shell cmd notification allow_listener \
-  <app-id>/com.danielealbano.androidremotecontrolmcp.services.notifications.McpNotificationListenerService
-
-# Grant notification permission (Android 13+)
-adb shell pm grant <app-id> android.permission.POST_NOTIFICATIONS
-
-# Grant camera permission
-adb shell pm grant <app-id> android.permission.CAMERA
-
-# Grant microphone permission
-adb shell pm grant <app-id> android.permission.RECORD_AUDIO
-
-# Grant location permissions
-adb shell pm grant <app-id> android.permission.ACCESS_FINE_LOCATION
-adb shell pm grant <app-id> android.permission.ACCESS_COARSE_LOCATION
-adb shell pm grant <app-id> android.permission.ACCESS_BACKGROUND_LOCATION
-
-# Grant nearby WiFi devices permission (Android 13+)
-adb shell pm grant <app-id> android.permission.NEARBY_WIFI_DEVICES
-
-# Grant media read permissions (Android 13+)
-adb shell pm grant <app-id> android.permission.READ_MEDIA_IMAGES
-adb shell pm grant <app-id> android.permission.READ_MEDIA_VIDEO
-adb shell pm grant <app-id> android.permission.READ_MEDIA_AUDIO
-```
-
-See [docs/PERMISSIONS.md](docs/PERMISSIONS.md) for the full reference and a copy-paste script that grants everything in one go.
-
-#### Configure the App
-
-All extras are optional — only the ones provided are updated. The app does **not** need to be open.
-
-> **Requires adb.** The configuration receiver and the service trampoline are gated on
-> `android.permission.DUMP`, which the adb shell UID holds but ordinary apps cannot obtain. The
-> commands below work unchanged from `adb shell`; an app on the device cannot use them to
-> reconfigure the server. See the [Security](#security) section.
-
-```bash
-adb shell am broadcast \
-  -a com.danielealbano.androidremotecontrolmcp.ADB_CONFIGURE \
-  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbConfigReceiver \
-  --es bearer_token "my-secret-token" \
-  --es binding_address "0.0.0.0" \
-  --ei port 8080 \
-  --ez auto_start_on_boot true \
-  --ez hide_from_recents false \
-  --ez https_enabled false \
-  --es certificate_source "AUTO_GENERATED" \
-  --es certificate_hostname "mcp.local" \
-  --ez tunnel_enabled true \
-  --es tunnel_provider "android-remote-control-mcp-tunneld" \
-  --es arc_tunnel_base_address "arc-tunnel.io" \
-  --ez arc_tunnel_ct_check_enabled true \
-  --es cloudflare_tunnel_mode "TOKEN" \
-  --es cloudflare_tunnel_token "your-cloudflare-tunnel-token" \
-  --es cloudflare_tunnel_extra_args "--edge region1.v2.argotunnel.com:7844" \
-  --es ngrok_authtoken "your-ngrok-token" \
-  --es ngrok_domain "your-domain.ngrok-free.app" \
-  --ei tunnel_local_port 61200 \
-  --ei file_size_limit_mb 50 \
-  --ez allow_http_downloads false \
-  --ez allow_unverified_https_certs false \
-  --ez block_local_network_downloads false \
-  --ei download_timeout_seconds 60 \
-  --es device_slug "pixel8" \
-  --es tool_permissions '{"disabled_tools":["tap"],"disabled_params":{"swipe":["duration_ms"]}}'
-```
-
-```bash
-# Disable bearer authentication (use only on trusted networks; the server is open
-# only if OAuth is also disabled — see the Security section)
-adb shell am broadcast \
-  -a com.danielealbano.androidremotecontrolmcp.ADB_CONFIGURE \
-  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbConfigReceiver \
-  --ez bearer_token_enabled false
-```
-
-Bearer enforcement is controlled by `--ez bearer_token_enabled <bool>`, NOT by clearing the value. Clearing the value (`--es bearer_token ""`) while `bearer_token_enabled=true` makes `/mcp` fail CLOSED (401) — it does NOT open the server. The server accepts unauthenticated requests only when BOTH `bearer_token_enabled` and `oauth_enabled` are false.
-
-| Extra | Type | Description |
-|-------|------|-------------|
-| `bearer_token` | string | Static bearer-token value (clearing it while `bearer_token_enabled=true` fails closed, it does NOT disable auth) |
-| `bearer_token_enabled` | boolean | Enable/disable bearer-token authentication (controls enforcement, independent of the value) |
-| `oauth_enabled` | boolean | Enable/disable the self-contained OAuth 2.1 server (Claude.ai / Claude Desktop connectors) |
-| `public_url_override` | string | Pin the public host used for OAuth metadata and share links (empty = auto-detect from the request) |
-| `binding_address` | string | `127.0.0.1` (localhost), `0.0.0.0` (network) or another IP address literal of the device (specific IP) |
-| `port` | int | HTTP/HTTPS server port (1-65535) |
-| `auto_start_on_boot` | boolean | Start MCP server when device boots |
-| `hide_from_recents` | boolean | Exclude the app from the Android Recent Tasks list |
-| `https_enabled` | boolean | Enable HTTPS with TLS |
-| `certificate_source` | string | `AUTO_GENERATED` or `CUSTOM` |
-| `certificate_hostname` | string | Hostname for auto-generated certificate |
-| `tunnel_enabled` | boolean | Enable remote access tunnel |
-| `tunnel_provider` | string | `android-remote-control-mcp-tunneld` (free E2E tunnel), `CLOUDFLARE` or `NGROK` |
-| `arc_tunnel_base_address` | string | Base address of the free E2E tunnel service (default `arc-tunnel.io`; hosts `enroll.`, `connect.` and `d.` are derived) |
-| `arc_tunnel_ct_check_enabled` | boolean | Certificate Transparency check for the free E2E tunnel (default `true`) |
-| `arc_tunnel_enroll` | boolean | `true` enrolls the free E2E tunnel (or resumes a failed certificate issuance) with the settings in the same broadcast, while the app is visible and the server is stopped; headless, use the trampoline action `enroll-tunnel` below. The public URL appears in the Server tab |
-| `cloudflare_tunnel_mode` | string | `FREE` (Quick Tunnel, random `*.trycloudflare.com` URL) or `TOKEN` (named tunnel with static hostname) |
-| `cloudflare_tunnel_token` | string | Cloudflare named-tunnel token (used when `cloudflare_tunnel_mode` is `TOKEN`) |
-| `cloudflare_tunnel_extra_args` | string | Optional extra arguments passed to cloudflared (e.g. `--edge region1.v2.argotunnel.com:7844`) |
-| `ngrok_authtoken` | string | ngrok authentication token |
-| `ngrok_domain` | string | ngrok custom domain (optional) |
-| `tunnel_local_port` | int | Port Cloudflare and ngrok forward to on `localhost` (1-65535) |
-| `file_size_limit_mb` | int | Max file size for file operations (1-500) |
-| `allow_http_downloads` | boolean | Allow non-HTTPS downloads |
-| `allow_unverified_https_certs` | boolean | Allow unverified HTTPS certificates for downloads |
-| `block_local_network_downloads` | boolean | Refuse downloads from this phone, the local network and VPN addresses |
-| `download_timeout_seconds` | int | Download timeout (10-300) |
-| `device_slug` | string | Device identifier for tool name prefix |
-| `tool_permissions` | string (JSON) | Per-tool and per-parameter permissions: `{"disabled_tools":["tool_name"],"disabled_params":{"tool_name":["param"]}}` |
-| `storage_location_id` | string | ID of an existing storage location (from `android_list_storage_locations` or Settings > Storage); required by the two extras below, unknown IDs are ignored |
-| `storage_allow_write` | boolean | Allow write operations on the location identified by `storage_location_id` |
-| `storage_allow_delete` | boolean | Allow delete operations on the location identified by `storage_location_id` |
-
-#### Start the MCP Server
-
-The server must be started via a trampoline Activity (required on Android 12+ to gain foreground service exemption). This works even when the app is force-stopped.
-
-```bash
-adb shell am start \
-  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
-  --es action start
-```
-
-#### Stop the MCP Server
-
-```bash
-adb shell am start \
-  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
-  --es action stop
-```
-
-#### Enroll the Free E2E Tunnel
-
-Enrollment (getting the device's name and certificate) runs in a short foreground service. Headless, use the same trampoline Activity as for starting the server; it also resumes a failed certificate issuance. Run it while the server is stopped.
-
-```bash
-adb shell am start \
-  -n <app-id>/com.danielealbano.androidremotecontrolmcp.services.mcp.AdbServiceTrampolineActivity \
-  --es action enroll-tunnel
-```
-
-`--ez arc_tunnel_enroll true` on the configuration broadcast does the same when the app is visible; from the background Android 12+ refuses the foreground service start and the app reports "background start refused".
-
----
-
-## Permissions Reference
-
-The app declares the permissions below. **Normal** permissions are granted automatically at install. **Runtime** permissions and **Special access** require explicit user action (via the app's Settings > Permissions tab, or programmatically — see [Granting Permissions Programmatically](docs/PERMISSIONS.md)). All runtime permissions are optional: the app works without them, but the features that depend on them are disabled until granted.
-
-| Permission | Type | Used for |
-|------------|------|----------|
-| `INTERNET` | Normal | HTTP/HTTPS server and remote access tunnels |
-| `ACCESS_NETWORK_STATE` | Normal | Detect network connectivity |
-| `FOREGROUND_SERVICE` | Normal | Run the MCP server as a foreground service |
-| `FOREGROUND_SERVICE_SPECIAL_USE` | Normal | Foreground service type for the MCP server |
-| `FOREGROUND_SERVICE_LOCATION` | Normal | Foreground service type for the Event Channel (geofence/WiFi) |
-| `FOREGROUND_SERVICE_DATA_SYNC` | Normal | Foreground service type for the free E2E tunnel enrollment (name + certificate) |
-| `RECEIVE_BOOT_COMPLETED` | Normal | Auto-start the server on device boot |
-| `QUERY_ALL_PACKAGES` | Normal | Enumerate installed apps for app-management tools |
-| `KILL_BACKGROUND_PROCESSES` | Normal | Stop background apps via app-management tools |
-| `ACCESS_WIFI_STATE` | Normal | Read WiFi state for the Event Channel |
-| `CHANGE_WIFI_STATE` | Normal | Manage WiFi for the Event Channel |
-| `POST_NOTIFICATIONS` | Runtime | Show the foreground service notification (Android 13+) |
-| `CAMERA` | Runtime | Camera photo/video MCP tools |
-| `RECORD_AUDIO` | Runtime | Audio capture for camera video tools |
-| `ACCESS_FINE_LOCATION` | Runtime | Location tools and geofence events |
-| `ACCESS_COARSE_LOCATION` | Runtime | Approximate location |
-| `ACCESS_BACKGROUND_LOCATION` | Runtime | Location/geofence events while the app is in the background |
-| `NEARBY_WIFI_DEVICES` | Runtime | WiFi scanning for the Event Channel (Android 13+) |
-| `READ_MEDIA_IMAGES` | Runtime | "All files" mode for built-in image storage locations (Android 13+) |
-| `READ_MEDIA_VIDEO` | Runtime | "All files" mode for built-in video storage locations (Android 13+) |
-| `READ_MEDIA_AUDIO` | Runtime | "All files" mode for built-in audio storage locations (Android 13+) |
-| Accessibility Service | Special access | UI introspection, action execution, and screenshots — **required** for core functionality |
-| Notification Listener | Special access | Reading and managing notifications via notification tools |
-
----
-
-## Security
-
-### No Root Required
-
-The application runs entirely within Android's standard permission model. No root access, no unlocked bootloader, no custom ROM required.
-
-### Authentication
-
-Authentication is combined (dual-accept): a `/mcp` request is authorized by a valid static bearer token OR a valid issued OAuth access token. Enforcement is controlled by two independent toggles in **Settings → Access** — `bearer_token_enabled` (default on) and `oauth_enabled` (default on) — not by the token value. The bearer token is auto-generated once on first launch (UUID, preserved across app upgrades) and can be viewed, copied, or regenerated in the app. Clearing the value while bearer is enabled makes the server fail CLOSED (401). The server accepts unauthenticated requests only when BOTH toggles are off (the app shows a warning and a confirmation before that happens) — see the security note in the Connect section.
-
-### Network Security
-
-- **Default binding `127.0.0.1`**: Only accessible via adb port forwarding or tunnels (most secure)
-- **Optional binding `0.0.0.0`**: Accessible over network (use only on trusted networks; security warning displayed when enabling)
-- **Optional specific IP**: Listens on that address only (plus `127.0.0.1` for an enabled tunnel), so normally only the network of that address reaches it (same security warning)
-- **HTTPS**: Optional, disabled by default. When enabled, uses auto-generated self-signed certificates or upload your own CA-signed certificate. Certificate is stored in app-private storage.
-
-### Permissions
-
-All permissions are managed from the app's Settings > Permissions tab. Every sensitive permission requires explicit user action — nothing is granted silently.
-
-Storage locations are configured in Settings > Storage, which includes automatic locations (e.g., Downloads) and custom locations authorized via the system file picker.
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for build requirements, testing, architecture, and development conventions.
-
----
-
-## License
-
-This project is licensed under the GNU General Public License, version 3 or (at your option) any later version,
-with an additional permission under GPLv3 section 7 for combining it with the Google Play services client libraries.
-See [LICENSE.md](LICENSE.md) for the full text.
-
-Third-party components bundled with the app and their licenses are listed in
-[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+기존 MCP README와 기여 문서에는 원본 앱의 화면·배포 링크·이전 빌드 정보가 포함되어 있습니다. 여기콕의 제품 동작은 [PRODUCT.md](PRODUCT.md), 빌드 세부 설정은 현재 Gradle 파일과 Makefile을 기준으로 확인해주세요.
