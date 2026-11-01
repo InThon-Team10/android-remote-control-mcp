@@ -251,14 +251,17 @@ class McpAccessibilityService : AccessibilityService() {
             emptyList()
         }
 
+    /** The window id is read only for this app's own window events (other apps' events never need it). */
     private fun isOwnOverlayEvent(event: AccessibilityEvent): Boolean =
-        isOwnOverlayStateEvent(
-            event.eventType,
-            event.packageName,
-            event.windowId,
-            packageName,
-            ::getAccessibilityWindowsUnfiltered,
-        )
+        event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            event.packageName?.toString().let { it != null && it == packageName } &&
+            isOwnOverlayStateEvent(
+                event.eventType,
+                event.packageName,
+                event.windowId,
+                packageName,
+                ::getAccessibilityWindowsUnfiltered,
+            )
 
     /**
      * Returns the package name of the currently focused application,
