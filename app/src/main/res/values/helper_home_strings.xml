@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="helper_home_active_title">콕콕이가\n켜져 있어요</string>
+    <string name="helper_home_inactive_title">콕콕이가\n꺼져 있어요</string>
+    <string name="helper_home_ai_missing">앱의 AI 연결이 아직 준비되지 않았어요.</string>
+</resources>

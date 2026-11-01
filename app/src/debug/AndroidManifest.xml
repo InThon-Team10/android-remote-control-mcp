@@ -21,7 +21,7 @@
             android:exported="true"
             android:permission="android.permission.DUMP" />
 
-        <!-- Debug-only assistant test screen, opened from the helper settings page or by adb shell. -->
+        <!-- Debug-only assistant test screen, opened by adb shell. -->
         <!-- Gated on DUMP (adb-shell-only) for the same reason as E2EConfigReceiver above. -->
         <activity
             android:name=".debug.assistant.AssistantTestActivity"

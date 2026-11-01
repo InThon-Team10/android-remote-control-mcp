@@ -1,34 +1,28 @@
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.danielealbano.androidremotecontrolmcp.R
-import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
-import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityServiceProvider
 import com.danielealbano.androidremotecontrolmcp.services.mcp.McpServerService
-import com.danielealbano.androidremotecontrolmcp.utils.Logger
+import com.danielealbano.androidremotecontrolmcp.ui.helper.bubble.errorTextRes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-/** Mutable parts of the UI state that are not owned by another source. */
-private data class LocalState(
-    val accessibilityReady: Boolean = false,
-    val permissions: PermissionSnapshot = PermissionSnapshot(),
-    val busy: Boolean = false,
-    val errorRes: Int? = null,
-)
 
 @HiltViewModel
 class HelperEntryViewModel
@@ -37,123 +31,146 @@ class HelperEntryViewModel
         private val savedState: SavedStateHandle,
         private val settings: AssistantSettings,
         private val bubble: HelperBubble,
-        private val starter: AssistantServerStarter,
+        private val serverSwitch: HelperServerSwitch,
         private val accessibility: AccessibilityServiceProvider,
+        private val conversation: HelperConversationControl,
     ) : ViewModel() {
         private val local = MutableStateFlow(LocalState())
         private val navigation = MutableStateFlow(savedState.restoreNavigation())
 
-        val editor =
-            HelperSettingsEditor(settings, viewModelScope) {
-                local.update { it.copy(errorRes = R.string.entry_error_key_store) }
-            }
+        val editor = HelperSettingsEditor(settings, viewModelScope)
+
+        val setup =
+            HelperSetupFlow(
+                settings = settings,
+                accessibility = accessibility,
+                serverSwitch = serverSwitch,
+                local = local,
+                scope = viewModelScope,
+                navigate = ::navigate,
+                currentPage = { (navigation.value ?: HelperEntryModel.initial(false)).page },
+            )
 
         val uiState: StateFlow<HelperEntryUiState> =
             combine(
                 settings.config,
-                bubble.status,
                 McpServerService.serverStatus,
                 local,
                 navigation,
-            ) { config, bubbleStatus, server, local, nav ->
+                conversation.active,
+            ) { config, server, local, nav, conversationActive ->
                 HelperEntryUiState(
                     loaded = true,
                     model = nav ?: HelperEntryModel.initial(config.helperIntroSeen),
                     config = config,
-                    bubble = bubbleStatus,
                     server = server,
                     accessibilityReady = local.accessibilityReady,
                     permissions = local.permissions,
                     busy = local.busy,
                     errorRes = local.errorRes,
+                    conversationActive = conversationActive,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HelperEntryUiState())
 
-        /** Re-reads accessibility readiness and takes the permissions; on HOME while enabled it revives the server. */
+        /**
+         * Re-reads accessibility readiness and takes the permissions; on HOME while enabled it revives the server and
+         * on the permission page it continues the setup as soon as accessibility is on.
+         */
         fun onResume(
             context: Context,
             permissions: PermissionSnapshot,
         ) {
-            local.update { it.copy(accessibilityReady = accessibility.isReady(), permissions = permissions) }
+            val ready = accessibility.isReady()
+            local.update { it.copy(accessibilityReady = ready, permissions = permissions) }
             viewModelScope.launch {
                 val config = settings.getConfig()
                 val page = (navigation.value ?: HelperEntryModel.initial(config.helperIntroSeen)).page
-                if (config.enabled && page == HelperEntryPage.HOME) ensureServer(context)
+                when {
+                    page == HelperEntryPage.PERMISSION && ready -> setup.continueSetup(context)
+                    config.enabled && page == HelperEntryPage.HOME -> setup.ensureServer(context)
+                }
             }
         }
 
-        fun startSetup() {
-            navigate(HelperEntryModel::setup)
-            editor.setIntroSeen(true)
+        /** Keeps the floating 도움 버튼 hidden on every page but HOME; call while the activity is resumed. */
+        suspend fun suppressBubbleOffHome() {
+            try {
+                uiState
+                    .filter { it.loaded }
+                    .map { it.model.page != HelperEntryPage.HOME }
+                    .distinctUntilChanged()
+                    .collect { bubble.setSuppressed(it) }
+            } finally {
+                bubble.setSuppressed(false)
+            }
         }
 
+        fun startPractice() = endConversationThen(HelperEntryModel::practice)
+
         fun showIntroAgain() {
-            navigate(HelperEntryModel::intro)
+            endConversationThen(HelperEntryModel::intro)
             editor.setIntroSeen(false)
+        }
+
+        /** The live conversation must be over before the practice or the intro owns the microphone and the screen. */
+        private fun endConversationThen(transition: (HelperEntryModel) -> HelperEntryModel) {
+            viewModelScope.launch {
+                conversation.stop()
+                navigate(transition)
+            }
         }
 
         fun navigate(transition: (HelperEntryModel) -> HelperEntryModel) {
             val next = transition(uiState.value.model)
             savedState[KEY_PAGE] = next.page.name
-            savedState[KEY_RETURN] = next.returnPage.name
+            savedState[KEY_STEP] = next.step.name
             navigation.value = next
+            if (next.page == HelperEntryPage.HOME && !uiState.value.config.helperIntroSeen) editor.setIntroSeen(true)
         }
 
         fun dismissError() = local.update { it.copy(errorRes = null) }
 
-        /** "버블 켜기": starts the server from the visible [context], enables the helper and shows HOME. */
-        fun turnOn(context: Context) {
+        fun reportError(
+            @StringRes errorRes: Int,
+        ) = local.update { it.copy(errorRes = errorRes) }
+
+        /** "도우미 종료": ends the conversation, disables the helper and stops the server. */
+        fun turnOff(context: Context) {
             viewModelScope.launch {
-                if (ensureServer(context)) {
-                    settings.setEnabled(true)
-                    navigate(HelperEntryModel::home)
-                }
+                conversation.stop()
+                settings.setEnabled(false)
+                serverSwitch.stop(context)
             }
         }
 
-        fun turnOff() {
-            viewModelScope.launch { settings.setEnabled(false) }
+        /** Starts the live conversation; [onStarted] runs only after it started, a failure is shown as an error. */
+        fun openHelper(onStarted: () -> Unit) {
+            viewModelScope.launch {
+                local.update { it.copy(errorRes = null) }
+                conversation
+                    .start()
+                    .onSuccess { onStarted() }
+                    .onFailure { failure ->
+                        val error = (failure as? AssistantException)?.error
+                        local.update {
+                            it.copy(errorRes = error?.let(::errorTextRes) ?: R.string.bubble_error_generic)
+                        }
+                    }
+            }
         }
 
         fun openInput() = bubble.openInput()
 
-        private suspend fun ensureServer(context: Context): Boolean {
-            if (!local.tryMarkBusy()) return false
-            return try {
-                val result = starter.ensureRunning(context)
-                local.update { it.copy(errorRes = result.exceptionOrNull()?.let(::errorFor)) }
-                result.isSuccess
-            } finally {
-                local.update { it.copy(busy = false) }
-            }
-        }
-
-        private fun errorFor(failure: Throwable): Int {
-            Logger.w(TAG, "Server start failed")
-            return when ((failure as? AssistantException)?.error) {
-                AssistantError.ServerStartBlocked -> R.string.entry_error_blocked
-                else -> R.string.entry_error_start
-            }
-        }
-
         private companion object {
-            const val TAG = "MCP:HelperEntry"
             const val STOP_TIMEOUT_MS = 5_000L
         }
     }
 
-private fun MutableStateFlow<LocalState>.tryMarkBusy(): Boolean {
-    while (true) {
-        val current = value
-        if (current.busy) return false
-        if (compareAndSet(current, current.copy(busy = true, errorRes = null))) return true
-    }
-}
-
 private fun SavedStateHandle.restoreNavigation(): HelperEntryModel? {
     fun page(key: String) = get<String>(key)?.let { runCatching { HelperEntryPage.valueOf(it) }.getOrNull() }
-    return page(KEY_PAGE)?.let { HelperEntryModel(it, page(KEY_RETURN) ?: HelperEntryPage.HOME) }
+    val step = get<String>(KEY_STEP)?.let { runCatching { HelperPracticeStep.valueOf(it) }.getOrNull() }
+    return page(KEY_PAGE)?.let { HelperEntryModel(it, step ?: HelperPracticeStep.OPEN) }
 }
 
 private const val KEY_PAGE = "page"
-private const val KEY_RETURN = "return_page"
+private const val KEY_STEP = "practice_step"

@@ -10,13 +10,7 @@ interface HelperSetupActions {
 
     fun requestMicrophone()
 
-    fun acceptConsent()
-
     fun setVoice(enabled: Boolean)
-
-    fun saveKey(key: String)
-
-    fun clearKey()
 }
 
 /** Entry points of the settings page that leave the app's own screens. */
@@ -28,9 +22,17 @@ interface HelperSettingsActions {
 
 /** Navigation and home actions of the entry flow. */
 interface HelperEntryActions : HelperSettingsActions {
-    fun startSetup()
-
     fun navigate(transition: (HelperEntryModel) -> HelperEntryModel)
+
+    /** Moves on to the first setup step that is still missing, turning the helper on when none is. */
+    fun continueSetup()
+
+    fun acceptConsent()
+
+    /** The microphone page's "later": the helper still turns on, talking asks for the permission again. */
+    fun skipMicrophone()
+
+    fun startPractice()
 
     fun turnOn()
 

@@ -17,10 +17,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.ui.theme.AndroidRemoteControlMcpTheme
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import com.danielealbano.androidremotecontrolmcp.utils.PermissionUtils
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 /** The app's launcher: explains the helper, walks through the setup and shows its real status. */
 @AndroidEntryPoint
@@ -29,12 +34,27 @@ class HelperActivity : ComponentActivity() {
 
     private val notificationLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { reportResume() }
+    private var openAfterMicrophone = false
     private val microphoneLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { reportResume() }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            reportResume()
+            viewModel.setup.onMicrophoneAnswered(this, granted)
+            if (openAfterMicrophone) {
+                openAfterMicrophone = false
+                if (granted) openConversation() else viewModel.reportError(R.string.bubble_error_mic_permission)
+            }
+        }
 
     private val setupActions =
         object : HelperSetupActions {
-            override fun openAccessibilitySettings() = PermissionUtils.openAccessibilitySettings(this@HelperActivity)
+            override fun openAccessibilitySettings() {
+                try {
+                    PermissionUtils.openAccessibilitySettings(this@HelperActivity)
+                } catch (e: ActivityNotFoundException) {
+                    Logger.w(TAG, "Accessibility settings cannot be opened", e)
+                    viewModel.reportError(R.string.helper_onboard_permission_error)
+                }
+            }
 
             override fun openAppInfo() =
                 startSafely(
@@ -45,29 +65,32 @@ class HelperActivity : ComponentActivity() {
 
             override fun requestMicrophone() = microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
 
-            override fun acceptConsent() = viewModel.editor.acceptConsent()
-
             override fun setVoice(enabled: Boolean) = viewModel.editor.setVoice(enabled)
-
-            override fun saveKey(key: String) = viewModel.editor.saveKey(key)
-
-            override fun clearKey() = viewModel.editor.clearKey()
         }
 
     private val actions =
         object : HelperEntryActions {
-            override fun startSetup() = viewModel.startSetup()
-
             override fun navigate(transition: (HelperEntryModel) -> HelperEntryModel) = viewModel.navigate(transition)
 
-            override fun turnOn() = viewModel.turnOn(this@HelperActivity)
+            override fun continueSetup() = viewModel.setup.continueSetup(this@HelperActivity)
 
-            override fun turnOff() = viewModel.turnOff()
+            override fun acceptConsent() = viewModel.setup.acceptConsent(this@HelperActivity)
+
+            override fun skipMicrophone() = viewModel.setup.turnOn(this@HelperActivity)
+
+            override fun startPractice() = viewModel.startPractice()
+
+            override fun turnOn() = viewModel.setup.turnOn(this@HelperActivity)
+
+            override fun turnOff() = viewModel.turnOff(this@HelperActivity)
 
             override fun openHelper() {
-                val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-                startSafely(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                Handler(Looper.getMainLooper()).post { viewModel.openInput() }
+                if (PermissionUtils.isMicrophonePermissionGranted(this@HelperActivity)) {
+                    openConversation()
+                } else {
+                    openAfterMicrophone = true
+                    microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
             }
 
             override fun setSpeech(enabled: Boolean) = viewModel.editor.setSpeech(enabled)
@@ -91,9 +114,10 @@ class HelperActivity : ComponentActivity() {
                 }
             },
         )
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.RESUMED) { viewModel.suppressBubbleOffHome() } }
         setContent {
             val state by viewModel.uiState.collectAsState()
-            AndroidRemoteControlMcpTheme {
+            AndroidRemoteControlMcpTheme(dynamicColor = false) {
                 HelperEntryScreen(state, actions, setupActions)
             }
         }
@@ -102,6 +126,15 @@ class HelperActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         reportResume()
+    }
+
+    /** The conversation is live: show the 도움 버튼 on top of the launcher home screen. */
+    private fun openConversation() {
+        viewModel.openHelper {
+            val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            startSafely(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            Handler(Looper.getMainLooper()).post { viewModel.openInput() }
+        }
     }
 
     private fun reportResume() {
