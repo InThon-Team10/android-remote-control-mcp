@@ -67,6 +67,7 @@ class AssistantSettingsImpl
         override suspend fun setApiKey(key: String) {
             val trimmed = key.trim()
             require(trimmed.isNotEmpty()) { "API key cannot be blank" }
+            require(trimmed.all { it.code in PRINTABLE_ASCII }) { "API key contains characters that cannot be sent" }
             writeApiKeyCiphertext(withContext(ioDispatcher) { cipher.encrypt(trimmed) })
         }
 
@@ -193,3 +194,6 @@ private fun Preferences.toConfig(
         helperSpeechEnabled = this[ASSISTANT_HELPER_SPEECH_ENABLED_KEY] ?: true,
     )
 }
+
+/** The only characters an API key can carry: it travels as an HTTP header value, which rejects the rest. */
+private val PRINTABLE_ASCII = 0x20..0x7E
