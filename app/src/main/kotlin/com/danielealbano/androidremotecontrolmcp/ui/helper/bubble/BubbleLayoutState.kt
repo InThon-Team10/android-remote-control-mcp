@@ -20,22 +20,3 @@ internal fun resolveLayout(
         thinking = thinkingShown,
     )
 }
-
-/**
- * Per-request latch for the thinking screen: it shows from the request until the first guidance step, never again in
- * that request (between steps only the bubble's busy label shows), and a new request starts it again.
- */
-internal data class ThinkingTracker(
-    private val latched: Boolean = false,
-    val visible: Boolean = false,
-) {
-    fun next(
-        awaiting: Boolean,
-        guidanceActive: Boolean,
-    ): ThinkingTracker =
-        when {
-            !awaiting -> ThinkingTracker()
-            guidanceActive -> ThinkingTracker(latched = true, visible = false)
-            else -> ThinkingTracker(latched = latched, visible = !latched)
-        }
-}

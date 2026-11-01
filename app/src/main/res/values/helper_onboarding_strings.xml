@@ -7,7 +7,7 @@
     <string name="helper_onboard_welcome_safety">연습용 화면에서 편하게 연습해요. 잘못 눌러도 괜찮아요.</string>
     <string name="helper_onboard_start_practice">함께 연습하기</string>
     <string name="helper_onboard_invite_title">이제 콕콕이를\n불러볼까요?</string>
-    <string name="helper_onboard_invite_body">콕콕이를 켜 둘까요? 여기콕에서 ‘물어보기’를 누르면 콕콕이와 대화가 시작되고, 대화하는 동안 화면 옆에 도움 버튼이 생겨요.</string>
+    <string name="helper_onboard_invite_body">콕콕이를 켜 둘까요? 화면 옆 도움 버튼을 눌러 글로 요청할 수 있어요.</string>
     <string name="helper_onboard_enable_yes">예, 콕콕이 켜기</string>
     <string name="helper_onboard_replay">한 번 더 연습하기</string>
     <string name="helper_onboard_permission_title">콕콕이가 화면을 보고 가리키려면\n허용이 필요해요</string>
@@ -21,14 +21,14 @@
     <string name="helper_onboard_enable_home">콕콕이 켜기</string>
     <string name="helper_onboard_practice_again">사용법 다시 연습하기</string>
     <string name="helper_consent_title">안내를 받기 전에\n확인해 주세요</string>
-    <string name="helper_consent_body">콕콕이와 대화하는 동안 내 목소리와 입력한 글, 지금 화면의 글자·버튼 이름·위치가 OpenAI로 전송돼요. 필요하면 화면 사진(스크린샷)도 함께 전송돼요. 화면에 개인정보가 있으면 함께 전송될 수 있어요.</string>
+    <string name="helper_consent_body">요청을 보내면 입력한 글과 지금 화면의 글자·버튼 이름·위치가 OpenAI로 전송돼요. 필요하면 화면 사진도 전송돼요. 화면에 개인정보가 있으면 함께 전송될 수 있어요. 음성 입력은 기기에서 글자로 바꾸고, 확인한 글만 요청으로 보내요.</string>
     <string name="helper_consent_control">콕콕이는 누를 곳을 알려주고, 선택은 내가 직접 해요. 동의하지 않아도 사용법 연습은 할 수 있어요.</string>
     <string name="helper_consent_accept">화면 정보 전송에 동의하고 계속</string>
     <string name="helper_consent_defer">동의하지 않고 나중에 하기</string>
     <string name="helper_consent_error">동의를 저장하지 못했어요. 다시 시도해 주세요.</string>
-    <string name="helper_mic_setup_title">말로 대화해 볼까요?</string>
-    <string name="helper_mic_setup_body">마이크는 콕콕이와 말로 대화하는 동안에만 들어요. 대화가 끝나면 마이크도 꺼져요. 허용하지 않으면 지금은 대화를 시작할 수 없어요.</string>
-    <string name="helper_mic_setup_privacy">대화하는 동안 말한 목소리는 OpenAI로 전송돼요.</string>
+    <string name="helper_mic_setup_title">말을 글자로 입력할까요?</string>
+    <string name="helper_mic_setup_body">마이크 버튼을 누르면 말한 내용을 글자로 바꿔요. 글을 확인하고 요청 보내기를 눌러 주세요. 허용하지 않아도 직접 입력할 수 있어요.</string>
+    <string name="helper_mic_setup_privacy">음성은 기기에서 글자로 바꿔요. 목소리는 OpenAI로 보내지 않아요.</string>
     <string name="helper_mic_setup_allow">마이크 허용하기</string>
     <string name="helper_mic_setup_skip">나중에 하기</string>
 </resources>

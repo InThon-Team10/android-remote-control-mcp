@@ -1,35 +1,28 @@
 package com.danielealbano.androidremotecontrolmcp.ui.helper
 
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.isActive
+import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject
 
-/**
- * What the entry screens need from the live conversation, and nothing more. The provider stream behind
- * [LiveVoiceSession] implements it by exposing its connecting/listening/speaking states through the session.
- */
+/** Entry lifecycle for text guidance; dictation belongs to the request panel. */
 interface HelperConversationControl {
-    /** True while a conversation holds the microphone (connecting, listening or speaking). */
+    /** No background microphone conversation is active in text mode. */
     val active: Flow<Boolean>
 
-    /** Idempotent while running; the failure is a typed `AssistantException`. */
     suspend fun start(): Result<Unit>
 
-    /** Ends the conversation and releases the microphone; idempotent. */
     suspend fun stop()
 }
 
-class LiveHelperConversationControl
+class TextHelperConversationControl
     @Inject
     constructor(
-        private val session: LiveVoiceSession,
+        private val session: AssistantSession,
     ) : HelperConversationControl {
-        override val active: Flow<Boolean> = session.state.map { it.isActive() }.distinctUntilChanged()
+        override val active: Flow<Boolean> = flowOf(false)
 
-        override suspend fun start(): Result<Unit> = session.start()
+        override suspend fun start(): Result<Unit> = Result.success(Unit)
 
         override suspend fun stop() = session.stop()
     }

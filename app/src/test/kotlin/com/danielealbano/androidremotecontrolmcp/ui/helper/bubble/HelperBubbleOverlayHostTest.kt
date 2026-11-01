@@ -6,8 +6,6 @@ import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerSt
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
 import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.InFlightToolCallSignal
@@ -46,7 +44,6 @@ class HelperBubbleOverlayHostTest {
     private val settings = mockk<AssistantSettings> { every { config } returns this@HelperBubbleOverlayHostTest.config }
     private val guidance = mockk<GuidanceController> { every { state } returns guidanceState }
     private val speaker = mockk<HelperSpeaker>(relaxed = true)
-    private val liveVoice = mockk<LiveVoiceSession> { every { state } returns MutableStateFlow(LiveVoiceState.Idle) }
     private val toolCalls = InFlightToolCallSignal()
     private val liveActive = MutableStateFlow(false)
     private val conversation = mockk<HelperConversationControl> { every { active } returns liveActive }
@@ -71,7 +68,6 @@ class HelperBubbleOverlayHostTest {
             settings,
             guidance,
             speaker,
-            liveVoice,
             mockk<AssistantServerStarter>(),
             toolCalls,
             conversation,
@@ -260,7 +256,7 @@ class HelperBubbleOverlayHostTest {
             items.value = items.value + ChatItem.Assistant(2, "new")
             advanceUntilIdle()
 
-            verify(exactly = 1) { speaker.speak("new") }
+            verify(exactly = 0) { speaker.speak(any()) }
         }
 
     @Test
@@ -291,7 +287,6 @@ class HelperBubbleOverlayHostTest {
                     settings,
                     guidance,
                     speaker,
-                    liveVoice,
                     mockk<AssistantServerStarter>(),
                     toolCalls,
                     conversation,
@@ -348,7 +343,6 @@ class HelperBubbleOverlayHostTest {
                     settings,
                     guidance,
                     speaker,
-                    liveVoice,
                     mockk<AssistantServerStarter>(),
                     toolCalls,
                     conversation,
@@ -366,5 +360,27 @@ class HelperBubbleOverlayHostTest {
             advanceUntilIdle()
 
             assertEquals(listOf(333), saves)
+        }
+
+    @Test
+    fun `thinking returns between steps even after assistant text without reopening chat`() =
+        runTest {
+            val host = host()
+            host.attach(service)
+            advanceUntilIdle()
+            host.openInput()
+            sessionState.value = SessionState.Running
+            items.value = listOf(ChatItem.User(1, "q"), ChatItem.Assistant(2, "intermediate"))
+            advanceUntilIdle()
+            guidanceState.value = mockk<GuidanceState>()
+            advanceUntilIdle()
+            guidanceState.value = null
+            advanceUntilIdle()
+            verifyOrder {
+                controller.setThinking(true)
+                controller.setThinking(false)
+                controller.setThinking(true)
+                controller.setPanelOpen(false)
+            }
         }
 }

@@ -2,16 +2,38 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.guidance.ScreenPoint
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
 @DisplayName("ElderGuidanceGeometry")
 class ElderGuidanceGeometryTest {
+    @Test
+    fun `all content directions map to opposite finger directions safely inside screen`() {
+        val screen = ScreenInfo(1080, 2400, 420, "portrait")
+        val opposite =
+            mapOf(
+                ScrollDirection.DOWN to ScrollDirection.UP,
+                ScrollDirection.UP to ScrollDirection.DOWN,
+                ScrollDirection.LEFT to ScrollDirection.RIGHT,
+                ScrollDirection.RIGHT to ScrollDirection.LEFT,
+            )
+        opposite.forEach { (content, finger) ->
+            val (start, end) = requireNotNull(ElderGuidanceGeometry.scrollPath(BoundsData(0, 0, 1080, 2400), content, screen))
+            assertEquals(finger, ElderGuidanceGeometry.swipeDirection((end.x - start.x).toFloat(), (end.y - start.y).toFloat()))
+            listOf(start, end).forEach { point ->
+                assertTrue(point.x in 84..996 && point.y in 84..2316)
+                assertTrue(!ElderGuidanceGeometry.isSystemEdge(point.x.toFloat(), point.y.toFloat(), screen))
+            }
+        }
+    }
+
     private fun node(
         id: String,
         bounds: BoundsData,

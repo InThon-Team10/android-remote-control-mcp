@@ -115,6 +115,72 @@ class ElderGuidanceIntegrationTest {
     ) = tool.inputSchema.properties?.containsKey(name) == true
 
     @Test
+    fun `screenshot target bounds highlight only the chosen chat row`() =
+        runTest {
+            val deps = depsWithScreen()
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result =
+                    client.callTool(
+                        "android_tap",
+                        mapOf(
+                            "x" to 540,
+                            "y" to 900,
+                            "target_bounds" to mapOf("left" to 0, "top" to 800, "right" to 1080, "bottom" to 1000),
+                        ),
+                    )
+                assertNotEquals(true, result.isError)
+                assertEquals(BoundsData(0, 800, 1080, 1000), controller.targets.single().bounds)
+                assertEquals(GuidanceKind.TAP, controller.targets.single().kind)
+                coVerify(exactly = 0) { deps.actionExecutor.tap(any(), any()) }
+            }
+        }
+
+    @Test
+    fun `screenshot target rejects whole list and point outside the chosen row`() =
+        runTest {
+            val deps = depsWithScreen()
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                listOf(
+                    mapOf("left" to 0, "top" to 0, "right" to 1080, "bottom" to 2400),
+                    mapOf("left" to 0, "top" to 300, "right" to 1080, "bottom" to 500),
+                ).forEach { bounds ->
+                    val result = client.callTool("android_tap", mapOf("x" to 540, "y" to 900, "target_bounds" to bounds))
+                    assertEquals(true, result.isError)
+                }
+                assertTrue(controller.targets.isEmpty())
+            }
+        }
+
+    @Test
+    fun `home gesture overrides content coordinates with bottom edge and never operates phone`() =
+        runTest {
+            val deps = depsWithScreen()
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result =
+                    client.callTool(
+                        "android_swipe",
+                        mapOf(
+                            "gesture" to "home",
+                            "x1" to 540,
+                            "y1" to 1800,
+                            "x2" to 540,
+                            "y2" to 800,
+                            "instruction" to "화면 안쪽에서 밀어 주세요",
+                        ),
+                    )
+                assertNotEquals(true, result.isError)
+                val target = controller.targets.single()
+                assertEquals(ScreenPoint(540, 2399), target.swipeStart)
+                assertEquals(ScreenPoint(540, 1979), target.swipeEnd)
+                assertEquals(ScrollDirection.UP, target.scrollDirection)
+                assertTrue(target.systemGesture)
+                assertTrue(target.instruction.contains("맨 아래 가장자리"))
+                assertTrue(target.instruction.contains("바로 손을 떼"))
+                coVerify(exactly = 0) { deps.actionExecutor.swipe(any(), any(), any(), any(), any()) }
+            }
+        }
+
+    @Test
     fun `a tool that changes the device by itself is refused with a guide-the-user error`() =
         runTest {
             val deps = depsWithScreen()
@@ -301,21 +367,14 @@ class ElderGuidanceIntegrationTest {
         }
 
     @Test
-    fun `scroll_node on a list mostly behind a floating bar is still shown`() =
+    fun `scroll_node refuses a path covered by a floating bar`() =
         runTest {
-            // The user scrolls by swiping anywhere on the list, so a covered list is no reason to refuse
             val list = plain("node_list", underSearchBar).copy(scrollable = true)
             val deps = depsWith(rootOf(list, searchBar), list)
-
             McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
-                val result =
-                    client.callTool("android_scroll_node", mapOf("node_id" to "node_list", "direction" to "up"))
-
-                assertNotEquals(true, result.isError)
-                val target = controller.targets.single()
-                assertEquals(underSearchBar, target.bounds)
-                assertEquals(GuidanceKind.SCROLL, target.kind)
-                assertEquals(ScrollDirection.UP, target.scrollDirection)
+                val result = client.callTool("android_scroll_node", mapOf("node_id" to "node_list", "direction" to "up"))
+                assertEquals(true, result.isError)
+                assertTrue(controller.targets.isEmpty())
             }
         }
 
@@ -364,7 +423,7 @@ class ElderGuidanceIntegrationTest {
                 val target = controller.targets.single()
                 assertEquals(BoundsData(0, 300, 1080, 2400), target.bounds)
                 assertEquals(GuidanceKind.SCROLL, target.kind)
-                assertEquals(ScrollDirection.DOWN, target.scrollDirection)
+                assertEquals(ScrollDirection.UP, target.scrollDirection)
             }
         }
 
@@ -489,17 +548,28 @@ class ElderGuidanceIntegrationTest {
         }
 
     @Test
-    fun `scroll_node highlights with the requested direction`() =
+    fun `scroll_node down shows an upward finger path inside the list`() =
         runTest {
-            val deps = depsWithScreen()
-
+            val list = plain("node_list", BoundsData(0, 300, 1080, 2400)).copy(scrollable = true)
+            val deps = depsWith(rootOf(list), list)
             McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
-                client.callTool("android_scroll_node", mapOf("node_id" to "node_btn", "direction" to "down"))
-
+                client.callTool("android_scroll_node", mapOf("node_id" to "node_list", "direction" to "down"))
                 val target = controller.targets.single()
                 assertEquals(GuidanceKind.SCROLL, target.kind)
-                assertEquals(ScrollDirection.DOWN, target.scrollDirection)
-                assertNull(target.swipeStart)
+                assertEquals(ScrollDirection.UP, target.scrollDirection)
+                assertTrue(requireNotNull(target.swipeStart).y > requireNotNull(target.swipeEnd).y)
+                assertFalse(target.systemGesture)
+            }
+        }
+
+    @Test
+    fun `scroll_node rejects a non scrollable button`() =
+        runTest {
+            val deps = depsWithScreen()
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result = client.callTool("android_scroll_node", mapOf("node_id" to "node_btn", "direction" to "down"))
+                assertEquals(true, result.isError)
+                assertTrue(controller.targets.isEmpty())
             }
         }
 
@@ -524,16 +594,13 @@ class ElderGuidanceIntegrationTest {
         }
 
     @Test
-    fun `a swipe starting off screen carries its start point clamped to the screen`() =
+    fun `a swipe starting off screen is rejected instead of guessed`() =
         runTest {
             val deps = depsWithScreen()
-
             McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
-                client.callTool("android_swipe", mapOf("x1" to 1500, "y1" to 1800, "x2" to 540, "y2" to 1800))
-
-                val target = controller.targets.single()
-                assertEquals(ScrollDirection.LEFT, target.scrollDirection)
-                assertEquals(ScreenPoint(1079, 1800), target.swipeStart)
+                val result = client.callTool("android_swipe", mapOf("x1" to 1500, "y1" to 1800, "x2" to 540, "y2" to 1800))
+                assertEquals(true, result.isError)
+                assertTrue(controller.targets.isEmpty())
             }
         }
 

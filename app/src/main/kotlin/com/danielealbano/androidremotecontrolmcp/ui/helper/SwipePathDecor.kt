@@ -126,3 +126,40 @@ private fun DrawScope.drawArrowHead(
 }
 
 private fun pathStroke(width: Float) = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round)
+
+/** The drawn tip is the validated endpoint, including diagonal paths and paths near an edge. */
+@Composable
+internal fun ExactSwipePathLine(
+    start: ScreenPoint,
+    end: ScreenPoint,
+    window: PxRect,
+) {
+    val animate = remember { ValueAnimator.areAnimatorsEnabled() }
+    val phase = if (animate) pathPhase() else PATH_PHASE_STILL
+    Canvas(Modifier.fillMaxSize()) {
+        val from = Offset((start.x - window.left).toFloat(), (start.y - window.top).toFloat())
+        val to = Offset((end.x - window.left).toFloat(), (end.y - window.top).toFloat())
+        val delta = to - from
+        val length = delta.getDistance()
+        if (length == 0f) return@Canvas
+        val unit = delta / length
+        val perpendicular = Offset(-unit.y, unit.x)
+        val stroke = PATH_STROKE.toPx()
+        drawLine(HALO_COLOR, from, to, stroke + PATH_HALO_EXTRA.toPx(), StrokeCap.Round)
+        drawLine(DECOR_COLOR.copy(alpha = PATH_LINE_ALPHA), from, to, stroke, StrokeCap.Round)
+        val tips = if (animate && phase < 1f) listOf(to, from + delta * phase) else listOf(to)
+        tips.forEach { tip ->
+            val back = tip - unit * HEAD_SIZE.toPx()
+            val left = back + perpendicular * HEAD_SIZE.toPx()
+            val right = back - perpendicular * HEAD_SIZE.toPx()
+            val head =
+                Path().apply {
+                    moveTo(left.x, left.y)
+                    lineTo(tip.x, tip.y)
+                    lineTo(right.x, right.y)
+                }
+            drawPath(head, HALO_COLOR, style = pathStroke(stroke + PATH_HALO_EXTRA.toPx()))
+            drawPath(head, DECOR_COLOR, style = pathStroke(stroke))
+        }
+    }
+}

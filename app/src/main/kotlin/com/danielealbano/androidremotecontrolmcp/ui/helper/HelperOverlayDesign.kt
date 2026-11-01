@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
@@ -92,12 +93,16 @@ internal fun CaptionBubble(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(GuidanceDisplay.CAPTION_LINE_GAP_DP.dp),
             ) {
-                Text(caption.instruction, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    caption.instruction,
+                    style = MaterialTheme.typography.titleLarge.copy(platformStyle = PlatformTextStyle(includeFontPadding = true)),
+                )
                 caption.explanation?.let { explanation ->
                     Text(
                         explanation,
                         style =
                             MaterialTheme.typography.bodyLarge.copy(
+                                platformStyle = PlatformTextStyle(includeFontPadding = true),
                                 fontSize = GuidanceDisplay.EXPLANATION_TEXT_SP.sp,
                                 lineHeight = GuidanceDisplay.EXPLANATION_LINE_SP.sp,
                             ),
@@ -160,28 +165,24 @@ internal fun SpotlightBand(
     val density = LocalDensity.current
     DimLayer {
         if (layout.captionSide == side) {
-            val room = layout.caption
+            val margin = with(density) { 16.dp.roundToPx() }
+            val top = if (layout.captionBelow) layout.caption.top else band.top + margin
+            val bottom = if (layout.captionBelow) band.bottom - margin else layout.caption.bottom
+            val height = maxOf(0, bottom - top)
             Box(
                 Modifier
-                    .offset { IntOffset(room.left - band.left, room.top - band.top) }
-                    .size(with(density) { DpSize(room.width.toDp(), room.height.toDp()) }),
+                    .offset { IntOffset(layout.caption.left - band.left, top - band.top) }
+                    .size(with(density) { DpSize(layout.caption.width.toDp(), height.toDp()) }),
                 contentAlignment = if (layout.captionBelow) Alignment.TopStart else Alignment.BottomStart,
             ) {
-                CaptionBubble(
+                TypeHintCaption(
                     caption,
-                    modifier = Modifier.fillMaxWidth(),
-                    pointerX = if (layout.captionFits) holeCenterX - room.left else null,
-                    pointerUp = layout.captionBelow,
+                    if (layout.captionFits) holeCenterX - layout.caption.left else null,
+                    layout.captionBelow,
+                    with(density) { height.toDp() },
+                    onClose,
                 )
             }
-        }
-        if (layout.closeSide == side) {
-            GuidanceCloseButton(
-                onClose,
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .offset { IntOffset(-16.dp.roundToPx(), layout.closeTop - band.top) },
-            )
         }
     }
 }

@@ -26,6 +26,8 @@ data class GuidanceTarget(
     val explanation: String? = null,
     val scrollDirection: ScrollDirection? = null,
     val swipeStart: ScreenPoint? = null,
+    val swipeEnd: ScreenPoint? = null,
+    val systemGesture: Boolean = false,
 )
 
 /** Why a [GuidanceController.guide] wait ended. */

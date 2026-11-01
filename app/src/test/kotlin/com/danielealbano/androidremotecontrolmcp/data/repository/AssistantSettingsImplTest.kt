@@ -114,7 +114,7 @@ class AssistantSettingsImplTest {
         testScope.runTest {
             dataStore.edit { it[ASSISTANT_MODEL_KEY] = "gemini-flash-latest" }
 
-            assertEquals("gpt-6-luna", settings.config.first().model)
+            assertEquals("gpt-6.1-terra", settings.config.first().model)
             assertFailsWith<IllegalArgumentException> { settings.setModel("gemini-flash-latest") }
         }
 

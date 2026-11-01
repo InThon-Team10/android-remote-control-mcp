@@ -72,6 +72,7 @@ internal data class GuidanceWindowSpec(
     val watchOutside: Boolean = false,
     val wrapHeight: Boolean = false,
     val bottomAnchored: Boolean = false,
+    val behindKeyboard: Boolean = false,
 )
 
 /**
@@ -158,6 +159,7 @@ internal class GuidanceWindowSet(
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+        if (spec.behindKeyboard) flags = flags or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
         if (!spec.touchable) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         if (spec.watchOutside) flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
         val height =

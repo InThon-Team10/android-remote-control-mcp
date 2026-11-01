@@ -15,16 +15,16 @@ class AssistantConfigTest {
 
         assertFalse(config.enabled)
         assertFalse(config.voiceEnabled)
-        assertEquals("gpt-6-luna", config.model)
+        assertEquals("gpt-6.1-terra", config.model)
         assertEquals(30, config.stepLimit)
         assertFalse(config.privacyNoticeAccepted)
         assertFalse(config.apiKeyConfigured)
     }
 
     @Test
-    fun `the text model is pinned to gpt-6-luna and voice to gpt-realtime-2_1`() {
-        assertEquals(listOf("gpt-6-luna"), AssistantConfig.MODELS)
-        assertEquals("gpt-6-luna", AssistantConfig.DEFAULT_MODEL)
+    fun `the text model is pinned to Terra and voice to gpt-realtime-2_1`() {
+        assertEquals(listOf("gpt-6.1-terra"), AssistantConfig.MODELS)
+        assertEquals("gpt-6.1-terra", AssistantConfig.DEFAULT_MODEL)
         assertEquals("gpt-realtime-2.1", AssistantConfig.LIVE_MODEL)
     }
 

@@ -31,6 +31,50 @@ class SpotlightGeometryTest {
     ) = swipePathLayout(area, ScreenPoint(x, y), direction, metrics, screen)
 
     @Test
+    fun `full screen target keeps a caption band and a usable touch area`() {
+        val target = PxRect(0, 0, 1080, 2340)
+        val hole = requireNotNull(reserveCaptionRoom(target, screen, 650, 160))
+        assertTrue(hole.top >= 650 || screen.height - hole.bottom >= 650)
+        assertTrue(hole.height >= 160)
+        assertTrue(hole.top >= target.top && hole.bottom <= target.bottom)
+    }
+
+    @Test
+    fun `large target with keyboard and large font still leaves half viewport for caption`() {
+        val viewport = PxSize(1080, 1000)
+        val hole = requireNotNull(reserveCaptionRoom(PxRect(0, 0, 1080, 1000), viewport, 500, 160))
+        assertEquals(PxRect(0, 500, 1080, 1000), hole)
+    }
+
+    @Test
+    fun `small target with room is unchanged and impossible placement is rejected`() {
+        val target = PxRect(100, 900, 900, 1100)
+        assertEquals(target, reserveCaptionRoom(target, screen, 650, 160))
+        assertNull(reserveCaptionRoom(PxRect(0, 0, 1080, 200), PxSize(1080, 200), 120, 160))
+    }
+
+    @Test
+    fun `home path leaves bottom centre start free of every overlay strip`() {
+        val start = ScreenPoint(540, 2339)
+        val end = ScreenPoint(540, 1919)
+        val layout = swipePathLayout(PxRect(414, 1793, 666, 2340), start, ScrollDirection.UP, metrics, screen, end)
+        assertFalse(requireNotNull(layout.line).contains(start))
+        assertTrue(layout.ringStrips.none { it.contains(start) })
+        assertTrue(requireNotNull(layout.line).contains(end))
+    }
+
+    @Test
+    fun `exact diagonal swipe keeps its endpoint in the line window and its start uncovered`() {
+        val start = ScreenPoint(540, 1800)
+        val end = ScreenPoint(720, 700)
+        val layout = swipePathLayout(PxRect(400, 550, 850, 1950), start, ScrollDirection.UP, metrics, screen, end)
+        val line = requireNotNull(layout.line)
+        assertTrue(end.x >= line.left && end.x < line.right && end.y >= line.top && end.y < line.bottom)
+        assertTrue(start.y >= line.bottom)
+        assertTrue(layout.ringStrips.none { start.x >= it.left && start.x < it.right && start.y >= it.top && start.y < it.bottom })
+    }
+
+    @Test
     fun `the ring grows the hole and stays on screen`() {
         assertEquals(PxRect(380, 640, 700, 1920), outlineRing(PxRect(400, 660, 680, 1900), 20, screen))
         assertEquals(PxRect(0, 0, 1080, 120), outlineRing(PxRect(10, 5, 1075, 100), 20, screen))
@@ -162,5 +206,16 @@ class SpotlightGeometryTest {
             }
         }
         assertTrue(lines > 0)
+    }
+
+    @org.junit.jupiter.api.Test
+    fun `typing viewport excludes docked floating and fullscreen keyboards`() {
+        val screen = PxSize(1080, 2340)
+        org.junit.jupiter.api.Assertions
+            .assertEquals(screen, typingViewport(screen, null))
+        for (top in listOf(0, 700, 1500, 2340)) {
+            org.junit.jupiter.api.Assertions
+                .assertEquals(PxSize(1080, top), typingViewport(screen, top))
+        }
     }
 }

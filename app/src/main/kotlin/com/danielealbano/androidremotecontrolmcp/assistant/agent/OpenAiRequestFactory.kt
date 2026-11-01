@@ -56,7 +56,7 @@ internal object OpenAiRequestFactory {
         if (tools.isNotEmpty()) {
             builder
                 .tools(tools.map(Tool::ofFunction))
-                .toolChoice(ToolChoiceOptions.AUTO)
+                .toolChoice(ToolChoiceOptions.REQUIRED)
                 .parallelToolCalls(false)
         }
         return builder.build()

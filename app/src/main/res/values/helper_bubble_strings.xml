@@ -8,8 +8,8 @@
     <string name="bubble_send">요청 보내기</string>
     <string name="bubble_stop">멈추기</string>
     <string name="bubble_new_chat">새 대화</string>
-    <string name="bubble_mic_start">말로 물어보기</string>
-    <string name="bubble_mic_stop">듣기 멈추기</string>
+    <string name="bubble_mic_start">말을 글자로 입력하기</string>
+    <string name="bubble_mic_stop">음성 입력 마치기</string>
     <string name="bubble_mic_processing">음성을 글자로 바꾸는 중</string>
     <string name="bubble_mic_speaking">콕콕이가 말하는 중</string>
     <string name="bubble_mic_muted">마이크 켜기</string>
@@ -31,4 +31,6 @@
     <string name="bubble_error_consent">여기콕 앱에서 도움 버튼을 켜고 화면 정보 전송 안내를 확인해 주세요.</string>
     <string name="bubble_move_up">도움 버튼 위로 이동</string>
     <string name="bubble_move_down">도움 버튼 아래로 이동</string>
+    <string name="helper_gesture_edge">화면 가장자리 동작</string>
+    <string name="helper_gesture_inside">표시된 원에서 시작해 화살표 끝까지 밀어 주세요</string>
 </resources>

@@ -521,7 +521,9 @@ androidComponents {
     // the release applicationId stays identical across flavors (`com.danielealbano.androidremotecontrolmcp`).
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.applicationId.set(
-            "com.danielealbano.androidremotecontrolmcp.${variant.flavorName}.debug",
+            providers
+                .gradleProperty("helperDebugApplicationId")
+                .getOrElse("com.danielealbano.androidremotecontrolmcp.${variant.flavorName}.debug"),
         )
     }
     onVariants { variant ->

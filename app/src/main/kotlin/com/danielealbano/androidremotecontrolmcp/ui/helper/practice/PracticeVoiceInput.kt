@@ -1,7 +1,9 @@
 package com.danielealbano.androidremotecontrolmcp.ui.helper.practice
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -24,8 +26,7 @@ internal data class PracticeDictationState(
 }
 
 /**
- * Dictation for the practice only: nothing is sent to the AI. It must never run while the live conversation holds the
- * microphone.
+ * Shared on-device dictation for practice and real requests. Results only update the draft; they never submit it.
  */
 internal interface PracticeDictation {
     val state: StateFlow<PracticeDictationState>
@@ -65,6 +66,10 @@ internal class OnDevicePracticeDictation(
     override fun start(draft: String) {
         cancel()
         if (isBlocked()) return
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            publish(false, false, R.string.helper_voice_permission_denied)
+            return
+        }
         if (!available) {
             publish(false, false, R.string.helper_voice_unavailable)
             return

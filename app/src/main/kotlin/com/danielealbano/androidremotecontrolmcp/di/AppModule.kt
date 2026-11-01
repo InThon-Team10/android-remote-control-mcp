@@ -13,8 +13,8 @@ import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidAudioPla
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.AndroidVoiceServiceLauncher
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioCapture
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.AudioPlayback
+import com.danielealbano.androidremotecontrolmcp.assistant.voice.DisabledVoiceSession
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSessionImpl
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.OpenAiRealtimeGateway
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.RealtimeGateway
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.VoiceServiceLauncher
@@ -107,8 +107,8 @@ import com.danielealbano.androidremotecontrolmcp.services.update.UpdateNotifier
 import com.danielealbano.androidremotecontrolmcp.services.update.UpdateNotifierImpl
 import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperConversationControl
 import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperServerSwitch
-import com.danielealbano.androidremotecontrolmcp.ui.helper.LiveHelperConversationControl
 import com.danielealbano.androidremotecontrolmcp.ui.helper.McpHelperServerSwitch
+import com.danielealbano.androidremotecontrolmcp.ui.helper.TextHelperConversationControl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -390,11 +390,11 @@ abstract class ServiceModule {
     /** Binds the assistant live voice session. */
     @Binds
     @Singleton
-    abstract fun bindLiveVoiceSession(impl: LiveVoiceSessionImpl): LiveVoiceSession
+    abstract fun bindLiveVoiceSession(impl: DisabledVoiceSession): LiveVoiceSession
 
     /** Binds the entry screens' view of the live conversation. */
     @Binds
-    abstract fun bindHelperConversationControl(impl: LiveHelperConversationControl): HelperConversationControl
+    abstract fun bindHelperConversationControl(impl: TextHelperConversationControl): HelperConversationControl
 
     /** Binds the entry screens' MCP server switch. */
     @Binds

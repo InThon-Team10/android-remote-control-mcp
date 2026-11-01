@@ -66,7 +66,7 @@ class OpenAiAssistantAgent
                 OpenAiRunContext(
                     apiKey = apiKey,
                     model = settings.model,
-                    tools = OpenAiRequestFactory.functionTools(tools),
+                    tools = OpenAiRequestFactory.functionTools(tools) + GuidanceReply.tool,
                     stepLimit = settings.stepLimit,
                     deviceSlug = deviceSlug,
                     toolNames = tools.mapTo(HashSet()) { it.name },
@@ -97,11 +97,52 @@ class OpenAiAssistantAgent
             val response = gateway.create(context.apiKey, params)
             val items = OpenAiResponseReader.inputItems(response)
             locked { history.addAll(items) }
-            OpenAiResponseReader.texts(response).forEach(listener::onAssistantText)
             val calls = OpenAiResponseReader.functionCalls(response)
             return when {
                 calls.isEmpty() -> {
-                    AgentOutcome.Completed
+                    // A prose-only response must not silently replace the highlight workflow.
+                    if (stepsDone >= context.stepLimit) {
+                        AgentOutcome.StepLimitReached(context.stepLimit)
+                    } else {
+                        locked {
+                            history.add(
+                                OpenAiRequestFactory.userMessage(
+                                    AgentInput.Text(
+                                        "Use a highlight tool for the next phone action, " +
+                                            "or reply_to_user for a question/completion/limitation. " +
+                                            "Do not replace highlights with written instructions.",
+                                    ),
+                                ),
+                            )
+                        }
+                        null
+                    }
+                }
+
+                calls.size == 1 && calls.single().name() == GuidanceReply.NAME -> {
+                    val call = calls.single()
+                    val message = GuidanceReply.message(call)
+                    locked {
+                        history.add(
+                            if (message == null) {
+                                OpenAiToolOutput.invalidArguments(call.callId())
+                            } else {
+                                OpenAiToolOutput.fromResult(
+                                    call.callId(),
+                                    com.danielealbano.androidremotecontrolmcp.mcp.tools.McpToolUtils
+                                        .textResult("Shown to user."),
+                                )
+                            },
+                        )
+                    }
+                    if (message != null) {
+                        listener.onAssistantText(message)
+                        AgentOutcome.Completed
+                    } else if (stepsDone >= context.stepLimit) {
+                        AgentOutcome.StepLimitReached(context.stepLimit)
+                    } else {
+                        null
+                    }
                 }
 
                 stepsDone >= context.stepLimit -> {

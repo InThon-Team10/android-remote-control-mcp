@@ -24,6 +24,9 @@ internal sealed interface GuidanceStep {
         val kind: GuidanceKind,
         val scrollDirection: ScrollDirection? = null,
         val swipeStart: ScreenPoint? = null,
+        val swipeEnd: ScreenPoint? = null,
+        val systemGesture: Boolean = false,
+        val instructionOverride: String? = null,
     ) : GuidanceStep
 
     data class Answer(
@@ -75,13 +78,40 @@ internal class ElderGuidanceTargets(
         }
         val screen = accessibilityServiceProvider.getScreenInfo()
         val windows = freshWindows().windows
+        val explicit = explicitPointBounds(arguments, x, y, screen)
         val bounds =
-            ElderGuidanceGeometry
+            explicit ?: ElderGuidanceGeometry
                 .nodeBoundsAt(windows, x, y)
                 ?.let { ElderGuidanceGeometry.clamp(it, screen.width, screen.height) }
+                ?.takeIf { (it.bottom - it.top) <= screen.height / 2 }
                 ?: ElderGuidanceGeometry.fallbackBox(x, y, screen.densityDpi, screen.width, screen.height)
                 ?: throw McpToolException.InvalidParams("The point ($x, $y) is outside the screen")
         return GuidanceStep.Show(bounds, kind)
+    }
+
+    private fun explicitPointBounds(
+        arguments: JsonObject?,
+        x: Float,
+        y: Float,
+        screen: ScreenInfo,
+    ): BoundsData? {
+        val raw = arguments?.get("target_bounds") ?: return null
+        if (raw is kotlinx.serialization.json.JsonNull) return null
+        val obj = raw as? JsonObject ?: throw McpToolException.InvalidParams("target_bounds must be an object")
+        val bounds =
+            BoundsData(
+                McpToolUtils.requireInt(obj, "left"),
+                McpToolUtils.requireInt(obj, "top"),
+                McpToolUtils.requireInt(obj, "right"),
+                McpToolUtils.requireInt(obj, "bottom"),
+            )
+        if (ElderGuidanceGeometry.clamp(bounds, screen.width, screen.height) != bounds ||
+            bounds.bottom - bounds.top > screen.height / 2 ||
+            x < bounds.left || x >= bounds.right || y < bounds.top || y >= bounds.bottom
+        ) {
+            throw McpToolException.InvalidParams("target_bounds must enclose one visible target and contain x,y, not the whole screen")
+        }
+        return bounds
     }
 
     /**
@@ -89,6 +119,14 @@ internal class ElderGuidanceTargets(
      * screen so the hint shows where the finger goes down; nothing is swiped.
      */
     private fun swipeStep(arguments: JsonObject?): GuidanceStep {
+        val gesture =
+            McpToolUtils.optionalString(
+                arguments?.takeUnless { it["gesture"] is kotlinx.serialization.json.JsonNull },
+                "gesture",
+                "",
+            )
+        if (gesture == "home") return homeStep()
+        if (gesture.isNotEmpty()) throw McpToolException.InvalidParams("Unknown gesture; use home or omit gesture")
         val x1 = McpToolUtils.requireFloat(arguments, "x1")
         val y1 = McpToolUtils.requireFloat(arguments, "y1")
         val x2 = McpToolUtils.requireFloat(arguments, "x2")
@@ -100,6 +138,11 @@ internal class ElderGuidanceTargets(
         McpToolUtils.validateNonNegative(y2, "y2")
         McpToolUtils.validatePositiveRange(duration, "duration", McpToolUtils.MAX_DURATION_MS)
         val screen = accessibilityServiceProvider.getScreenInfo()
+        if (x1 >= screen.width || x2 >= screen.width || y1 >= screen.height || y2 >= screen.height ||
+            (x1 == x2 && y1 == y2)
+        ) {
+            throw McpToolException.InvalidParams("Swipe endpoints must be distinct and inside the current screen")
+        }
         val bounds =
             ElderGuidanceGeometry.swipeArea(x1 to y1, x2 to y2, screen.densityDpi, screen.width, screen.height)
                 ?: throw McpToolException.InvalidParams("The swipe ($x1, $y1) -> ($x2, $y2) is outside the screen")
@@ -108,6 +151,33 @@ internal class ElderGuidanceTargets(
             GuidanceKind.SCROLL,
             ElderGuidanceGeometry.swipeDirection(x2 - x1, y2 - y1),
             ElderGuidanceGeometry.clampPoint(x1, y1, screen.width, screen.height),
+            ElderGuidanceGeometry.clampPoint(x2, y2, screen.width, screen.height),
+            ElderGuidanceGeometry.isSystemEdge(x1, y1, screen),
+        )
+    }
+
+    /** Home starts at the bottom SYSTEM edge, never at an app's scrollable content. */
+    private fun homeStep(): GuidanceStep.Show {
+        val screen = accessibilityServiceProvider.getScreenInfo()
+        val (start, end) = ElderGuidanceGeometry.homePath(screen)
+        val bounds =
+            requireNotNull(
+                ElderGuidanceGeometry.swipeArea(
+                    start.x.toFloat() to start.y.toFloat(),
+                    end.x.toFloat() to end.y.toFloat(),
+                    screen.densityDpi,
+                    screen.width,
+                    screen.height,
+                ),
+            )
+        return GuidanceStep.Show(
+            bounds,
+            GuidanceKind.SCROLL,
+            ScrollDirection.UP,
+            start,
+            end,
+            systemGesture = true,
+            instructionOverride = "화면 맨 아래 가장자리에서 위로 짧게 밀고 바로 손을 떼 주세요.",
         )
     }
 
@@ -140,7 +210,11 @@ internal class ElderGuidanceTargets(
             )
             GuidanceStep.Answer(McpToolUtils.textResult(ElderToolGuidance.HIDDEN_TARGET_TEXT).copy(isError = true))
         } else {
-            GuidanceStep.Show(bounds, kind, direction)
+            if (kind == GuidanceKind.SCROLL) {
+                scrollStep(shown, windows, screen, requireNotNull(direction))
+            } else {
+                GuidanceStep.Show(bounds, kind, direction)
+            }
         }
     }
 
@@ -183,8 +257,36 @@ internal class ElderGuidanceTargets(
             val container =
                 ElderGuidanceGeometry.scrollableAncestor(windows, node.id)
                     ?: throw McpToolException.ActionFailed("No scrollable container found for node '${node.id}'")
-            GuidanceStep.Show(onScreen(container.bounds, screen), GuidanceKind.SCROLL, direction)
+            scrollStep(container, windows, screen, direction)
         }
+    }
+
+    private fun scrollStep(
+        node: AccessibilityNodeData,
+        windows: List<WindowData>,
+        screen: ScreenInfo,
+        direction: ScrollDirection,
+    ): GuidanceStep {
+        if (!node.scrollable || !node.enabled || !node.visible) {
+            throw McpToolException.ActionFailed("Choose a visible enabled scrollable container, not a button or label")
+        }
+        val (start, end) =
+            ElderGuidanceGeometry.scrollPath(node.bounds, direction, screen)
+                ?: throw McpToolException.ActionFailed("No safe scroll path inside this container")
+        val clear =
+            (0..4).all { index ->
+                val x = start.x + (end.x - start.x) * index / 4f
+                val y = start.y + (end.y - start.y) * index / 4f
+                ElderGuidanceGeometry.topmostPathAt(windows, x, y)?.any { it.id == node.id } == true
+            }
+        if (!clear) throw McpToolException.ActionFailed("The scroll path is covered. Read the screen and choose a clear container")
+        return GuidanceStep.Show(
+            onScreen(node.bounds, screen),
+            GuidanceKind.SCROLL,
+            ElderGuidanceGeometry.swipeDirection((end.x - start.x).toFloat(), (end.y - start.y).toFloat()),
+            start,
+            end,
+        )
     }
 
     private sealed interface Found {

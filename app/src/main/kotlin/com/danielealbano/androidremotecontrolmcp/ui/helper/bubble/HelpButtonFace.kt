@@ -61,7 +61,6 @@ internal fun HelpButtonFace(
                 style = MaterialTheme.typography.labelLarge.copy(fontSize = LABEL_SIZE, lineHeight = LABEL_LINE_HEIGHT),
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
             )
         }
     }

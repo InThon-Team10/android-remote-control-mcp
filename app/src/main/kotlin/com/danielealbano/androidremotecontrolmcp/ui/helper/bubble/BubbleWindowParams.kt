@@ -31,7 +31,8 @@ internal class BubbleWindowParams(
 
     /** Focusable (no FLAG_NOT_FOCUSABLE) so the IME can type into the request input. */
     fun panel(): WindowManager.LayoutParams =
-        base(WindowManager.LayoutParams.MATCH_PARENT, 0).apply {
+        base(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.FLAG_DIM_BEHIND).apply {
+            dimAmount = 0.72f
             gravity = Gravity.BOTTOM
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
