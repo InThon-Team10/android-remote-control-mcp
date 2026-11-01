@@ -10,6 +10,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -129,7 +130,9 @@ class ElderToolGuidance internal constructor(
         name: String,
         maxChars: Int,
     ): String {
-        val text = McpToolUtils.optionalString(arguments, name, "").trim()
+        // Strict-schema providers send an explicit null for omitted optional fields.
+        val present = arguments?.takeUnless { it[name] is JsonNull }
+        val text = McpToolUtils.optionalString(present, name, "").trim()
         if (text.length > maxChars) {
             throw McpToolException.InvalidParams("Parameter '$name' must be at most $maxChars characters")
         }

@@ -19,7 +19,7 @@
     <string name="bubble_deny">거부</string>
     <string name="bubble_notice_step_limit">한 번에 할 수 있는 단계를 넘었어요. 다시 말씀해 주세요.</string>
     <string name="bubble_notice_stopped">멈췄어요.</string>
-    <string name="bubble_error_key">AI 연결 키를 확인해 주세요.</string>
+    <string name="bubble_error_key">앱의 AI 연결이 아직 준비되지 않았어요.</string>
     <string name="bubble_error_quota">지금은 사용량이 가득 찼어요. 잠시 후에 다시 해 주세요.</string>
     <string name="bubble_error_unavailable">AI에 연결할 수 없어요. 인터넷을 확인해 주세요.</string>
     <string name="bubble_error_blocked">이 요청에는 답할 수 없어요.</string>
@@ -27,7 +27,8 @@
     <string name="bubble_error_server">도우미를 준비하지 못했어요. 앱을 다시 열어 주세요.</string>
     <string name="bubble_error_voice">음성을 사용할 수 없어요.</string>
     <string name="bubble_error_mic_permission">마이크 사용을 허용해 주세요.</string>
-    <string name="bubble_error_disabled">도우미가 꺼져 있어요. 설정을 확인해 주세요.</string>
+    <string name="bubble_error_disabled">여기콕 앱에서 도움 버튼을 켜 주세요.</string>
+    <string name="bubble_error_consent">여기콕 앱에서 도움 버튼을 켜고 화면 정보 전송 안내를 확인해 주세요.</string>
     <string name="bubble_move_up">도움 버튼 위로 이동</string>
     <string name="bubble_move_down">도움 버튼 아래로 이동</string>
 </resources>

@@ -67,6 +67,15 @@ class BubbleLogicTest {
 
         assertEquals(PanelMessage.Problem(R.string.bubble_error_quota), panelMessage(error))
         assertEquals(PanelMessage.Problem(R.string.bubble_notice_stopped), panelMessage(notice))
+        assertEquals(R.string.bubble_error_disabled, problemRes(AssistantError.AssistantDisabled))
+        val consent = problemRes(AssistantError.PrivacyNoticeNotAccepted)
+        assertEquals(R.string.bubble_error_consent, consent)
+        assertEquals(R.string.bubble_error_key, problemRes(AssistantError.ApiKeyMissing))
+    }
+
+    private fun problemRes(error: AssistantError): Int {
+        val message = panelMessage(listOf(ChatItem.Error(1, error)))
+        return (message as PanelMessage.Problem).textRes
     }
 
     @Test

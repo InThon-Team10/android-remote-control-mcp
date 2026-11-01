@@ -415,6 +415,25 @@ class ElderGuidanceIntegrationTest {
         }
 
     @Test
+    fun `a null optional guidance argument is treated as omitted`() =
+        runTest {
+            val deps = depsWithScreen()
+
+            McpIntegrationTestHelper.withTestApplication(deps, guidanceController = controller) { client, _ ->
+                val result =
+                    client.callTool(
+                        "android_click_node",
+                        mapOf("node_id" to "node_btn", "instruction" to null, "explanation" to null),
+                    )
+
+                assertNotEquals(true, result.isError)
+                val target = controller.targets.single()
+                assertEquals("", target.instruction)
+                assertNull(target.explanation)
+            }
+        }
+
+    @Test
     fun `tap on a point with no node highlights a 72dp box around it`() =
         runTest {
             val deps = depsWithScreen()

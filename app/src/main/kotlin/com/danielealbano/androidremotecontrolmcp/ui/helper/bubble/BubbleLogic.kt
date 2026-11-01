@@ -106,6 +106,7 @@ private fun setupErrorTextRes(error: AssistantError): Int =
     when (error) {
         AssistantError.VoiceRecordingFailed, AssistantError.VoiceDisabled -> R.string.bubble_error_voice
         AssistantError.MicrophonePermissionMissing -> R.string.bubble_error_mic_permission
-        AssistantError.AssistantDisabled, AssistantError.PrivacyNoticeNotAccepted -> R.string.bubble_error_disabled
+        AssistantError.AssistantDisabled -> R.string.bubble_error_disabled
+        AssistantError.PrivacyNoticeNotAccepted -> R.string.bubble_error_consent
         else -> R.string.bubble_error_server
     }
