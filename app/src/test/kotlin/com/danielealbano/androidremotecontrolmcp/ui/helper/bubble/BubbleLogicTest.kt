@@ -159,7 +159,7 @@ class BubbleLogicTest {
         val answers =
             listOf(
                 ChatItem.Assistant(3, "a"),
-                ChatItem.Error(3, AssistantError.GeminiQuotaExceeded),
+                ChatItem.Error(3, AssistantError.ModelQuotaExceeded),
                 ChatItem.Notice(3, NoticeKind.Stopped),
                 ChatItem.Confirmation(3, "c1", "close_app", null),
             )
