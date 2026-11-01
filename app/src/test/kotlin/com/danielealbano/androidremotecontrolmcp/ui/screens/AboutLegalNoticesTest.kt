@@ -63,7 +63,16 @@ class AboutLegalNoticesTest {
     fun `third-party licenses list names every bundled component family`() {
         val list = repoFile("THIRD_PARTY_LICENSES.md").readText()
 
-        val families = listOf("Google Play services", "cloudflared", "ngrok-java", "| ring |", "DB-IP", "Ai4Privacy")
+        val families =
+            listOf(
+                "Google Play services",
+                "cloudflared",
+                "ngrok-java",
+                "| ring |",
+                "DB-IP",
+                "Ai4Privacy",
+                "OpenAI Java SDK",
+            )
         families.forEach { name -> assertTrue(list.contains(name)) { "THIRD_PARTY_LICENSES.md lacks \"$name\"" } }
     }
 

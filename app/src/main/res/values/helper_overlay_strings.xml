@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="helper_overlay_guide_close">닫기</string>
+    <string name="helper_overlay_guide_close_description">안내 닫기</string>
+    <string name="helper_overlay_caption_pane">도우미 안내</string>
+    <string name="helper_overlay_default_tap">여기를 눌러 주세요</string>
+    <string name="helper_overlay_default_long_press">여기를 길게 눌러 주세요</string>
+    <string name="helper_overlay_default_double_tap">여기를 두 번 눌러 주세요</string>
+    <string name="helper_overlay_default_type">여기를 눌러 글자를 입력해 주세요</string>
+    <string name="helper_overlay_default_scroll">이 부분을 밀어 주세요</string>
+    <string name="helper_overlay_default_scroll_up">이 부분을 위로 밀어 주세요</string>
+    <string name="helper_overlay_default_scroll_down">이 부분을 아래로 밀어 주세요</string>
+    <string name="helper_overlay_default_scroll_left">이 부분을 왼쪽으로 밀어 주세요</string>
+    <string name="helper_overlay_default_scroll_right">이 부분을 오른쪽으로 밀어 주세요</string>
+</resources>

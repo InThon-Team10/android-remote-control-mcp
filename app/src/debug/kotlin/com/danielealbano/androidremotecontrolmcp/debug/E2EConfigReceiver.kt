@@ -57,7 +57,8 @@ import javax.inject.Inject
  *   --ei port 8080 \
  *   --ei tunnel_local_port 61200 \
  *   --ez auto_start_on_boot true \
- *   --ez hide_from_recents false
+ *   --ez hide_from_recents false \
+ *   --ez elder_guidance_enabled false
  *
  * (`binding_address`: `127.0.0.1`, `0.0.0.0`, or another IP address literal of the device for Specific IP)
  *
@@ -155,6 +156,11 @@ class E2EConfigReceiver : BroadcastReceiver() {
                 settingsRepository.updateHideFromRecents(hideFromRecents)
                 RecentsUtils.setExcludeFromRecents(context, hideFromRecents)
                 Log.i(TAG, "Hide from recents updated to $hideFromRecents")
+            }
+            if (intent.hasExtra(EXTRA_ELDER_GUIDANCE_ENABLED)) {
+                val elderGuidance = intent.getBooleanExtra(EXTRA_ELDER_GUIDANCE_ENABLED, true)
+                settingsRepository.updateElderGuidanceEnabled(elderGuidance)
+                Log.i(TAG, "Elder guidance updated to $elderGuidance")
             }
             applyAuthFlags(intent)
             applyDownloadSettings(intent)
@@ -377,6 +383,7 @@ class E2EConfigReceiver : BroadcastReceiver() {
         private const val EXTRA_PORT = "port"
         private const val EXTRA_AUTO_START_ON_BOOT = "auto_start_on_boot"
         private const val EXTRA_HIDE_FROM_RECENTS = "hide_from_recents"
+        private const val EXTRA_ELDER_GUIDANCE_ENABLED = "elder_guidance_enabled"
         private const val EXTRA_STORAGE_LOCATION_ID = "storage_location_id"
         private const val EXTRA_STORAGE_ALLOW_WRITE = "storage_allow_write"
         private const val EXTRA_STORAGE_ALLOW_DELETE = "storage_allow_delete"

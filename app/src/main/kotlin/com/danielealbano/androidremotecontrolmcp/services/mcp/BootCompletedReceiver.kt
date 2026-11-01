@@ -16,8 +16,8 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /**
- * Receives BOOT_COMPLETED broadcast and auto-starts the MCP server
- * if the auto-start setting is enabled.
+ * Receives BOOT_COMPLETED broadcast and starts the MCP server when the auto-start setting is enabled or the
+ * helper is on (the helper's assistant needs the server; see [shouldStartMcpServerOnBoot]).
  *
  * Uses [goAsync] to extend the broadcast receiver's lifecycle beyond the
  * default 10-second limit, allowing a coroutine to read settings from DataStore.
@@ -42,16 +42,21 @@ class BootCompletedReceiver : BroadcastReceiver() {
             try {
                 withTimeout(SETTINGS_READ_TIMEOUT_MS) {
                     val config = settingsRepository.serverConfig.first()
+                    val helperEnabled = settingsRepository.getConfig().enabled
 
-                    if (config.autoStartOnBoot) {
-                        Log.i(TAG, "Auto-start enabled, starting McpServerService")
+                    if (shouldStartMcpServerOnBoot(config.autoStartOnBoot, helperEnabled)) {
+                        Log.i(
+                            TAG,
+                            "Starting McpServerService on boot (autoStart=${config.autoStartOnBoot}, " +
+                                "helper=$helperEnabled)",
+                        )
                         val serviceIntent =
                             Intent(context, McpServerService::class.java).apply {
                                 action = McpServerService.ACTION_START
                             }
                         context.startForegroundService(serviceIntent)
                     } else {
-                        Log.i(TAG, "Auto-start disabled, skipping MCP server start")
+                        Log.i(TAG, "Auto-start and helper disabled, skipping MCP server start")
                     }
 
                     // Event Channel auto-start
@@ -78,3 +83,12 @@ class BootCompletedReceiver : BroadcastReceiver() {
         private const val SETTINGS_READ_TIMEOUT_MS = 10_000L
     }
 }
+
+/**
+ * The MCP server starts at boot when the auto-start setting is on, or when the elder helper is on: the helper's
+ * bubble comes back after a reboot (Android rebinds the accessibility service) and its assistant needs the server.
+ */
+internal fun shouldStartMcpServerOnBoot(
+    autoStartOnBoot: Boolean,
+    helperEnabled: Boolean,
+): Boolean = autoStartOnBoot || helperEnabled

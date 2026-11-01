@@ -85,6 +85,23 @@ graph TB
 
 ---
 
+## In-App Assistant (OpenAI)
+
+The voice model only converses (`gpt-realtime-2.1`, Realtime API over WebSocket). It has two tools: `show_next_step(goal)` and `wait_for_user()`. `show_next_step` runs a planner (`gpt-6-luna`, reasoning effort low, Responses API) that reads the screen and the phone's own MCP server (127.0.0.1), then calls a highlight tool. Highlight tools go through `ElderToolGuidance` and `GuidanceController` and block until the user acts. The AI never acts on the phone.
+
+```mermaid
+flowchart LR
+    User((User)) <-->|24 kHz audio| Voice[LiveVoiceSession<br/>gpt-realtime-2.1]
+    Voice -->|show_next_step| Guide[GuideSteps planner<br/>gpt-6-luna]
+    Voice -->|wait_for_user| Guide
+    Guide -->|read-only and highlight tools| MCP[Local MCP server]
+    MCP --> Guidance[ElderToolGuidance<br/>GuidanceController]
+    Guidance -->|highlight| Screen[Phone screen]
+    Screen -->|user acts| Guidance
+```
+
+The typed text assistant (`OpenAiAssistantAgent`) uses the same Responses API with the MCP tools. SDK: `com.openai:openai-java` (blocking client inside `runInterruptible(Dispatchers.IO)`; no structured outputs).
+
 ## Service Lifecycle
 
 ### Startup Sequence

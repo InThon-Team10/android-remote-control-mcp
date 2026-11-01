@@ -259,7 +259,7 @@ class AccessibilityTreeParser
                 "$resourceId|$className|${bounds.left},${bounds.top}," +
                     "${bounds.right},${bounds.bottom}|$depth|$index|$parentId"
             val hash = hashInput.hashCode().toUInt().toString(HASH_RADIX)
-            return "node_$hash"
+            return "$NODE_ID_PREFIX$hash"
         }
 
         companion object {
@@ -267,6 +267,9 @@ class AccessibilityTreeParser
             private const val ROOT_PARENT_ID = "root"
             private const val HASH_RADIX = 16
             internal const val MAX_TREE_DEPTH = 100
+
+            /** Prefix of every generated node id (see [generateNodeId]). */
+            internal const val NODE_ID_PREFIX = "node_"
 
             /** `getExtras()` key holding the Chromium DOM role on web accessibility nodes. */
             private const val EXTRA_KEY_CHROME_ROLE = "AccessibilityNodeInfo.chromeRole"
@@ -279,6 +282,17 @@ class AccessibilityTreeParser
              * virtual accessibility node. Present in [AccessibilityNodeInfo.getAvailableExtraData].
              */
             internal const val COMPOSE_SEMANTICS_ID_KEY = "androidx.compose.ui.semantics.id"
+
+            /**
+             * Bounds of the part of [window] that takes touches (the bounds of its touchable region); null when
+             * empty or unknown.
+             */
+            fun touchableBounds(window: AccessibilityWindowInfo): BoundsData? {
+                val rect = Rect()
+                window.getBoundsInScreen(rect)
+                return BoundsData(left = rect.left, top = rect.top, right = rect.right, bottom = rect.bottom)
+                    .takeIf { it.right > it.left && it.bottom > it.top }
+            }
 
             /** Maps [AccessibilityWindowInfo] type constants to human-readable labels. */
             fun mapWindowType(type: Int): String =

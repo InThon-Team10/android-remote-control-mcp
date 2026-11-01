@@ -1,15 +1,20 @@
 <resources>
-    <string name="app_name">Android Remote Control MCP</string>
-    <string name="share_target_label">Android Remote Control MCP</string>
+    <string name="app_name">여기콕</string>
+    <string name="share_target_label">여기콕</string>
 
     <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Provides remote control capabilities via MCP protocol. Allows introspecting UI elements and performing actions on the device.</string>
+    <string name="accessibility_service_description">화면을 읽고 눌러야 할 곳을 표시해 휴대폰 사용을 한 단계씩 안내해요. 휴대폰을 직접 조작하지는 않아요.</string>
 
     <!-- Notification Channel -->
     <string name="notification_channel_mcp_server_id">mcp_server_channel</string>
-    <string name="notification_channel_mcp_server_name">MCP Server</string>
+    <string name="notification_channel_mcp_server_name">여기콕 실행 상태</string>
     <!-- Notification Content -->
-    <string name="notification_mcp_server_title">MCP Server Running</string>
+    <string name="notification_mcp_server_title">여기콕이 켜져 있어요</string>
+
+    <!-- Live voice conversation notification -->
+    <string name="assistant_voice_channel_name">여기콕 음성 대화</string>
+    <string name="assistant_voice_listening">여기콕이 듣고 있어요</string>
+    <string name="assistant_voice_end">끝내기</string>
 
     <!-- App Bar -->
     <string name="app_bar_title">MCP Remote Control</string>

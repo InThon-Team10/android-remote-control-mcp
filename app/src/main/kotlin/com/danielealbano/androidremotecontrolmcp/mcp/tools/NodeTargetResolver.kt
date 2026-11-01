@@ -3,6 +3,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
 import com.danielealbano.androidremotecontrolmcp.privacy.PlaceholderSubstitutor
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityTreeParser
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.CompactTreeFormatter
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementFinder
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ElementInfo
@@ -69,7 +70,10 @@ class NodeTargetResolver
         private val privacyToolGate: PrivacyToolGate,
         private val substitutor: PlaceholderSubstitutor,
     ) {
-        /** Validates the target arguments (no tree read). */
+        /**
+         * Validates the target arguments (no tree read). A bare lowercase hex `node_id` (1-16 characters, the
+         * `node_` prefix left out) gets the prefix; any other `node_id` is kept as is.
+         */
         fun parse(arguments: JsonObject?): NodeTarget {
             val nodeId = optionalNonNullString(arguments, PARAM_NODE_ID)
             val by = optionalNonNullString(arguments, PARAM_BY)
@@ -87,7 +91,7 @@ class NodeTargetResolver
                     invalid("Provide either '$PARAM_NODE_ID' or a selector ('$PARAM_BY' + '$PARAM_VALUE'), not both")
                 }
                 if (nodeId.isEmpty()) invalid("Parameter '$PARAM_NODE_ID' must be non-empty")
-                return NodeTarget.ById(nodeId)
+                return NodeTarget.ById(withNodeIdPrefix(nodeId))
             }
             if (!hasSelector) {
                 invalid("Missing required parameter '$PARAM_NODE_ID' (or a selector: '$PARAM_BY' + '$PARAM_VALUE')")
@@ -203,6 +207,12 @@ class NodeTargetResolver
             return McpToolUtils.optionalString(arguments, name, "")
         }
 
+        /** [nodeId] with the `node_` prefix when it is a bare node id hash (some clients drop the prefix). */
+        private fun withNodeIdPrefix(nodeId: String): String {
+            val bare = BARE_NODE_ID.matches(nodeId)
+            return if (bare) "${AccessibilityTreeParser.NODE_ID_PREFIX}$nodeId" else nodeId
+        }
+
         private fun invalid(message: String): Nothing = throw McpToolException.InvalidParams(message)
 
         companion object {
@@ -211,6 +221,7 @@ class NodeTargetResolver
             const val PARAM_VALUE = "value"
             const val PARAM_EXACT_MATCH = "exact_match"
             const val MAX_CANDIDATES = 5
+            private val BARE_NODE_ID = Regex("[0-9a-f]{1,16}")
         }
     }
 

@@ -1039,6 +1039,7 @@ private fun getFreshWindowsLocked(
                         layer = windowLayer,
                         focused = windowFocused,
                         tree = tree,
+                        touchableBounds = AccessibilityTreeParser.touchableBounds(window),
                     ),
                 )
             }

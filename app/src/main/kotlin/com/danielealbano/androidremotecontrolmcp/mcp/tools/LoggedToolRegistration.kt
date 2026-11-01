@@ -147,6 +147,7 @@ class LoggedToolRegistrar internal constructor(
     private val serverLog: ServerLogRepository,
     private val toolCallIndicator: ToolCallIndicator,
     private val inFlightToolCalls: InFlightToolCalls,
+    private val elderGuidance: ElderToolGuidance? = null,
     private val currentRequestId: suspend () -> RequestId?,
 ) {
     constructor(
@@ -154,7 +155,15 @@ class LoggedToolRegistrar internal constructor(
         serverLog: ServerLogRepository,
         toolCallIndicator: ToolCallIndicator = ToolCallIndicator.NONE,
         inFlightToolCalls: InFlightToolCalls,
-    ) : this(server, serverLog, toolCallIndicator, inFlightToolCalls, { currentRequestHandlerExtra()?.requestId })
+        elderGuidance: ElderToolGuidance? = null,
+    ) : this(
+        server,
+        serverLog,
+        toolCallIndicator,
+        inFlightToolCalls,
+        elderGuidance,
+        { currentRequestHandlerExtra()?.requestId },
+    )
 
     /**
      * [Server.addTool] with per-call TOOL_CALL logging, cancellable by `notifications/cancelled` (see
@@ -167,12 +176,16 @@ class LoggedToolRegistrar internal constructor(
         inputSchema: ToolSchema,
         handler: suspend (CallToolRequest) -> CallToolResult,
     ) {
-        val cancellable = cancellableToolHandler(inFlightToolCalls, currentRequestId, handler)
-        server.addTool(name = name, description = description, inputSchema = inputSchema) { request ->
+        val tool =
+            elderGuidance?.guard(toolName, description, inputSchema, handler)
+                ?: GuardedTool(description, inputSchema, handler, showsToolCallIndicator = true)
+        val indicator = if (tool.showsToolCallIndicator) toolCallIndicator else ToolCallIndicator.NONE
+        val cancellable = cancellableToolHandler(inFlightToolCalls, currentRequestId, tool.handler)
+        server.addTool(name = name, description = tool.description, inputSchema = tool.inputSchema) { request ->
             // The caller is bound to this request's session, whether the session runs the call inline or launches it
             val caller = inFlightToolCalls.callerOf(sessionId)
             // Logging outermost: withContext refuses to start in a cancelled request, which is still logged then
-            loggedToolHandler(serverLog, toolName, toolCallIndicator) { call ->
+            loggedToolHandler(serverLog, toolName, indicator) { call ->
                 if (caller == null) cancellable(call) else withContext(caller) { cancellable(call) }
             }(request)
         }

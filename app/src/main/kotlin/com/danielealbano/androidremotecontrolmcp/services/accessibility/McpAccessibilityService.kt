@@ -22,6 +22,8 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.TextView
+import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
+import com.danielealbano.androidremotecontrolmcp.services.guidance.UserActivity
 import com.danielealbano.androidremotecontrolmcp.services.screencapture.ScreenshotPacer
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -45,11 +47,23 @@ class McpAccessibilityService : AccessibilityService() {
         fun nodeCache(): AccessibilityNodeCache
     }
 
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface GuidanceEntryPoint {
+        fun guidanceController(): GuidanceController
+
+        fun overlayHosts(): Set<AccessibilityOverlayHost>
+    }
+
     private var serviceScope: CoroutineScope? = null
 
     private var nodeCache: AccessibilityNodeCache? = null
 
     private var cacheInvalidationDebouncer: CacheInvalidationDebouncer? = null
+
+    private var guidanceController: GuidanceController? = null
+
+    private var overlayHosts: List<AccessibilityOverlayHost> = emptyList()
 
     private var toolCallIndicatorView: View? = null
 
@@ -81,6 +95,7 @@ class McpAccessibilityService : AccessibilityService() {
             )
 
         configureServiceInfo()
+        attachOverlayHosts()
 
         Log.i(TAG, "Accessibility service connected")
     }
@@ -90,11 +105,13 @@ class McpAccessibilityService : AccessibilityService() {
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                event.packageName?.toString()?.takeIf { it.isNotBlank() }?.let { packageName ->
-                    currentPackageName = packageName
-                }
-                event.className?.toString()?.takeIf { it.isNotBlank() }?.let { className ->
-                    currentActivityName = className
+                if (!isOwnOverlayEvent(event)) {
+                    event.packageName?.toString()?.takeIf { it.isNotBlank() }?.let { packageName ->
+                        currentPackageName = packageName
+                    }
+                    event.className?.toString()?.takeIf { it.isNotBlank() }?.let { className ->
+                        currentActivityName = className
+                    }
                 }
                 Log.d(
                     TAG,
@@ -123,7 +140,31 @@ class McpAccessibilityService : AccessibilityService() {
         // Schedule a debounced invalidation so the cache is dropped once — and only once — AFTER
         // the transition settles, so the next node lookup resolves against the live tree.
         scheduleCacheInvalidationIfNeeded(event.eventType, cacheInvalidationDebouncer)
+        forwardUserActivity(event)
     }
+
+    /** Reports what the user does in other apps to the guidance controller while a step is shown; never reads text. */
+    private fun forwardUserActivity(event: AccessibilityEvent) {
+        val controller = guidanceController?.takeIf { it.state.value != null } ?: return
+        guidanceActivityFor(event.eventType, event.packageName?.toString(), packageName, event.className?.toString())
+            ?.let(controller::onUserActivity)
+    }
+
+    private fun attachOverlayHosts() {
+        val entryPoint = resolveGuidanceEntryPoint()
+        guidanceController = entryPoint?.guidanceController()
+        overlayHosts = entryPoint?.overlayHosts()?.toList().orEmpty()
+        overlayHosts.forEach { it.attach(this) }
+        assistantOverlayHider = AssistantOverlayHider.combine(overlayHosts.map { it.overlayHider })
+    }
+
+    private fun resolveGuidanceEntryPoint(): GuidanceEntryPoint? =
+        try {
+            EntryPointAccessors.fromApplication(applicationContext, GuidanceEntryPoint::class.java)
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "Could not resolve the guidance entry point", e)
+            null
+        }
 
     override fun onInterrupt() {
         Log.w(TAG, "Accessibility service interrupted")
@@ -131,6 +172,10 @@ class McpAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         Log.i(TAG, "Accessibility service destroying")
+
+        overlayHosts.forEach { it.detach() }
+        overlayHosts = emptyList()
+        guidanceController = null
 
         // Stop any pending debounced invalidation before tearing down the scope it runs on.
         cacheInvalidationDebouncer?.cancel()
@@ -147,6 +192,7 @@ class McpAccessibilityService : AccessibilityService() {
         removeToolCallIndicator()
         // A newer connection may already have replaced this instance; do not clear its singleton.
         if (instance === this) {
+            assistantOverlayHider = AssistantOverlayHider.NONE
             inputMethodInstance = null
             instance = null
         }
@@ -178,17 +224,24 @@ class McpAccessibilityService : AccessibilityService() {
 
     /**
      * Returns the root [AccessibilityNodeInfo] of the currently active window,
-     * or null if no window is available.
+     * or null when no window is available or the active window is an own accessibility overlay.
      */
-    fun getRootNode(): AccessibilityNodeInfo? = rootInActiveWindow
+    fun getRootNode(): AccessibilityNodeInfo? = rootInActiveWindow?.takeUnless { isOwnOverlayRoot(it, packageName) }
 
     /**
      * Returns all on-screen windows via [AccessibilityService.getWindows].
      * Requires [AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS].
      *
+     * Own accessibility overlays are excluded.
+     *
      * @return List of [AccessibilityWindowInfo], or empty list if unavailable.
      */
-    fun getAccessibilityWindows(): List<AccessibilityWindowInfo> =
+    fun getAccessibilityWindows(): List<AccessibilityWindowInfo> {
+        val windows = getAccessibilityWindowsUnfiltered()
+        return filterOwnOverlayWindows(windows, packageName)
+    }
+
+    private fun getAccessibilityWindowsUnfiltered(): List<AccessibilityWindowInfo> =
         try {
             windows ?: emptyList()
         } catch (
@@ -197,6 +250,18 @@ class McpAccessibilityService : AccessibilityService() {
             Log.w(TAG, "getWindows() failed: ${e.message}")
             emptyList()
         }
+
+    /** The window id is read only for this app's own window events (other apps' events never need it). */
+    private fun isOwnOverlayEvent(event: AccessibilityEvent): Boolean =
+        event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            event.packageName?.toString().let { it != null && it == packageName } &&
+            isOwnOverlayStateEvent(
+                event.eventType,
+                event.packageName,
+                event.windowId,
+                packageName,
+                ::getAccessibilityWindowsUnfiltered,
+            )
 
     /**
      * Returns the package name of the currently focused application,
@@ -306,6 +371,7 @@ class McpAccessibilityService : AccessibilityService() {
             ).apply {
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                 y = TOOL_INDICATOR_TOP_MARGIN_DP.dpToPx()
+                title = OWN_OVERLAY_ACCESSIBILITY_TITLE
             }
 
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
@@ -315,7 +381,11 @@ class McpAccessibilityService : AccessibilityService() {
             serviceInfo?.apply {
                 eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                     AccessibilityEvent.TYPE_WINDOWS_CHANGED or
-                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                    AccessibilityEvent.TYPE_VIEW_CLICKED or
+                    AccessibilityEvent.TYPE_VIEW_LONG_CLICKED or
+                    AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED or
+                    AccessibilityEvent.TYPE_VIEW_SCROLLED
                 feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
                 flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
@@ -351,7 +421,7 @@ class McpAccessibilityService : AccessibilityService() {
      * @return Bitmap of the screenshot, or null if capture failed or timed out.
      */
     suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? =
-        screenshotPacer.paced { captureScreenshotBitmap(timeoutMs) }
+        screenshotPacer.paced { assistantOverlayHider.hiddenDuring { captureScreenshotBitmap(timeoutMs) } }
 
     private suspend fun captureScreenshotBitmap(timeoutMs: Long): Bitmap? =
         withTimeoutOrNull(timeoutMs) {
@@ -439,6 +509,13 @@ class McpAccessibilityService : AccessibilityService() {
         var inputMethodInstance: McpInputMethod? = null
             private set
 
+        /**
+         * Hides the assistant overlays around screenshots and gestures; installed by the UI (D18/D19). `onDestroy`
+         * resets it to [AssistantOverlayHider.NONE], so it must be (re)installed after each `onServiceConnected`.
+         */
+        @Volatile
+        var assistantOverlayHider: AssistantOverlayHider = AssistantOverlayHider.NONE
+
         fun showToolCallIndicator(toolName: String) {
             if (instance == null) return
             Handler(Looper.getMainLooper()).post {
@@ -500,3 +577,46 @@ internal fun scheduleCacheInvalidationIfNeeded(
 internal fun invalidateCache(cache: AccessibilityNodeCache?) {
     cache?.clear()
 }
+
+private const val SOFT_INPUT_WINDOW_CLASS = "android.inputmethodservice.SoftInputWindow"
+
+/**
+ * The [UserActivity] an accessibility event stands for, or null when it is not one. Events of this app
+ * ([ownPackage], which includes its overlays) are ignored, and so are window changes of the keyboard (it opens when
+ * the user focuses a field, which is not a screen change). Never reads the event's text.
+ */
+internal fun guidanceActivityFor(
+    eventType: Int,
+    eventPackage: String?,
+    ownPackage: String,
+    eventClassName: String?,
+): UserActivity? =
+    when {
+        eventPackage == ownPackage -> {
+            null
+        }
+
+        eventType == AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+            UserActivity.CLICKED
+        }
+
+        eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
+            UserActivity.LONG_CLICKED
+        }
+
+        eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
+            UserActivity.TEXT_CHANGED
+        }
+
+        eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+            UserActivity.SCROLLED
+        }
+
+        eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && eventClassName != SOFT_INPUT_WINDOW_CLASS -> {
+            UserActivity.WINDOW_CHANGED
+        }
+
+        else -> {
+            null
+        }
+    }

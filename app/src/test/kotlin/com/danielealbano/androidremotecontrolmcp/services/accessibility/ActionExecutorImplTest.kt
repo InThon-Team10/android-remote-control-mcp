@@ -1,6 +1,7 @@
 package com.danielealbano.androidremotecontrolmcp.services.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
@@ -8,8 +9,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkConstructor
 import io.mockk.slot
 import io.mockk.spyk
+import io.mockk.unmockkConstructor
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -40,6 +43,7 @@ class ActionExecutorImplTest {
     @AfterEach
     fun tearDown() {
         setServiceInstance(null)
+        McpAccessibilityService.assistantOverlayHider = AssistantOverlayHider.NONE
     }
 
     /**
@@ -1100,6 +1104,104 @@ class ActionExecutorImplTest {
                 // Assert
                 assertTrue(result.isSuccess)
                 verify { mockService.getAccessibilityWindows() }
+            }
+    }
+
+    @Nested
+    @DisplayName("overlay hider around gestures")
+    inner class OverlayHiderAroundGestures {
+        private val events = mutableListOf<String>()
+        private val callback = slot<AccessibilityService.GestureResultCallback>()
+
+        @BeforeEach
+        fun setUp() {
+            mockkConstructor(GestureDescription.Builder::class)
+            every { anyConstructed<GestureDescription.Builder>().addStroke(any()) } answers {
+                self as GestureDescription.Builder
+            }
+            every { anyConstructed<GestureDescription.Builder>().build() } returns mockk()
+            McpAccessibilityService.assistantOverlayHider =
+                object : AssistantOverlayHider {
+                    override suspend fun <T> hiddenDuring(block: suspend () -> T): T {
+                        events += "enter"
+                        try {
+                            return block()
+                        } finally {
+                            events += "exit"
+                        }
+                    }
+                }
+            setServiceInstance(mockService)
+        }
+
+        @AfterEach
+        fun tearDown() {
+            unmockkConstructor(GestureDescription.Builder::class)
+        }
+
+        private fun stubDispatch(
+            result: Boolean = true,
+            onDispatch: (AccessibilityService.GestureResultCallback) -> Unit = {},
+        ) {
+            every { mockService.dispatchGesture(any(), capture(callback), any()) } answers {
+                events += "dispatch"
+                onDispatch(callback.captured)
+                result
+            }
+        }
+
+        @Test
+        fun `hider is entered before dispatchGesture`() =
+            runTest {
+                stubDispatch { it.onCompleted(null) }
+
+                executor.tap(500f, 800f)
+
+                assertEquals(listOf("enter", "dispatch"), events.take(2))
+            }
+
+        @Test
+        fun `hider exits after onCompleted`() =
+            runTest {
+                stubDispatch { it.onCompleted(null) }
+
+                val result = executor.tap(500f, 800f)
+
+                assertTrue(result.isSuccess)
+                assertEquals(listOf("enter", "dispatch", "exit"), events)
+            }
+
+        @Test
+        fun `hider exits on onCancelled`() =
+            runTest {
+                stubDispatch { it.onCancelled(null) }
+
+                val result = executor.tap(500f, 800f)
+
+                assertTrue(result.isFailure)
+                assertEquals("exit", events.last())
+            }
+
+        @Test
+        fun `hider exits when dispatchGesture returns false`() =
+            runTest {
+                stubDispatch(result = false)
+
+                val result = executor.tap(500f, 800f)
+
+                assertTrue(result.isFailure)
+                assertEquals("exit", events.last())
+            }
+
+        @Test
+        fun `hider exits when the gesture times out`() =
+            runTest {
+                stubDispatch()
+
+                val result = executor.tap(500f, 800f)
+
+                assertTrue(result.isFailure)
+                assertEquals("exit", events.last())
             }
     }
 }

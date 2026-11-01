@@ -33,6 +33,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -84,6 +85,7 @@ class SettingsRepositoryImplTest {
                 EventChannelSettingsImpl(dataStore, changeLogger),
                 ArcTunnelSettingsImpl(dataStore, changeLogger),
                 DownloadSettingsImpl(dataStore, changeLogger),
+                createAssistantSettings(dataStore, changeLogger),
             )
     }
 
@@ -105,6 +107,7 @@ class SettingsRepositoryImplTest {
                 assertFalse(config.autoStartOnBoot)
                 assertFalse(config.hideFromRecents)
                 assertTrue(config.toolCallIndicatorEnabled)
+                assertTrue(config.elderGuidanceEnabled)
                 assertFalse(config.httpsEnabled)
                 assertEquals(CertificateSource.AUTO_GENERATED, config.certificateSource)
                 assertEquals(ServerConfig.DEFAULT_CERTIFICATE_HOSTNAME, config.certificateHostname)
@@ -481,6 +484,26 @@ class SettingsRepositoryImplTest {
                 val config = repository.getServerConfig()
 
                 assertFalse(config.hideFromRecents)
+            }
+    }
+
+    @Nested
+    @DisplayName("updateElderGuidanceEnabled")
+    inner class UpdateElderGuidanceEnabled {
+        @Test
+        fun `is on by default`() =
+            testScope.runTest {
+                assertTrue(repository.getServerConfig().elderGuidanceEnabled)
+            }
+
+        @Test
+        fun `turns guidance off and on again`() =
+            testScope.runTest {
+                repository.updateElderGuidanceEnabled(false)
+                assertFalse(repository.getServerConfig().elderGuidanceEnabled)
+
+                repository.updateElderGuidanceEnabled(true)
+                assertTrue(repository.getServerConfig().elderGuidanceEnabled)
             }
     }
 

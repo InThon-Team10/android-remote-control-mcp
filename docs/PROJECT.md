@@ -164,6 +164,11 @@ The typical startup flow: User opens app → enables Accessibility Service in An
 
 ---
 
+### In-app assistant (OpenAI)
+
+- SDK `com.openai:openai-java` 4.95.0. Voice: `gpt-realtime-2.1` (Realtime API). Text and planner: `gpt-6-luna`, reasoning effort low (Responses API). Screen information and voice are sent to OpenAI.
+- Build-time key: `OPENAI_API_KEY` from the gitignored root `local.properties`, else the environment variable of the same name, embedded as `BuildConfig.OPENAI_API_KEY` (release and debug). A key saved in settings wins; a key saved for a previous provider is never used. CI must not define it.
+
 ## MCP Protocol Implementation
 
 ### Protocol Overview
@@ -232,7 +237,7 @@ The MCP server exposes 59 tools across 14 categories. For full JSON-RPC schemas,
 
 ### 3. Node Action Tools (6 tools)
 
-"Target" = exactly one of `node_id` (string) or a selector: `by` (string: text/content_desc/resource_id/class_name) + `value` (string), optional `exact_match` (boolean, default false). A selector is resolved in the tool's own fresh screen read among on-screen nodes (`android_scroll_to_node`: on- and off-screen); more than one match returns an untrusted `isError` result listing up to 5 candidates, never a guess.
+"Target" = exactly one of `node_id` (string; a bare lowercase hex id of 1-16 characters gets the `node_` prefix) or a selector: `by` (string: text/content_desc/resource_id/class_name) + `value` (string), optional `exact_match` (boolean, default false). A selector is resolved in the tool's own fresh screen read among on-screen nodes (`android_scroll_to_node`: on- and off-screen); more than one match returns an untrusted `isError` result listing up to 5 candidates, never a guess.
 
 | Tool | Description | Required Params | Optional Params |
 |------|-------------|-----------------|-----------------|

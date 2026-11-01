@@ -15,6 +15,7 @@ This document provides a comprehensive reference for all MCP tools available in 
 2. [Tool Naming Convention](#tool-naming-convention)
 3. [Common Patterns](#common-patterns)
 4. [Error Codes](#error-codes)
+   - [Elder guidance mode](#elder-guidance-mode)
 5. [Screen Introspection Tools](#1-screen-introspection-tools)
 6. [System Action Tools](#2-system-action-tools)
 7. [Touch Action Tools](#3-touch-action-tools)
@@ -182,6 +183,47 @@ MCP clients MUST:
 Tool errors are **not** returned as JSON-RPC error codes. Instead, the SDK catches `McpToolException` subtypes and wraps them as `CallToolResult(isError = true)` with a descriptive message in `TextContent`. This follows the standard MCP SDK pattern.
 
 Protocol-level errors (parse errors, invalid requests) are handled automatically by the SDK and returned as standard JSON-RPC errors.
+
+---
+
+## Elder guidance mode
+
+The app helps elderly users, so MCP tools never operate the phone by themselves while guidance is on (the default). Tool names below are un-prefixed.
+
+| Class | Tools | Behavior |
+|-------|-------|----------|
+| Read-only | `get_screen_state`, `find_nodes`, `get_node_details`, `get_accessibility_status`, `get_clipboard`, `wait_for_node`, `wait_for_idle`, `list_apps`, `list_storage_locations`, `list_files`, `read_file`, `list_cameras`, `list_camera_photo_resolutions`, `list_camera_video_resolutions`, `notification_list`, `get_location`, `get_shared_content` | Unchanged |
+| Highlight | `tap`, `long_press`, `double_tap`, `swipe`, `click_node`, `long_click_node`, `tap_node`, `type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`, `scroll_node`, `scroll_to_node` | Validates its own parameters, highlights the target on screen and waits for the user to act. Never acts on the device |
+| Refused | every other tool (and any tool added later) | `isError` result telling the AI to explain the step to the user or use a highlight tool |
+
+Highlight tools take two extra optional strings: `instruction` (max 200 characters, one sentence telling the user what to do, in the user's language) and `explanation` (max 500 characters, what happens once they do it, shown as the second line of the caption while the highlight is up; there is no confirm step before a highlight). Longer values are an invalid-params error; blank values are dropped (the overlay shows a default). Privacy placeholders in both are substituted before they are shown.
+
+Targets: node tools highlight the node they would act on, except that:
+
+- `click_node`, `tap_node` and `long_click_node` on a node that does not take that touch itself (not clickable; for `long_click_node` not long-clickable), such as a label, highlight its nearest visible clickable (long-clickable) ancestor no taller than a third of the screen, i.e. the label's row. A node without such an ancestor keeps its own bounds.
+- `click_node`, `tap_node`, `long_click_node` and the `type_*` tools show nothing when something else is drawn over most of the target (fewer than 3 of 5 sample points, the centre and the points at 25%/75% of its width and height, have the target, a descendant or an ancestor on top; the app's own overlays do not count). The answer tells the AI to bring the target into view first (see below).
+- A node that is no longer on the screen shows nothing and gets the "target gone" answer below, not the tool's not-found error.
+
+`tap`, `long_press` and `double_tap` highlight the deepest visible node at the point (in the topmost window that takes a touch there, the app's own overlays excluded), or a 72dp square around it. `swipe` highlights the area around the swipe path (plus 48dp) with its direction. `scroll_to_node` answers that the node is already on screen when it is visible and not mostly drawn over, otherwise it highlights the node's nearest scrollable ancestor.
+
+The call waits up to 45 s (MCP client requests time out at 60 s). Answers (server-generated text only, never device text or the text the AI wanted to type):
+
+| Outcome | Result |
+|---------|--------|
+| User acted | "The user did it. Call get_screen_state to see the new screen before the next step." |
+| Screen changed | "The screen changed before the user acted on the highlight. Call get_screen_state and guide again." |
+| Timed out | "The user has not acted yet (waited 45 s). The highlight stays on screen. Call the same tool with the same target to keep waiting, or ask the user whether they need help." |
+| Closed (`isError`) | "The user closed the guidance. Ask what they want to do." |
+| Replaced (`isError`) | "A newer guidance step replaced this one." |
+| Overlay unavailable (`isError`) | "The guidance overlay is not available because the helper's accessibility service is not connected. Ask the user to turn it on." |
+| Target gone (`isError`, nothing shown) | "That element is no longer on the screen: the screen changed since it was read, so its node_id is stale. Read the screen again (get_screen_state or find_nodes) and highlight it with the new id, or target it by name with by and value. This is not something to tell the user." |
+| Target mostly hidden (`isError`, nothing shown) | "That element is mostly hidden behind another control, so the user cannot touch it. First show the user how to bring it into view (for example scroll_node on its list, or a swipe), then highlight it again. This is not something to tell the user." |
+
+After a timeout the highlight stays on screen for up to 120 s ("lingering"): a slow user can still act, and calling the same tool with the same target waits again without re-announcing the step. If the user already acted on it in the meantime, that call returns "user acted" at once.
+
+Guided calls do not show the tool-call indicator (the user acts, not the AI).
+
+**Test-only switch**: `ServerConfig.elderGuidanceEnabled` (default `true`) has no UI and is not part of the ADB config, so release builds cannot turn guidance off. Debug builds accept the boolean extra `elder_guidance_enabled` on the E2E config broadcast (the E2E suites set it to `false` to keep driving the device). When it is `false`, tools are registered exactly as without guidance.
 
 ---
 
@@ -1084,7 +1126,7 @@ Each path is an array of point objects:
 
 The node tools (`click_node`, `long_click_node`, `tap_node`, `scroll_to_node`, `scroll_node`) and the text input tools (`type_append_text`, `type_insert_text`, `type_replace_text`, `type_clear_text`) take their target in one of two forms, exactly one of them:
 
-- `node_id`: a node ID from `get_screen_state` or `find_nodes`.
+- `node_id`: a node ID from `get_screen_state` or `find_nodes`. A bare lowercase hex ID (1-16 characters, the `node_` prefix left out, as annotated screenshots label nodes) gets the `node_` prefix; any other value is used as is.
 - A selector: `by` (`text`, `content_desc`, `resource_id`, `class_name`) + `value`, with optional `exact_match` (default `false`: case-insensitive contains), the same semantics as `find_nodes`. The selector is matched in the tool's own fresh read of the screen, among **on-screen** nodes (`scroll_to_node` also matches off-screen nodes). With Privacy Mode on, pseudonym placeholders in `value` are matched against the real text.
 
 A selector never guesses: no match is a **Node not found** error; more than one match is an error (`isError = true`) whose first line is the untrusted-content warning, followed by `Ambiguous selector: N on-screen nodes match by=<by>...` (`N nodes match` for `scroll_to_node`, whose selector also matches off-screen nodes) and a `{"nodes":[...]}` JSON list of the first 5 candidates (same shape as `find_nodes`, with Privacy Mode applied and texts longer than 100 characters shortened like in `get_screen_state`). Retry with `node_id` set to one of them or with a more specific selector.

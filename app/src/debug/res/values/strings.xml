@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="assistant_debug_label">AI 테스트 화면 (디버그)</string>
+</resources>

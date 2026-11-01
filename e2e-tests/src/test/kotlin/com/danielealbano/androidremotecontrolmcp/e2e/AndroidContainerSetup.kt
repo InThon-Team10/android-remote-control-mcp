@@ -386,6 +386,9 @@ object AndroidContainerSetup {
             "--ei",
             "port",
             MCP_DEFAULT_PORT.toString(),
+            "--ez",
+            "elder_guidance_enabled",
+            "false",
         )
         Thread.sleep(3_000)
 

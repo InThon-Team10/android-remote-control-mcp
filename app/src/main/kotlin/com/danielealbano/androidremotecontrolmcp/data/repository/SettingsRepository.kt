@@ -26,7 +26,8 @@ import kotlinx.coroutines.flow.Flow
 interface SettingsRepository :
     EventChannelSettings,
     ArcTunnelSettings,
-    DownloadSettings {
+    DownloadSettings,
+    AssistantSettings {
     /**
      * Observes the current server configuration. Emits a new [ServerConfig]
      * whenever any setting changes.
@@ -130,6 +131,9 @@ interface SettingsRepository :
 
     /** Enables or disables the on-device MCP tool-call activity indicator. */
     suspend fun updateToolCallIndicatorEnabled(enabled: Boolean)
+
+    /** Turns elder guidance on or off. Test-only: no UI and not reachable from the ADB config. */
+    suspend fun updateElderGuidanceEnabled(enabled: Boolean)
 
     /**
      * Observes the persisted server-running intent flag (`true` after ACTION_START, `false` after
