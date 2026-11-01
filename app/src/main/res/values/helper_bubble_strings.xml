@@ -13,7 +13,7 @@
     <string name="bubble_mic_processing">음성을 글자로 바꾸는 중</string>
     <string name="bubble_mic_speaking">콕콕이가 말하는 중</string>
     <string name="bubble_mic_muted">마이크 켜기</string>
-    <string name="bubble_running">도우미가 생각하고 있어요</string>
+    <string name="bubble_running">콕콕이가 생각하고 있어요</string>
     <string name="bubble_confirm">%1$s 작업을 허용할까요?</string>
     <string name="bubble_allow">허용</string>
     <string name="bubble_deny">거부</string>

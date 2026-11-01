@@ -10,11 +10,13 @@ import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.VOICE_TRACE
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.isActive
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.InFlightToolCallSignal
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityOverlayHost
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AssistantOverlayHider
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperBubble
 import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperBubbleStatus
+import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperConversationControl
 import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperSpeaker
 import com.danielealbano.androidremotecontrolmcp.utils.Logger
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,6 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +47,8 @@ class HelperBubbleOverlayHost internal constructor(
     private val speaker: HelperSpeaker,
     private val liveVoice: LiveVoiceSession,
     private val serverStarter: AssistantServerStarter,
+    private val toolCalls: InFlightToolCallSignal,
+    private val conversation: HelperConversationControl,
     private val windowsFactory: BubbleWindowsFactory,
     private val positions: BubblePositionStore,
     private val mainDispatcher: CoroutineDispatcher,
@@ -57,6 +62,8 @@ class HelperBubbleOverlayHost internal constructor(
         speaker: HelperSpeaker,
         liveVoice: LiveVoiceSession,
         serverStarter: AssistantServerStarter,
+        toolCalls: InFlightToolCallSignal,
+        conversation: HelperConversationControl,
         windowsFactory: ComposeBubbleWindowsFactory,
         positions: SettingsBubblePositionStore,
     ) : this(
@@ -66,6 +73,8 @@ class HelperBubbleOverlayHost internal constructor(
         speaker,
         liveVoice,
         serverStarter,
+        toolCalls,
+        conversation,
         windowsFactory,
         positions,
         Dispatchers.Main.immediate,
@@ -78,7 +87,7 @@ class HelperBubbleOverlayHost internal constructor(
     private var service: AccessibilityService? = null
     private var windows: BubbleWindowController? = null
     private val actions =
-        BubbleActionsImpl(session, liveVoice, serverStarter, panelRequested, { scope }, { service }, positions)
+        BubbleActionsImpl(session, uiState, liveVoice, serverStarter, panelRequested, { scope }, { service }, positions)
 
     private var bubblePosition: Int? = null
     private var suppressed = false
@@ -106,6 +115,9 @@ class HelperBubbleOverlayHost internal constructor(
         newScope.launch { session.collapseRequests.collect { panelRequested.value = false } }
         newScope.launch { observeItems() }
         newScope.launch { session.state.collect { uiState.setSession(it) } }
+        newScope.launch {
+            combine(toolCalls.active, awaiting(), ::bubbleBusy).distinctUntilChanged().collect(uiState::setBusy)
+        }
         newScope.launch {
             liveVoice.state
                 .map { it.isActive() }
@@ -206,6 +218,9 @@ class HelperBubbleOverlayHost internal constructor(
                 session.setChatVisible(layout.panelOpen)
             }
     }
+
+    private fun awaiting(): Flow<Boolean> =
+        combine(session.items, session.state, conversation.active, ::awaitingTextAnswer).distinctUntilChanged()
 
     private suspend fun observeItems() {
         var lastSpoken = latestAssistantId(session.items.value)

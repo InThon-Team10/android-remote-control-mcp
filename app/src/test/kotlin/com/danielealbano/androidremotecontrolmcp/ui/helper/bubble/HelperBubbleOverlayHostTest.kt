@@ -10,9 +10,11 @@ import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSessio
 import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
+import com.danielealbano.androidremotecontrolmcp.mcp.tools.InFlightToolCallSignal
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceState
 import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperBubbleStatus
+import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperConversationControl
 import com.danielealbano.androidremotecontrolmcp.ui.helper.HelperSpeaker
 import io.mockk.every
 import io.mockk.mockk
@@ -34,16 +36,20 @@ class HelperBubbleOverlayHostTest {
     private val config = MutableStateFlow(ready)
     private val items = MutableStateFlow<List<ChatItem>>(emptyList())
     private val guidanceState = MutableStateFlow<GuidanceState?>(null)
+    private val sessionState = MutableStateFlow<SessionState>(SessionState.Idle)
     private val session =
         mockk<AssistantSession>(relaxed = true) {
             every { items } returns this@HelperBubbleOverlayHostTest.items
-            every { state } returns MutableStateFlow(SessionState.Idle)
+            every { state } returns sessionState
             every { collapseRequests } returns MutableSharedFlow()
         }
     private val settings = mockk<AssistantSettings> { every { config } returns this@HelperBubbleOverlayHostTest.config }
     private val guidance = mockk<GuidanceController> { every { state } returns guidanceState }
     private val speaker = mockk<HelperSpeaker>(relaxed = true)
     private val liveVoice = mockk<LiveVoiceSession> { every { state } returns MutableStateFlow(LiveVoiceState.Idle) }
+    private val toolCalls = InFlightToolCallSignal()
+    private val liveActive = MutableStateFlow(false)
+    private val conversation = mockk<HelperConversationControl> { every { active } returns liveActive }
     private val controller = mockk<BubbleWindowController>(relaxed = true)
     private val service = mockk<AccessibilityService>()
     private var created = 0
@@ -67,6 +73,8 @@ class HelperBubbleOverlayHostTest {
             speaker,
             liveVoice,
             mockk<AssistantServerStarter>(),
+            toolCalls,
+            conversation,
             { _, _, _ ->
                 created++
                 controller
@@ -274,6 +282,43 @@ class HelperBubbleOverlayHostTest {
         }
 
     @Test
+    fun `busy label follows in-flight tool calls`() =
+        runTest {
+            var state: BubbleUiState? = null
+            val host =
+                HelperBubbleOverlayHost(
+                    session,
+                    settings,
+                    guidance,
+                    speaker,
+                    liveVoice,
+                    mockk<AssistantServerStarter>(),
+                    toolCalls,
+                    conversation,
+                    { _, ui, _ ->
+                        state = ui
+                        controller
+                    },
+                    positions,
+                    StandardTestDispatcher(testScheduler),
+                )
+            host.attach(service)
+            advanceUntilIdle()
+            sessionState.value = SessionState.Running
+            liveActive.value = true
+            advanceUntilIdle()
+            assertEquals(false, state!!.busy.value)
+
+            toolCalls.onToolCallStarted("tap")
+            advanceUntilIdle()
+            assertEquals(true, state!!.busy.value)
+
+            toolCalls.onToolCallFinished("tap")
+            advanceUntilIdle()
+            assertEquals(false, state!!.busy.value)
+        }
+
+    @Test
     fun `moving the bubble saves its position`() =
         runTest {
             var actions: BubbleActions? = null
@@ -285,6 +330,8 @@ class HelperBubbleOverlayHostTest {
                     speaker,
                     liveVoice,
                     mockk<AssistantServerStarter>(),
+                    toolCalls,
+                    conversation,
                     { _, _, a ->
                         actions = a
                         controller

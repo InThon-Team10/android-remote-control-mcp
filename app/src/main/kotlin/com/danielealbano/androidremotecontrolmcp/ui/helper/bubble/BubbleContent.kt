@@ -37,10 +37,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -77,13 +75,13 @@ internal fun BubbleCharacterWindow(
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
 ) {
-    val running by state.session.collectAsState()
+    val busy by state.busy.collectAsState()
     val drag by rememberUpdatedState(onDrag)
     val dragEnd by rememberUpdatedState(onDragEnd)
     val moveUp = stringResource(R.string.bubble_move_up)
     val moveDown = stringResource(R.string.bubble_move_down)
     val step = with(LocalDensity.current) { BUBBLE_MOVE_STEP.toPx() }
-    val label = stringResource(if (running == SessionState.Idle) R.string.bubble_label else R.string.bubble_label_busy)
+    val label = stringResource(if (busy) R.string.bubble_label_busy else R.string.bubble_label)
     HelpButtonFace(
         label = label,
         onClick = actions::onToggleBubble,
@@ -133,13 +131,13 @@ private fun PanelInput(
     message: PanelMessage,
     session: SessionState,
 ) {
-    var text by remember { mutableStateOf("") }
+    val text by state.draft.collectAsState()
+    val busy by state.busy.collectAsState()
     val voiceEnabled by state.voiceEnabled.collectAsState()
     val listening by state.listening.collectAsState()
     val tick by focusTick.collectAsState()
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    val running = session != SessionState.Idle
     val micVisual =
         when {
             !voiceEnabled -> MicVisual.HIDDEN
@@ -151,25 +149,22 @@ private fun PanelInput(
         keyboard?.show()
     }
     HelperRequestInput(
-        ui = RequestInputUi(text, false, micVisual, null, sendEnabled(text, running), focus),
+        ui = RequestInputUi(text, false, micVisual, null, sendEnabled(text, busy), focus),
         actions =
             RequestInputActions(
-                onTextChange = { text = it },
+                onTextChange = state::setDraft,
                 onMic = actions::onToggleMic,
                 onSend = {
-                    if (sendEnabled(text, running)) {
-                        actions.onSend(text.trim())
-                        text = ""
-                    }
+                    if (sendEnabled(text, busy)) actions.onSend(text.trim())
                 },
                 onClose = actions::onClosePanel,
             ),
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         above = {
             PanelMessageView(message, session, actions)
-            if (running) RunningIndicator()
+            if (busy) RunningIndicator()
         },
-        below = { PanelButtons(actions, running) },
+        below = { PanelButtons(actions, session != SessionState.Idle) },
     )
 }
 

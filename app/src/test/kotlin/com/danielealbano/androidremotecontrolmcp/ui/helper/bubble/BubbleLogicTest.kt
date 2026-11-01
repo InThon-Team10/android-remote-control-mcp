@@ -4,6 +4,8 @@ import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
 import com.danielealbano.androidremotecontrolmcp.assistant.session.NoticeKind
+import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
+import com.danielealbano.androidremotecontrolmcp.assistant.session.ToolCallStatus
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -96,5 +98,36 @@ class BubbleLogicTest {
         assertEquals(BubbleLayoutState(panelOpen = false, bubbleVisible = false), resolveLayout(true, true))
         assertEquals(BubbleLayoutState(panelOpen = true, bubbleVisible = true), resolveLayout(true, false))
         assertEquals(BubbleLayoutState(panelOpen = false, bubbleVisible = true), resolveLayout(false, false))
+    }
+
+    @Test
+    fun `bubble is busy while tools run or an answer is awaited`() {
+        assertFalse(bubbleBusy(toolsInFlight = false, awaiting = false))
+        assertTrue(bubbleBusy(toolsInFlight = true, awaiting = false))
+        assertTrue(bubbleBusy(toolsInFlight = false, awaiting = true))
+    }
+
+    @Test
+    fun `a text request awaits an answer until a reply, error, notice or confirmation`() {
+        val asked = listOf(ChatItem.Assistant(1, "old"), ChatItem.User(2, "q"))
+        assertTrue(awaitingTextAnswer(asked, SessionState.Running, liveActive = false))
+        assertFalse(awaitingTextAnswer(asked, SessionState.Idle, liveActive = false))
+        assertFalse(awaitingTextAnswer(emptyList(), SessionState.Running, liveActive = false))
+        val answers =
+            listOf(
+                ChatItem.Assistant(3, "a"),
+                ChatItem.Error(3, AssistantError.GeminiQuotaExceeded),
+                ChatItem.Notice(3, NoticeKind.Stopped),
+                ChatItem.Confirmation(3, "c1", "close_app", null),
+            )
+        answers.forEach { assertFalse(awaitingTextAnswer(asked + it, SessionState.Running, liveActive = false)) }
+        assertTrue(awaitingTextAnswer(asked + ChatItem.ToolCall(3, "c", "tap", ToolCallStatus.RUNNING), SessionState.Running, false))
+    }
+
+    @Test
+    fun `a live conversation never counts as a text request`() {
+        val asked = listOf(ChatItem.User(1, "q"))
+
+        assertFalse(awaitingTextAnswer(asked, SessionState.Running, liveActive = true))
     }
 }

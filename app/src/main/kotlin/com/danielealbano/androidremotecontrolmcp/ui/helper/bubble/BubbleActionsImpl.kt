@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 /** Routes the panel's buttons to the assistant session and the live voice conversation. */
 internal class BubbleActionsImpl(
     private val session: AssistantSession,
+    private val state: BubbleUiState,
     private val liveVoice: LiveVoiceSession,
     private val serverStarter: AssistantServerStarter,
     private val panelRequested: MutableStateFlow<Boolean>,
@@ -25,6 +26,7 @@ internal class BubbleActionsImpl(
     private val positions: BubblePositionStore,
 ) : BubbleActions {
     private var voiceJob: Job? = null
+    private var lastSent = ""
 
     override fun onToggleBubble() {
         Log.d(BUBBLE_TRACE, "bubble tapped: panel ${if (panelRequested.value) "closes" else "opens"}")
@@ -43,6 +45,8 @@ internal class BubbleActionsImpl(
 
     override fun onSend(text: String) {
         val host = context() ?: return
+        lastSent = text
+        state.setDraft("")
         scope()?.launch {
             serverStarter.ensureRunning(host).fold(
                 onSuccess = { session.send(text) },
