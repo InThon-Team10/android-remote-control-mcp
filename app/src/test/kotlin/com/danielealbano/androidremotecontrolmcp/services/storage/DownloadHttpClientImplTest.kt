@@ -15,6 +15,7 @@ import okhttp3.tls.HeldCertificate
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -149,7 +150,9 @@ class DownloadHttpClientImplTest {
     fun `refuses a redirect to a local address with the block on`() {
         // 127.0.0.2 stands for a local target and the first server for a public one: the redirect hop is checked.
         val target = MockWebServer()
-        target.start(InetAddress.getByName(BLOCKED_LOOPBACK), 0)
+        // macOS has no 127.0.0.2 loopback alias by default: this scenario needs it
+        val bound = runCatching { target.start(InetAddress.getByName(BLOCKED_LOOPBACK), 0) }.isSuccess
+        Assumptions.assumeTrue(bound, "$BLOCKED_LOOPBACK is not bindable on this host")
         try {
             target.enqueue(ok())
             server.enqueue(redirectTo(URL("http", BLOCKED_LOOPBACK, target.port, "/inner").toString()))

@@ -114,8 +114,10 @@ class HelperEntryViewModelTest {
                 vm.showIntroAgain()
                 assertEquals(HelperEntryPage.WELCOME, expectMostRecentItem().model.page)
             }
-            coVerify { conversation.stop() }
-            coVerify { settings.setHelperFlag(HelperFlag.INTRO_SEEN, false) }
+            coVerifyOrder {
+                conversation.stop()
+                settings.setHelperFlag(HelperFlag.INTRO_SEEN, false)
+            }
         }
 
     @Test

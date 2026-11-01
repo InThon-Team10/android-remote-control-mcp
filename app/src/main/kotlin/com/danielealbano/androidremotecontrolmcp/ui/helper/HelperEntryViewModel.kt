@@ -108,8 +108,11 @@ class HelperEntryViewModel
         fun startPractice() = endConversationThen(HelperEntryModel::practice)
 
         fun showIntroAgain() {
-            endConversationThen(HelperEntryModel::intro)
-            editor.setIntroSeen(false)
+            viewModelScope.launch {
+                conversation.stop()
+                editor.setIntroSeen(false)
+                navigate(HelperEntryModel::intro)
+            }
         }
 
         /** The live conversation must be over before the practice or the intro owns the microphone and the screen. */
