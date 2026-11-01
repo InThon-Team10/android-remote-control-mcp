@@ -35,6 +35,40 @@ components:
 현재 범위는 여기콕 앱의 실제 화면(main 소스)이다: 시작 화면(HelperActivity), 떠 있는 도움 버튼과 대화 창, 생각 중 화면, 안내 오버레이. 디버그·AI 테스트·고급 MCP 설정·키 입력 화면은 사용자 화면에서 열 수 없다. 이름은 앱 여기콕, 캐릭터 콕콕이, 떠 있는 버튼 도움 버튼이다(사용자 결정, 2026-11-01). 앱 아이콘은 콕 누르는 콕콕이, 화면 속 캐릭터는 승인된 손을 든 휴대폰과 그 상태 그림이며 「캐릭터와 앱 아이콘」 절을 따른다. 제품 결정은 PRODUCT.md가 기준이고 아래 UI 팀 프로토타입 기록과 다르면 PRODUCT.md와 「현재 런타임」 절이 우선한다.
 사용자 요구: 정보 취약 계층을 위한 쉬운 설명, 텍스트/음성 입력, 현재 화면 강조와 안내.
 
+## Text-first guidance (2026-11-01, current decision)
+
+This section supersedes older runtime descriptions below.
+
+- Requests are typed or dictated with on-device Korean recognition into an editable draft. Only Send submits text.
+  Microphone permission is optional for typing; the Realtime voice session is disabled.
+- Screen analysis and step planning use `gpt-6.1-terra` through Responses with low reasoning effort. Existing model
+  selections migrate to the pinned model. Required tool calls keep free-form prose from replacing highlights;
+  explicit question/completion/unavailable replies are still allowed. This validates routing, not semantic correctness.
+- Each running interval without a guidance target shows the thinking character. Request entry dims the background;
+  typing guidance keeps the target and keyboard accessible. Captions follow keyboard bounds, scroll for large fonts,
+  and reserve space for instructions and exit controls when a large target would consume the screen.
+- Content-scroll arrows follow the finger, opposite to content direction, with an exact start and endpoint inside
+  the scroll container. Covered/invalid paths are refused. `gesture=home` starts at the bottom system edge, points
+  upward and asks for immediate release. App-list swipes are only appropriate on the launcher.
+- Screenshot-based `target_bounds` lets guidance illuminate one chat row when accessibility exposes only a generic
+  container. Self-chat identity and the recipient must be confirmed for each new sending task. Notes requests stay
+  in a suitable notes app; Back is not a generic recovery action. These model decisions still require live evaluation.
+- On API 34+, eligible full-screen app captures use `takeScreenshotOfWindow` without hiding the thinking UI.
+  Keyboard/dialog/multiwindow/unsupported/failure cases retain display capture and can still briefly hide overlays.
+- Android TTS reads only the rendered caption instruction and explanation. Re-layout does not repeat it; replacing
+  or closing the caption replaces/stops speech. No conversation or progress narration is generated. The app uses
+  natural pitch 1.0 and rate 0.95, preserving system settings and the speech opt-out/TalkBack duplicate suppression.
+- User decision: retain the existing input completion behavior; do not add an input-done button. The observed
+  first-character/keyboard transition issue remains: TYPE can finish on a window change or after 2.5 seconds idle.
+
+Validation: selected regression suites, ktlintCheck and assembleGmsDebug were run; the PR records final results.
+The Terra account access and required-function-call contract were checked with synthetic input and no screen data.
+Debug builds were installed and launched on SM-S938N using the optional `helperDebugApplicationId` property to
+preserve the previously signed app. No APK, screenshot or local API key is committed.
+Actual TTS listening quality, cross-app keyboard transitions, screenshot-only target accuracy, 200% custom fonts,
+TalkBack and Switch Access have not been fully verified. Caption speech restores the listening alternative from
+the earlier silent-only experiment; current accessibility is not certified by build/test success.
+
 ## 지속 디자인 원칙: 유니버설 디자인과 포용적 UI/UX
 
 이 프로젝트의 모든 화면, 오버레이, 문구, 상호작용은 아래 원칙을 기본 설계 기준으로 삼는다. 일시적·상황적 제약을 포함해 시각, 청각, 운동, 인지, 언어, 디지털 경험의 차이를 고려한다. 정보 취약 계층을 하나의 능력이나 연령으로 단정하지 않는다. 이 절은 기존 시안의 장식·배치 지침보다 우선하며, 현재 구현의 접근성 인증을 뜻하지 않는다.
@@ -313,3 +347,4 @@ HelperEntryScreen reuses Color.kt → MaterialTheme and Android system typograph
 Each branch fixes its guide mode in HelperBuildVariant.kt. A starts with explanation; B starts with the scrollable caption. The overlay request and inert test fixture use that same mode. Runtime A/B switching is removed from these branch builds; common onboarding/home source and settings storage are identical. The base MCP launcher is unchanged.
 
 Entry verification before the user requested a stop: assembleGmsDebug, ktlintCheck, strict static audit, compiled state checks, and emulator first-entry/skip/return/relaunch/mock grant/start/request-draft/stop/failure-retry/revocation flows passed. A contrast correction was subsequently rebuilt. New entry screens at 320dp/200% text, landscape, TalkBack/Switch Access and diverse-user testing remain unverified. No additional builds or UI tests were run for branch separation, following the user's request to prioritize Git publication.
+

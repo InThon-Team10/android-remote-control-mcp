@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.ui.helper.bubble
 
 import com.danielealbano.androidremotecontrolmcp.assistant.session.ChatItem
 import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
+import com.danielealbano.androidremotecontrolmcp.ui.helper.practice.PracticeDictationState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,8 +13,13 @@ internal class BubbleUiState {
     private val _items = MutableStateFlow<List<ChatItem>>(emptyList())
     private val _session = MutableStateFlow<SessionState>(SessionState.Idle)
     private val _voiceEnabled = MutableStateFlow(false)
-    private val _listening = MutableStateFlow(false)
     private val _busy = MutableStateFlow(false)
+    val dictation = MutableStateFlow(PracticeDictationState())
+
+    fun setDictation(value: PracticeDictationState) {
+        dictation.value = value
+    }
+
     private val _draft = MutableStateFlow("")
 
     val layout: StateFlow<BubbleLayoutState> = _layout.asStateFlow()
@@ -22,7 +28,6 @@ internal class BubbleUiState {
 
     /** The mic button is shown only while voice is enabled in the settings. */
     val voiceEnabled: StateFlow<Boolean> = _voiceEnabled.asStateFlow()
-    val listening: StateFlow<Boolean> = _listening.asStateFlow()
 
     /** True while a tool call runs or a typed request awaits its answer ([bubbleBusy]). */
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -44,10 +49,6 @@ internal class BubbleUiState {
 
     fun setVoiceEnabled(value: Boolean) {
         _voiceEnabled.value = value
-    }
-
-    fun setListening(value: Boolean) {
-        _listening.value = value
     }
 
     fun setBusy(value: Boolean) {

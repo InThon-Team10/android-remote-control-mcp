@@ -2,6 +2,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityNodeData
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
+import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScreenInfo
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.ScrollDirection
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.WindowData
 import com.danielealbano.androidremotecontrolmcp.services.guidance.ScreenPoint
@@ -145,6 +146,49 @@ internal object ElderGuidanceGeometry {
         } else {
             node.children.firstNotNullOfOrNull { child -> pathTo(child, nodeId)?.let { listOf(node) + it } }
         }
+
+    /** Content direction is the opposite of finger movement. Keep the entire path away from system edges. */
+    fun scrollPath(
+        bounds: BoundsData,
+        direction: ScrollDirection,
+        screen: ScreenInfo,
+    ): Pair<ScreenPoint, ScreenPoint>? {
+        val inset = 32 * screen.densityDpi / BASE_DENSITY_DPI
+        val left = maxOf(bounds.left, inset)
+        val top = maxOf(bounds.top, inset)
+        val right = minOf(bounds.right, screen.width - inset)
+        val bottom = minOf(bounds.bottom, screen.height - inset)
+        if (right - left < inset || bottom - top < inset) return null
+        val midX = (left + right) / 2
+        val midY = (top + bottom) / 2
+        val lowX = left + (right - left) / 4
+        val highX = right - (right - left) / 4
+        val lowY = top + (bottom - top) / 4
+        val highY = bottom - (bottom - top) / 4
+        return when (direction) {
+            ScrollDirection.DOWN -> ScreenPoint(midX, highY) to ScreenPoint(midX, lowY)
+            ScrollDirection.UP -> ScreenPoint(midX, lowY) to ScreenPoint(midX, highY)
+            ScrollDirection.RIGHT -> ScreenPoint(highX, midY) to ScreenPoint(lowX, midY)
+            ScrollDirection.LEFT -> ScreenPoint(lowX, midY) to ScreenPoint(highX, midY)
+        }
+    }
+
+    /** A short upward stroke and immediate release returns home; holding would open Recents. */
+    fun homePath(screen: ScreenInfo): Pair<ScreenPoint, ScreenPoint> {
+        val x = screen.width / 2
+        val startY = screen.height - 1
+        val distance = minOf(160 * screen.densityDpi / BASE_DENSITY_DPI, screen.height / 4)
+        return ScreenPoint(x, startY) to ScreenPoint(x, maxOf(0, startY - distance))
+    }
+
+    fun isSystemEdge(
+        x: Float,
+        y: Float,
+        screen: ScreenInfo,
+    ): Boolean {
+        val edge = 24 * screen.densityDpi / BASE_DENSITY_DPI
+        return x < edge || y < edge || x >= screen.width - edge || y >= screen.height - edge
+    }
 
     private fun contains(
         bounds: BoundsData,

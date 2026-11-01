@@ -5,10 +5,7 @@ import android.util.Log
 import android.view.WindowManager
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.VOICE_TRACE
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.isActive
+import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
 import com.danielealbano.androidremotecontrolmcp.data.repository.AssistantSettings
 import com.danielealbano.androidremotecontrolmcp.mcp.tools.InFlightToolCallSignal
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityOverlayHost
@@ -31,7 +28,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,7 +42,6 @@ class HelperBubbleOverlayHost internal constructor(
     private val settings: AssistantSettings,
     private val guidance: GuidanceController,
     private val speaker: HelperSpeaker,
-    private val liveVoice: LiveVoiceSession,
     private val serverStarter: AssistantServerStarter,
     private val toolCalls: InFlightToolCallSignal,
     private val conversation: HelperConversationControl,
@@ -61,7 +56,6 @@ class HelperBubbleOverlayHost internal constructor(
         settings: AssistantSettings,
         guidance: GuidanceController,
         speaker: HelperSpeaker,
-        liveVoice: LiveVoiceSession,
         serverStarter: AssistantServerStarter,
         toolCalls: InFlightToolCallSignal,
         conversation: HelperConversationControl,
@@ -72,7 +66,6 @@ class HelperBubbleOverlayHost internal constructor(
         settings,
         guidance,
         speaker,
-        liveVoice,
         serverStarter,
         toolCalls,
         conversation,
@@ -88,7 +81,7 @@ class HelperBubbleOverlayHost internal constructor(
     private var service: AccessibilityService? = null
     private var windows: BubbleWindowController? = null
     private val actions =
-        BubbleActionsImpl(session, uiState, liveVoice, serverStarter, panelRequested, { scope }, { service }, positions)
+        BubbleActionsImpl(session, uiState, serverStarter, panelRequested, { scope }, { service }, positions)
 
     private var bubblePosition: Int? = null
     private var suppressed = false
@@ -119,15 +112,6 @@ class HelperBubbleOverlayHost internal constructor(
         newScope.launch {
             combine(toolCalls.active, awaiting(), ::bubbleBusy).distinctUntilChanged().collect(uiState::setBusy)
         }
-        newScope.launch {
-            liveVoice.state
-                .map { it.isActive() }
-                .distinctUntilChanged()
-                .collect {
-                    Log.d(BUBBLE_TRACE, "live voice active=$it (bubble status=${_status.value})")
-                    uiState.setListening(it)
-                }
-        }
     }
 
     override fun detach() {
@@ -150,7 +134,10 @@ class HelperBubbleOverlayHost internal constructor(
         if (this.suppressed == suppressed) return
         this.suppressed = suppressed
         // A hidden focusable panel must never keep keyboard focus, so suppression also closes it.
-        if (suppressed) panelRequested.value = false
+        if (suppressed) {
+            actions.cancelDictation()
+            panelRequested.value = false
+        }
         windows?.setSuppressed(suppressed)
     }
 
@@ -166,6 +153,7 @@ class HelperBubbleOverlayHost internal constructor(
         prerequisites: Boolean,
     ) {
         uiState.setVoiceEnabled(voiceEnabled)
+        if (!voiceEnabled) actions.cancelDictation()
         Log.d(BUBBLE_TRACE, "gate prerequisites=$prerequisites voiceEnabled=$voiceEnabled shown=${windows != null}")
         if (!prerequisites) {
             removeWindows()
@@ -200,6 +188,7 @@ class HelperBubbleOverlayHost internal constructor(
     }
 
     private fun removeWindows() {
+        actions.cancelDictation()
         if (windows != null) Log.d(BUBBLE_TRACE, "bubble windows removed")
         windows?.removeAll()
         windows = null
@@ -210,15 +199,12 @@ class HelperBubbleOverlayHost internal constructor(
 
     private suspend fun observeLayout() {
         val guidanceActive = guidance.state.map { it != null }.distinctUntilChanged()
-        val thinking =
-            combine(awaiting(), guidanceActive, ::Pair)
-                .runningFold(ThinkingTracker()) { tracker, (waiting, guided) -> tracker.next(waiting, guided) }
-                .map { it.visible }
-                .distinctUntilChanged()
-        combine(panelRequested, guidanceActive, thinking, ::resolveLayout)
-            .distinctUntilChanged()
+        combine(panelRequested, guidanceActive, session.state) { requested, guided, sessionState ->
+            resolveLayout(requested, guided, thinking = sessionState == SessionState.Running)
+        }.distinctUntilChanged()
             .collect { layout ->
                 Log.d(BUBBLE_TRACE, "layout $layout")
+                if (!layout.panelOpen) actions.cancelDictation()
                 uiState.setLayout(layout)
                 windows?.setThinking(layout.thinking)
                 windows?.setPanelOpen(layout.panelOpen)
@@ -231,15 +217,7 @@ class HelperBubbleOverlayHost internal constructor(
         combine(session.items, session.state, conversation.active, ::awaitingTextAnswer).distinctUntilChanged()
 
     private suspend fun observeItems() {
-        var lastSpoken = latestAssistantId(session.items.value)
-        session.items.collect { items ->
-            uiState.setItems(items)
-            newAssistantText(items, lastSpoken)?.let { (id, text) ->
-                lastSpoken = id
-                Log.d(VOICE_TRACE, "bubble speaks new answer item id=$id len=${text.length}")
-                speaker.speak(text)
-            }
-        }
+        session.items.collect(uiState::setItems)
     }
 
     private companion object {

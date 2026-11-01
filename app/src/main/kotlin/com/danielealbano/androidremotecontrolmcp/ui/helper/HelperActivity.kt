@@ -34,15 +34,10 @@ class HelperActivity : ComponentActivity() {
 
     private val notificationLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { reportResume() }
-    private var openAfterMicrophone = false
     private val microphoneLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             reportResume()
             viewModel.setup.onMicrophoneAnswered(this, granted)
-            if (openAfterMicrophone) {
-                openAfterMicrophone = false
-                if (granted) openConversation() else viewModel.reportError(R.string.bubble_error_mic_permission)
-            }
         }
 
     private val setupActions =
@@ -84,14 +79,7 @@ class HelperActivity : ComponentActivity() {
 
             override fun turnOff() = viewModel.turnOff(this@HelperActivity)
 
-            override fun openHelper() {
-                if (PermissionUtils.isMicrophonePermissionGranted(this@HelperActivity)) {
-                    openConversation()
-                } else {
-                    openAfterMicrophone = true
-                    microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                }
-            }
+            override fun openHelper() = openConversation()
 
             override fun setSpeech(enabled: Boolean) = viewModel.editor.setSpeech(enabled)
 
@@ -128,7 +116,7 @@ class HelperActivity : ComponentActivity() {
         reportResume()
     }
 
-    /** The conversation is live: show the 도움 버튼 on top of the launcher home screen. */
+    /** Open the text request panel: show the 도움 버튼 on top of the launcher home screen. */
     private fun openConversation() {
         viewModel.openHelper {
             val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)

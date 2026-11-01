@@ -420,10 +420,45 @@ class McpAccessibilityService : AccessibilityService() {
      * @param timeoutMs Maximum time to wait for screenshot capture (the pacing wait is not included).
      * @return Bitmap of the screenshot, or null if capture failed or timed out.
      */
-    suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? =
-        screenshotPacer.paced { assistantOverlayHider.hiddenDuring { captureScreenshotBitmap(timeoutMs) } }
+    suspend fun takeScreenshotBitmap(timeoutMs: Long = SCREENSHOT_TIMEOUT_MS): Bitmap? {
+        // API 34 captures the app beneath accessibility overlays without hiding the thinking UI.
+        val windowId = unobscuredFullScreenWindowId()
+        if (windowId != null) {
+            val bitmap = screenshotPacer.paced { captureScreenshotBitmap(timeoutMs, windowId) }
+            val screen = getScreenInfo()
+            if (bitmap != null && bitmap.width == screen.width && bitmap.height == screen.height) {
+                Log.d(TAG, "Screenshot: window capture kept overlays visible")
+                return bitmap
+            }
+            bitmap?.recycle()
+        }
+        return screenshotPacer.paced { assistantOverlayHider.hiddenDuring { captureScreenshotBitmap(timeoutMs) } }
+    }
 
-    private suspend fun captureScreenshotBitmap(timeoutMs: Long): Bitmap? =
+    /** Restrict window-only capture to a single full-screen app; dialogs/IME/split-screen need the full display. */
+    private fun unobscuredFullScreenWindowId(): Int? {
+        if (android.os.Build.VERSION.SDK_INT < 34) return null
+        val visible = getAccessibilityWindows()
+        val app = visible.singleOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION } ?: return null
+        val screen = getScreenInfo()
+        val bounds = android.graphics.Rect().also(app::getBoundsInScreen)
+        if (bounds.left != 0 || bounds.top != 0 || bounds.width() != screen.width || bounds.height() != screen.height) return null
+        val covered =
+            visible.any { other ->
+                val rect = android.graphics.Rect().also(other::getBoundsInScreen)
+                other.id != app.id && other.layer > app.layer &&
+                    (
+                        other.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD ||
+                            rect.width().toLong() * rect.height() > screen.width.toLong() * screen.height / 4
+                    )
+            }
+        return app.id.takeUnless { covered }
+    }
+
+    private suspend fun captureScreenshotBitmap(
+        timeoutMs: Long,
+        windowId: Int? = null,
+    ): Bitmap? =
         withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 val executor = Executor { it.run() }
@@ -449,7 +484,11 @@ class McpAccessibilityService : AccessibilityService() {
                         }
                     }
 
-                takeScreenshot(Display.DEFAULT_DISPLAY, executor, callback)
+                if (windowId != null && android.os.Build.VERSION.SDK_INT >= 34) {
+                    takeScreenshotOfWindow(windowId, executor, callback)
+                } else {
+                    takeScreenshot(Display.DEFAULT_DISPLAY, executor, callback)
+                }
             }
         }
 

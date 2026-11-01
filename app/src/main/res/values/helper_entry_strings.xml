@@ -12,7 +12,7 @@
     <string name="entry_allow">허용하기</string>
     <string name="entry_step_microphone">마이크</string>
     <string name="entry_step_microphone_body">말로 물어보고 싶을 때만 필요해요. 허용하지 않아도 글로 물어볼 수 있어요.</string>
-    <string name="entry_voice_toggle">음성으로 대화하기</string>
+    <string name="entry_voice_toggle">말을 글자로 입력하기</string>
     <string name="entry_status_missing">시작 설정이 필요해요</string>
     <string name="entry_status_starting">콕콕이를 켜고 있어요</string>
     <string name="entry_status_failed">콕콕이를 켜지 못했어요</string>
@@ -26,6 +26,6 @@
     <string name="entry_retry">다시 시도</string>
     <string name="entry_stop">도우미 종료</string>
     <string name="entry_home">홈으로 돌아가기</string>
-    <string name="entry_speech_toggle">음성 안내</string>
+    <string name="entry_speech_toggle">말풍선 읽어주기</string>
     <string name="entry_reset">최초 안내 다시 보기</string>
 </resources>

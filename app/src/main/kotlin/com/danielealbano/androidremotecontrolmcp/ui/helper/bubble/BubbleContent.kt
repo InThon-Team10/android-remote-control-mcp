@@ -134,14 +134,15 @@ private fun PanelInput(
     val text by state.draft.collectAsState()
     val busy by state.busy.collectAsState()
     val voiceEnabled by state.voiceEnabled.collectAsState()
-    val listening by state.listening.collectAsState()
+    val dictation by state.dictation.collectAsState()
     val tick by focusTick.collectAsState()
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val micVisual =
         when {
             !voiceEnabled -> MicVisual.HIDDEN
-            listening -> MicVisual.LISTENING
+            dictation.listening -> MicVisual.LISTENING
+            dictation.recognizing -> MicVisual.PROCESSING
             else -> MicVisual.IDLE
         }
     LaunchedEffect(tick) {
@@ -149,13 +150,21 @@ private fun PanelInput(
         keyboard?.show()
     }
     HelperRequestInput(
-        ui = RequestInputUi(text, false, micVisual, null, sendEnabled(text, busy), focus),
+        ui =
+            RequestInputUi(
+                text,
+                dictation.busy,
+                micVisual,
+                dictation.message,
+                sendEnabled(text, busy || dictation.busy || session != SessionState.Idle),
+                focus,
+            ),
         actions =
             RequestInputActions(
                 onTextChange = state::setDraft,
                 onMic = actions::onToggleMic,
                 onSend = {
-                    if (sendEnabled(text, busy)) actions.onSend(text.trim())
+                    if (sendEnabled(text, busy || dictation.busy || session != SessionState.Idle)) actions.onSend(text.trim())
                 },
                 onClose = actions::onClosePanel,
             ),

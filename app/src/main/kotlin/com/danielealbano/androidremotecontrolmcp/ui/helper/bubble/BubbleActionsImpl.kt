@@ -6,30 +6,33 @@ import com.danielealbano.androidremotecontrolmcp.assistant.AssistantError
 import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantServerStarter
 import com.danielealbano.androidremotecontrolmcp.assistant.session.AssistantSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceSession
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.LiveVoiceState
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.isActive
+import com.danielealbano.androidremotecontrolmcp.assistant.session.SessionState
+import com.danielealbano.androidremotecontrolmcp.ui.helper.practice.OnDevicePracticeDictation
+import com.danielealbano.androidremotecontrolmcp.ui.helper.practice.PracticeDictation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
-/** Routes the panel's buttons to the assistant session and the live voice conversation. */
+/** Routes the panel's buttons to the assistant session and on-device dictation. */
 internal class BubbleActionsImpl(
     private val session: AssistantSession,
     private val state: BubbleUiState,
-    private val liveVoice: LiveVoiceSession,
     private val serverStarter: AssistantServerStarter,
     private val panelRequested: MutableStateFlow<Boolean>,
     private val scope: () -> CoroutineScope?,
     private val context: () -> Context?,
     private val positions: BubblePositionStore,
+    private val dictationFactory: (Context, (String) -> Unit) -> PracticeDictation =
+        { host, onText -> OnDevicePracticeDictation(host, onText) },
 ) : BubbleActions {
     private var voiceJob: Job? = null
+    private var dictation: PracticeDictation? = null
     private var lastSent = ""
 
     override fun onToggleBubble() {
         Log.d(BUBBLE_TRACE, "bubble tapped: panel ${if (panelRequested.value) "closes" else "opens"}")
+        if (panelRequested.value) cancelDictation()
         panelRequested.value = !panelRequested.value
     }
 
@@ -39,6 +42,7 @@ internal class BubbleActionsImpl(
     }
 
     override fun onClosePanel() {
+        cancelDictation()
         Log.d(BUBBLE_TRACE, "panel closed by the user")
         panelRequested.value = false
     }
@@ -51,20 +55,32 @@ internal class BubbleActionsImpl(
     }
 
     override fun onSend(text: String) {
+        if (!sendEnabled(text, state.session.value != SessionState.Idle)) return
+        if (dictation?.state?.value?.busy == true) return
         val host = context() ?: return
+        cancelDictation()
         lastSent = text
         state.setDraft("")
         scope()?.launch {
             serverStarter.ensureRunning(host).fold(
                 onSuccess = { session.send(text) },
-                onFailure = { session.reportError(it.toAssistantError()) },
+                onFailure = {
+                    state.setDraft(text)
+                    session.reportError(it.toAssistantError())
+                },
             )
         }
     }
 
-    override fun onStop() = session.stop()
+    override fun onStop() {
+        cancelDictation()
+        session.stop()
+    }
 
-    override fun onNewChat() = session.newChat()
+    override fun onNewChat() {
+        cancelDictation()
+        session.newChat()
+    }
 
     override fun onConfirm(
         callId: String,
@@ -73,29 +89,28 @@ internal class BubbleActionsImpl(
 
     override fun onToggleMic() {
         val host = context() ?: return
-        val active = liveVoice.state.value.isActive()
-        Log.d(BUBBLE_TRACE, "mic tapped: live voice ${if (active) "stops" else "starts"}")
-        voiceJob?.cancel()
-        voiceJob =
-            scope()?.launch {
-                if (active) {
-                    liveVoice.stop()
-                } else {
-                    serverStarter
-                        .ensureRunning(host)
-                        .fold(
-                            onSuccess = { liveVoice.start().exceptionOrNull() },
-                            onFailure = { it },
-                        )?.let {
-                            Log.d(BUBBLE_TRACE, "live voice did not start: ${it.javaClass.simpleName}")
-                            session.reportError(it.toAssistantError())
-                        }
-                }
+        if (state.busy.value || state.session.value != SessionState.Idle) return
+        val current =
+            dictation ?: dictationFactory(host, state::setDraft).also { created ->
+                dictation = created
+                voiceJob = scope()?.launch { created.state.collect(state::setDictation) }
             }
+        if (current.state.value.listening) {
+            current.stop()
+        } else if (!current.state.value.recognizing) {
+            current.start(state.draft.value)
+        }
+    }
+
+    fun cancelDictation() {
+        dictation?.cancel()
     }
 
     fun reset() {
+        cancelDictation()
+        voiceJob?.cancel()
         voiceJob = null
+        dictation = null
     }
 }
 

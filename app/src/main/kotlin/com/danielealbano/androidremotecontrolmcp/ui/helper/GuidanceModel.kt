@@ -18,7 +18,7 @@ internal sealed interface GuidanceScene {
         val target: GuidanceTarget,
     ) : GuidanceScene
 
-    /** Outline and caption without dim or blockers, so the keyboard stays usable. */
+    /** Dimmed bands around the typing field, excluding the keyboard area. */
     data class TypeHint(
         val stateId: Long,
         val target: GuidanceTarget,
@@ -52,7 +52,7 @@ internal data class GuidanceCaption(
 ) {
     /** What the helper reads aloud: the instruction, then the explanation as a sentence of its own. */
     val spokenText: String
-        get() = if (explanation == null) instruction else "${withSentenceEnd(instruction)} $explanation"
+        get() = listOfNotNull(instruction, explanation).joinToString("\n")
 }
 
 /** The caption of [target]: its instruction ([defaultInstruction] when blank) and its non-blank explanation. */
@@ -64,14 +64,6 @@ internal fun guidanceCaption(
         instruction = target.instruction.ifBlank(defaultInstruction),
         explanation = target.explanation?.trim()?.takeIf { it.isNotEmpty() },
     )
-
-/** [text] ending with sentence punctuation, so speech pauses before what follows it. */
-private fun withSentenceEnd(text: String): String {
-    val trimmed = text.trimEnd()
-    return if (trimmed.lastOrNull() in SENTENCE_ENDS) trimmed else "$trimmed."
-}
-
-private val SENTENCE_ENDS = setOf('.', '!', '?', '…', '。', '！', '？')
 
 @StringRes
 internal fun defaultCaptionRes(

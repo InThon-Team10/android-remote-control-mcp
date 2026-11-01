@@ -29,6 +29,23 @@ class AssistantProviderMigrationTest {
     private val testScope = TestScope(UnconfinedTestDispatcher())
 
     @Test
+    fun `old Luna planner selection migrates to Terra without losing key or consent settings`() =
+        testScope.runTest {
+            val before =
+                preferencesOf(
+                    ASSISTANT_MODEL_KEY to "gpt-6-luna",
+                    ASSISTANT_API_KEY_CIPHERTEXT_KEY to "openai-ciphertext",
+                    ASSISTANT_PRIVACY_NOTICE_ACCEPTED_KEY to true,
+                )
+            assertTrue(AssistantProviderMigration.shouldMigrate(before))
+            val after = AssistantProviderMigration.migrate(before)
+            assertNull(after[ASSISTANT_MODEL_KEY])
+            assertEquals("gpt-6.1-terra", AssistantConfig.DEFAULT_MODEL)
+            assertEquals("openai-ciphertext", after[ASSISTANT_API_KEY_CIPHERTEXT_KEY])
+            assertEquals(true, after[ASSISTANT_PRIVACY_NOTICE_ACCEPTED_KEY])
+        }
+
+    @Test
     fun `drops the key saved for the previous provider and keeps everything else`() =
         testScope.runTest {
             val before =

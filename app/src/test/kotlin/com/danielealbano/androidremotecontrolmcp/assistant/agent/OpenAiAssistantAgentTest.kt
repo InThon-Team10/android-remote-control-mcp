@@ -5,7 +5,6 @@ import com.danielealbano.androidremotecontrolmcp.assistant.AssistantException
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.calls
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.errorObject
 import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.headers
-import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.text
 import com.danielealbano.androidremotecontrolmcp.assistant.mcp.AssistantMcpConnection
 import com.danielealbano.androidremotecontrolmcp.data.model.AssistantConfig
 import com.danielealbano.androidremotecontrolmcp.data.model.ServerConfig
@@ -44,6 +43,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.jvm.optionals.getOrNull
+import com.danielealbano.androidremotecontrolmcp.assistant.agent.OpenAiTestResponses.text as rawText
 import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpTool
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -78,6 +78,32 @@ class OpenAiAssistantAgentTest {
         coEvery { connection.listTools() } answers { Result.success(tools) }
         coEvery { connection.callTool(any(), any()) } returns Result.success(McpToolUtils.textResult("ok"))
     }
+
+    private fun text(message: String) =
+        calls(
+            GuidanceReply.NAME to
+                JsonObject(mapOf("kind" to JsonPrimitive("completed"), "message" to JsonPrimitive(message))).toString(),
+        )
+
+    @Test
+    fun `plain instructions are withheld and retried as a highlight`() =
+        runTest {
+            gateway.enqueue(rawText("설정을 누르고 와이파이를 켜세요"))
+            gateway.enqueue(calls("android_tap" to """{"x":500,"y":800}"""))
+            gateway.enqueue(text("완료했어요"))
+            assertEquals(AgentOutcome.Completed, agent.run(userText("와이파이 켜기"), listener))
+            assertFalse(listener.events.any { it.contains("설정을 누르고") })
+            assertTrue(listener.events.contains("started:android_tap"))
+        }
+
+    @Test
+    fun `recipient question ends the turn without interacting with the phone`() =
+        runTest {
+            gateway.enqueue(calls(GuidanceReply.NAME to """{"kind":"question","message":"본인의 나와의 채팅으로 보낼까요?"}"""))
+            assertEquals(AgentOutcome.Completed, agent.run(userText("나한테 보내줘"), listener))
+            assertEquals(listOf("text:본인의 나와의 채팅으로 보낼까요?"), listener.events)
+            coVerify(exactly = 0) { connection.callTool(any(), any()) }
+        }
 
     private fun userText(value: String) = AgentInput.Text(value)
 
@@ -125,9 +151,15 @@ class OpenAiAssistantAgentTest {
             assertEquals(false, params.store().get())
             assertEquals(listOf(ResponseIncludable.REASONING_ENCRYPTED_CONTENT), params.include().get())
             assertEquals(false, params.parallelToolCalls().get())
-            assertEquals(ToolChoiceOptions.AUTO, params.toolChoice().get().asOptions())
-            assertEquals(listOf("android_tap", "android_get_screen_state"), call.toolNames())
-            assertTrue(params.tools().get().all { it.asFunction().strict().get() == false })
+            assertEquals(ToolChoiceOptions.REQUIRED, params.toolChoice().get().asOptions())
+            assertEquals(listOf("android_tap", "android_get_screen_state", GuidanceReply.NAME), call.toolNames())
+            assertTrue(
+                params
+                    .tools()
+                    .get()
+                    .filter { it.asFunction().name() != GuidanceReply.NAME }
+                    .all { !it.asFunction().strict().get() },
+            )
             assertEquals(listOf("user"), call.input.map { it.kind() })
             assertEquals(
                 "hello",
@@ -140,22 +172,21 @@ class OpenAiAssistantAgentTest {
         }
 
     @Test
-    fun `no tools omits tools, tool choice and parallel tool calls`() =
+    fun `without device tools a clarification tool remains available`() =
         runTest {
             coEvery { connection.listTools() } returns Result.success(emptyList())
-            gateway.enqueue(text("Hi"))
-
+            gateway.enqueue(text("연결을 확인해 주세요"))
             agent.run(userText("hello"), listener)
-
-            val params = gateway.calls.single().params
-            assertTrue(
-                params
-                    .tools()
-                    .getOrNull()
-                    .isNullOrEmpty(),
+            assertEquals(listOf(GuidanceReply.NAME), gateway.calls.single().toolNames())
+            assertEquals(
+                ToolChoiceOptions.REQUIRED,
+                gateway.calls
+                    .single()
+                    .params
+                    .toolChoice()
+                    .get()
+                    .asOptions(),
             )
-            assertFalse(params.toolChoice().isPresent)
-            assertFalse(params.parallelToolCalls().isPresent)
         }
 
     @Test
@@ -204,7 +235,10 @@ class OpenAiAssistantAgentTest {
             agent.run(userText("1"), listener)
             agent.run(userText("2"), listener)
 
-            assertEquals(listOf("user", "reasoning", "message", "user"), gateway.calls[1].input.map { it.kind() })
+            assertEquals(
+                listOf("user", "reasoning", "function_call", "function_call_output", "user"),
+                gateway.calls[1].input.map { it.kind() },
+            )
         }
 
     @Test
@@ -257,7 +291,7 @@ class OpenAiAssistantAgentTest {
 
             agent.run(userText("x"), listener)
 
-            assertEquals(listOf("android_tap", "android_get_screen_state"), gateway.calls[0].toolNames())
+            assertEquals(listOf("android_tap", "android_get_screen_state", GuidanceReply.NAME), gateway.calls[0].toolNames())
             coVerify(exactly = 0) { connection.callTool(any(), any()) }
             assertEquals(listOf("text:done"), listener.events)
             assertEquals("ERROR: Unknown tool.", gateway.calls[1].input[3].outputText())
@@ -275,7 +309,7 @@ class OpenAiAssistantAgentTest {
 
             agent.run(userText("x"), listener)
 
-            assertEquals(listOf("android_pixel7_tap"), gateway.calls.single().toolNames())
+            assertEquals(listOf("android_pixel7_tap", GuidanceReply.NAME), gateway.calls.single().toolNames())
         }
 
     @Test
@@ -347,7 +381,7 @@ class OpenAiAssistantAgentTest {
             assertEquals(AgentOutcome.Failed(AssistantError.ModelRequestFailed("HTTP 400")), failed)
             assertEquals(3, gateway.calls.size)
             assertEquals(
-                listOf("user", "reasoning", "message", "user"),
+                listOf("user", "reasoning", "function_call", "function_call_output", "user"),
                 gateway.calls
                     .last()
                     .input
@@ -477,7 +511,7 @@ class OpenAiAssistantAgentTest {
 
             agent.run(userText("1"), listener)
             agent.run(userText("2"), listener)
-            assertEquals(4, gateway.calls[1].input.size)
+            assertEquals(5, gateway.calls[1].input.size)
             agent.reset()
             agent.run(userText("3"), listener)
 

@@ -2,9 +2,11 @@ package com.danielealbano.androidremotecontrolmcp.ui.helper
 
 import android.accessibilityservice.AccessibilityService
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.danielealbano.androidremotecontrolmcp.R
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.BoundsData
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceTarget
 import kotlin.math.roundToInt
@@ -19,9 +21,27 @@ internal class GuidanceDisplay(
 
     fun toDp(px: Int): Dp = (px / density).dp
 
+    fun captionMinimumRoom(screen: PxSize): Int {
+        val textRoom = dp(96) * service.resources.configuration.fontScale
+        val desired = textRoom.roundToInt() + dp(CONTROLS_HEIGHT_DP + CONTROLS_GAP_DP + MARGIN_DP * 2)
+        return minOf(desired, screen.height / 2)
+    }
+
     fun screenSize(): PxSize {
         val bounds = service.getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
         return PxSize(bounds.width(), bounds.height())
+    }
+
+    /** Keyboard windows stay fully exposed. Re-read when the IME opens, closes or changes height. */
+    fun typingScreenSize(): PxSize {
+        val screen = screenSize()
+        val keyboardTop =
+            service.windows
+                .filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+                .map { window -> android.graphics.Rect().also(window::getBoundsInScreen) }
+                .filter { !it.isEmpty }
+                .minOfOrNull { it.top }
+        return typingViewport(screen, keyboardTop)
     }
 
     /** The target padded for the hole and clipped to the screen; null when it is invalid or off screen. */
@@ -60,8 +80,15 @@ internal class GuidanceDisplay(
     }
 
     /** The caption of [target]; a blank instruction becomes the default for its kind and scroll direction. */
-    fun caption(target: GuidanceTarget): GuidanceCaption =
-        guidanceCaption(target) { service.getString(defaultCaptionRes(target.kind, target.scrollDirection)) }
+    fun caption(target: GuidanceTarget): GuidanceCaption {
+        val caption = guidanceCaption(target) { service.getString(defaultCaptionRes(target.kind, target.scrollDirection)) }
+        if (target.swipeStart == null) return caption
+        val label =
+            service.getString(
+                if (target.systemGesture) R.string.helper_gesture_edge else R.string.helper_gesture_inside,
+            )
+        return caption.copy(instruction = "$label\n${caption.instruction}")
+    }
 
     companion object {
         const val MARGIN_DP = 16

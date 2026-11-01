@@ -5,9 +5,7 @@ import android.content.ComponentCallbacks
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.WindowManager
-import com.danielealbano.androidremotecontrolmcp.assistant.voice.VOICE_TRACE
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AccessibilityOverlayHost
 import com.danielealbano.androidremotecontrolmcp.services.accessibility.AssistantOverlayHider
 import com.danielealbano.androidremotecontrolmcp.services.guidance.GuidanceController
@@ -16,6 +14,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +24,7 @@ import javax.inject.Singleton
 /**
  * Renders the [GuidanceController] state over other apps as soon as a step arrives: a dimmed screen with a hole over
  * the target (four touchable blocker windows around it, so touches inside the hole reach the app), or, for typing,
- * just an outline and a caption so the keyboard stays usable, or, for a swipe, an arrow and a caption. A step's
+ * dimmed bands above the keyboard so the input field and keyboard stay usable, or, for a swipe, an arrow and a caption. A step's
  * explanation is the caption's second line and is read aloud after the instruction. Hosted by the accessibility
  * service.
  */
@@ -36,12 +37,14 @@ class GuidanceOverlayHost
     ) : AccessibilityOverlayHost {
         private val hider = RefCountedOverlayHider(Dispatchers.Main.immediate) { windows?.setHidden(it) }
         private val detector = HoleTouchDetector()
+        private val captionSpeech = CaptionSpeech(speaker)
         private val handler = Handler(Looper.getMainLooper())
         private var service: AccessibilityService? = null
         private var windows: GuidanceWindowSet? = null
         private var renderer: GuidanceSceneRenderer? = null
         private var scope: CoroutineScope? = null
         private var shown: GuidanceScene? = null
+        private var typingViewport: PxSize? = null
 
         private val configurationCallbacks =
             object : ComponentCallbacks {
@@ -68,7 +71,18 @@ class GuidanceOverlayHost
             controller.setRendererAttached(true)
             scope =
                 CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope ->
-                    scope.launch { controller.state.collect { render(guidanceScene(it)) } }
+                    scope.launch {
+                        controller.state.collectLatest { state ->
+                            val scene = guidanceScene(state)
+                            render(scene)
+                            if (scene != GuidanceScene.Empty) {
+                                while (isActive) {
+                                    delay(100L)
+                                    render(scene)
+                                }
+                            }
+                        }
+                    }
                 }
         }
 
@@ -83,7 +97,7 @@ class GuidanceOverlayHost
             renderer = null
             detector.reset(emptySet())
             shown = null
-            speaker.stop()
+            captionSpeech.clear()
             service = null
             controller.setRendererAttached(false)
         }
@@ -102,49 +116,25 @@ class GuidanceOverlayHost
         private fun render(scene: GuidanceScene) {
             val previous = shown
             val current = renderer
-            if (current != null && scene != previous) {
+            val viewport = if (scene != GuidanceScene.Empty) service?.let { GuidanceDisplay(it).typingScreenSize() } else null
+            if (current != null && (scene != previous || viewport != typingViewport)) {
+                typingViewport = viewport
                 shown = scene
                 windows?.clear()
                 detector.reset(emptySet())
                 current.show(scene)
-                announce(previous, scene)
+                // Rendering can cancel a step that has no safe room; never read a caption that was not shown.
+                announce(if (guidanceScene(controller.state.value) == scene) scene else GuidanceScene.Empty)
             }
         }
 
-        private fun announce(
-            previous: GuidanceScene?,
-            scene: GuidanceScene,
-        ) {
-            val text = spokenText(scene)
-            when {
-                text == null -> {
-                    Log.d(VOICE_TRACE, "guidance stops speech (no scene text)")
-                    speaker.stop()
-                }
-
-                sceneKey(previous) != sceneKey(scene) -> {
-                    Log.d(VOICE_TRACE, "guidance speaks instruction len=${text.length}")
-                    speaker.speak(text)
-                }
-            }
-        }
-
-        /** The caption read aloud: the instruction, then the explanation when the step has one. */
-        private fun spokenText(scene: GuidanceScene): String? {
-            val display = service?.let { GuidanceDisplay(it) }
-            return when (scene) {
-                GuidanceScene.Empty -> null
-                is GuidanceScene.Spotlight -> display?.caption(scene.target)?.spokenText
-                is GuidanceScene.TypeHint -> display?.caption(scene.target)?.spokenText
-                is GuidanceScene.SwipeHint -> display?.caption(scene.target)?.spokenText
-            }
-        }
-
-        private fun sceneKey(scene: GuidanceScene?): Pair<Long, Class<*>>? =
+        private fun announce(scene: GuidanceScene) {
+            val display = service?.let { GuidanceDisplay(it) } ?: return
             when (scene) {
-                null, GuidanceScene.Empty -> null
-                is GuidanceScene.Spotlight -> scene.stateId to scene.javaClass
-                is GuidanceScene.TypeHint -> scene.stateId to scene.javaClass
-                is GuidanceScene.SwipeHint -> scene.stateId to scene.javaClass
+                GuidanceScene.Empty -> captionSpeech.clear()
+                is GuidanceScene.Spotlight -> captionSpeech.show(scene.stateId, display.caption(scene.target))
+                is GuidanceScene.TypeHint -> captionSpeech.show(scene.stateId, display.caption(scene.target))
+                is GuidanceScene.SwipeHint -> captionSpeech.show(scene.stateId, display.caption(scene.target))
             }
+        }
     }

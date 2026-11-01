@@ -18,7 +18,7 @@ data class AssistantConfig(
 ) {
     companion object {
         /** Pinned (owner decision): the text planner's model on the Responses API, run with low reasoning effort. */
-        const val DEFAULT_MODEL = "gpt-6-luna"
+        const val DEFAULT_MODEL = "gpt-6.1-terra"
 
         /** Pinned (owner decision): the live voice model on the Realtime API. */
         const val LIVE_MODEL = "gpt-realtime-2.1"

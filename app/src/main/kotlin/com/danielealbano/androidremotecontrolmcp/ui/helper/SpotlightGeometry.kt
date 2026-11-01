@@ -94,6 +94,7 @@ internal fun swipePathLayout(
     direction: ScrollDirection,
     metrics: SwipePathMetrics,
     screen: PxSize,
+    end: ScreenPoint? = null,
 ): SwipePathLayout {
     val gap =
         PxRect(
@@ -103,8 +104,42 @@ internal fun swipePathLayout(
             (start.y + metrics.gapHalf).coerceAtMost(screen.height),
         )
     val ring = outlineRing(gap, metrics.ringOuter - metrics.gapHalf, screen)
-    val line = lineWindow(area, start, direction, gap, metrics, screen)
+    val line =
+        if (end ==
+            null
+        ) {
+            lineWindow(area, start, direction, gap, metrics, screen)
+        } else {
+            exactLineWindow(start, end, gap, metrics, screen)
+        }
     return SwipePathLayout(gap, ring, outlineStrips(gap, ring), line)
+}
+
+private fun exactLineWindow(
+    start: ScreenPoint,
+    end: ScreenPoint,
+    gap: PxRect,
+    metrics: SwipePathMetrics,
+    screen: PxSize,
+): PxRect? {
+    val vertical = kotlin.math.abs(end.y - start.y) >= kotlin.math.abs(end.x - start.x)
+    val rect =
+        if (vertical) {
+            PxRect(
+                maxOf(0, minOf(start.x, end.x) - metrics.lineHalf),
+                if (end.y > start.y) gap.bottom else maxOf(0, end.y - metrics.endPad),
+                minOf(screen.width, maxOf(start.x, end.x) + metrics.lineHalf),
+                if (end.y > start.y) minOf(screen.height, end.y + metrics.endPad) else gap.top,
+            )
+        } else {
+            PxRect(
+                if (end.x > start.x) gap.right else maxOf(0, end.x - metrics.endPad),
+                maxOf(0, minOf(start.y, end.y) - metrics.lineHalf),
+                if (end.x > start.x) minOf(screen.width, end.x + metrics.endPad) else gap.left,
+                minOf(screen.height, maxOf(start.y, end.y) + metrics.lineHalf),
+            )
+        }
+    return rect.takeIf { it.width > 0 && it.height > 0 }
 }
 
 private fun lineWindow(
@@ -137,3 +172,23 @@ private fun lineWindow(
 }
 
 private fun ScrollDirection.isVertical(): Boolean = this == ScrollDirection.UP || this == ScrollDirection.DOWN
+
+/** Keep every typing blocker/caption above the keyboard, including floating and resized keyboards. */
+internal fun typingViewport(
+    screen: PxSize,
+    keyboardTop: Int?,
+): PxSize = PxSize(screen.width, keyboardTop?.coerceIn(0, screen.height) ?: screen.height)
+
+/** Keep a usable part of a large target exposed while reserving a real band for the caption and exit. */
+internal fun reserveCaptionRoom(
+    hole: PxRect,
+    screen: PxSize,
+    room: Int,
+    minimumTarget: Int,
+): PxRect? {
+    if (hole.top >= room || screen.height - hole.bottom >= room) return hole
+    val lower = hole.copy(top = maxOf(hole.top, room))
+    val upper = hole.copy(bottom = minOf(hole.bottom, screen.height - room))
+    val candidates = listOf(lower, upper).filter { it.height >= minimumTarget }
+    return candidates.maxByOrNull { it.height }
+}

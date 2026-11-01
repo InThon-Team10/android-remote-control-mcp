@@ -18,11 +18,15 @@ internal class GuidanceSceneRenderer(
     private val controller: GuidanceController,
 ) {
     fun show(scene: GuidanceScene) {
-        val screen = display.screenSize()
+        val screen = display.typingScreenSize()
+        if (screen.height < display.dp(CONTROLS_HEIGHT_DP + MARGIN_DP * 2) && scene != GuidanceScene.Empty) {
+            controller.cancel()
+            return
+        }
         when (scene) {
             GuidanceScene.Empty -> Unit
             is GuidanceScene.Spotlight -> showSpotlight(scene.target, screen)
-            is GuidanceScene.TypeHint -> showTypeHint(scene.target, screen)
+            is GuidanceScene.TypeHint -> showTypeHint(scene.target, display.typingScreenSize())
             is GuidanceScene.SwipeHint -> showSwipeHint(scene.target, screen)
         }
     }
@@ -30,11 +34,17 @@ internal class GuidanceSceneRenderer(
     private fun showSpotlight(
         target: GuidanceTarget,
         screen: PxSize,
+        typing: Boolean = false,
     ) {
         val caption = display.caption(target)
-        val hole = display.holeFor(target.bounds, screen)
-        if (hole == null) {
+        val originalHole = display.holeFor(target.bounds, screen)
+        if (originalHole == null) {
             showFloatingCaption(caption, screen)
+            return
+        }
+        val hole = reserveCaptionRoom(originalHole, screen, display.captionMinimumRoom(screen), display.dp(56))
+        if (hole == null) {
+            controller.cancel()
             return
         }
         val metrics =
@@ -55,7 +65,7 @@ internal class GuidanceSceneRenderer(
             ).filter { it.second.width > 0 && it.second.height > 0 }
         detector.reset(pieces.map { it.first }.toSet())
         pieces.forEach { (id, rect, side) ->
-            windows.add(id, GuidanceWindowSpec(rect, touchable = true, watchOutside = true)) {
+            windows.add(id, GuidanceWindowSpec(rect, touchable = true, watchOutside = !typing, behindKeyboard = typing)) {
                 SpotlightBand(rect, layout, side, caption, hole.centerX, controller::cancel)
             }
         }
@@ -72,8 +82,16 @@ internal class GuidanceSceneRenderer(
         target: GuidanceTarget,
         screen: PxSize,
     ) {
+        val pathScreen = if (target.systemGesture) display.screenSize() else screen
+        if (listOfNotNull(target.swipeStart, target.swipeEnd).any {
+                it.x !in 0 until pathScreen.width || it.y !in 0 until pathScreen.height
+            }
+        ) {
+            controller.cancel()
+            return
+        }
         val caption = display.caption(target)
-        val area = display.holeFor(target.bounds, screen)
+        val area = display.holeFor(target.bounds, pathScreen)
         if (area == null) {
             showFloatingCaption(caption, screen)
             return
@@ -82,15 +100,19 @@ internal class GuidanceSceneRenderer(
         val start = target.swipeStart
         val occupied =
             if (start == null) {
-                showCentredArrow(area, direction, screen)
+                showCentredArrow(area, direction, pathScreen)
             } else {
-                showSwipePath(area, start, direction, screen)
+                showSwipePath(area, start, direction, pathScreen, target.swipeEnd)
             }
-        val watcher = watcherRect(start, screen)
+        val watcher = watcherRect(start, pathScreen)
         windows.add(WATCHER_ID, GuidanceWindowSpec(watcher, touchable = true, watchOutside = true)) {}
         detector.reset(setOf(WATCHER_ID))
         // The caption goes outside the whole swipe path: a caption window under the finger would take the swipe.
-        showCaptionNear(occupied, caption, screen)
+        if (occupied.top >= screen.height) {
+            showFloatingCaption(caption, screen)
+        } else {
+            showCaptionNear(occupied.copy(bottom = minOf(occupied.bottom, screen.height)), caption, screen)
+        }
     }
 
     private fun showCentredArrow(
@@ -109,6 +131,7 @@ internal class GuidanceSceneRenderer(
         start: ScreenPoint,
         direction: ScrollDirection,
         screen: PxSize,
+        end: ScreenPoint?,
     ): PxRect {
         val metrics =
             SwipePathMetrics(
@@ -119,7 +142,7 @@ internal class GuidanceSceneRenderer(
                 endInset = display.dp(ElderGuidanceGeometry.SWIPE_MARGIN_DP),
                 minLine = display.dp(MIN_LINE_DP),
             )
-        val layout = swipePathLayout(area, start, direction, metrics, screen)
+        val layout = swipePathLayout(area, start, direction, metrics, screen, end)
         val radius = (metrics.gapHalf + metrics.ringOuter) / 2
         layout.ringStrips.forEachIndexed { index, strip ->
             windows.add(RING_FIRST_ID + index, GuidanceWindowSpec(strip, touchable = false)) {
@@ -127,7 +150,9 @@ internal class GuidanceSceneRenderer(
             }
         }
         layout.line?.let { line ->
-            windows.add(ARROW_ID, GuidanceWindowSpec(line, touchable = false)) { SwipePathLine(direction) }
+            windows.add(ARROW_ID, GuidanceWindowSpec(line, touchable = false)) {
+                if (end == null) SwipePathLine(direction) else ExactSwipePathLine(start, end, line)
+            }
         }
         return layout.line?.let { layout.ring.union(it) } ?: layout.ring
     }
@@ -146,19 +171,19 @@ internal class GuidanceSceneRenderer(
             WATCHER_RECT
         }
 
-    /** Typing keeps the keyboard usable: outline and caption only, nothing dimmed or blocked. */
+    /** The typing field remains a real hole; dimmed bands and controls never extend onto the keyboard. */
     private fun showTypeHint(
         target: GuidanceTarget,
         screen: PxSize,
     ) {
-        val caption = display.caption(target)
-        val hole = display.holeFor(target.bounds, screen)
-        if (hole == null) {
-            showFloatingCaption(caption, screen)
+        if (screen.height < display.dp(CONTROLS_HEIGHT_DP + MARGIN_DP * 2)) {
+            // A full-screen keyboard leaves no safe room for an overlay or its exit control.
+            controller.cancel()
             return
         }
-        showOutline(hole, screen)
-        showCaptionNear(hole, caption, screen)
+        showSpotlight(target, screen, typing = true)
+        // TYPE completes only after text changes, never from a tap on a key or the input field.
+        detector.reset(emptySet())
     }
 
     /**
@@ -174,13 +199,14 @@ internal class GuidanceSceneRenderer(
         val separation = display.dp(CAPTION_SEPARATION_DP)
         val placement = placeHelperCaption(screen, anchor, size, display.dp(MARGIN_DP), separation)
         val right = placement.left + size.width
+        val top = if (placement.below) placement.top else placement.bottom - minOf(size.height, placement.height)
         val spec =
-            if (placement.below) {
-                GuidanceWindowSpec(PxRect(placement.left, placement.top, right, 0), touchable = true, wrapHeight = true)
-            } else {
-                val rect = PxRect(placement.left, screen.height - placement.bottom, right, 0)
-                GuidanceWindowSpec(rect, touchable = true, bottomAnchored = true)
-            }
+            GuidanceWindowSpec(
+                PxRect(placement.left, top, right, 0),
+                touchable = true,
+                wrapHeight = true,
+                behindKeyboard = true,
+            )
         val pointerX = if (placement.fits) anchor.centerX - placement.left else null
         val maxHeight = display.toDp(placement.height)
         windows.add(CAPTION_ID, spec) {
@@ -198,9 +224,18 @@ internal class GuidanceSceneRenderer(
         val bottomMargin = display.dp(MARGIN_DP * 2)
         val spec =
             GuidanceWindowSpec(
-                PxRect(left, bottomMargin, left + size.width, 0),
+                PxRect(
+                    left,
+                    maxOf(
+                        display.dp(MARGIN_DP),
+                        screen.height - bottomMargin - size.height - display.dp(CONTROLS_HEIGHT_DP + CONTROLS_GAP_DP),
+                    ),
+                    left + size.width,
+                    0,
+                ),
                 touchable = true,
-                bottomAnchored = true,
+                wrapHeight = true,
+                behindKeyboard = true,
             )
         val maxHeight = display.toDp(screen.height - bottomMargin - display.dp(MARGIN_DP))
         windows.add(CAPTION_ID, spec) { TypeHintCaption(caption, null, true, maxHeight, controller::cancel) }

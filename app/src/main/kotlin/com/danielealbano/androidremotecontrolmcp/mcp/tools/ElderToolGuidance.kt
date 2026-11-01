@@ -10,8 +10,10 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -54,7 +56,7 @@ class ElderToolGuidance internal constructor(
             ToolGuidanceClass.HIGHLIGHT -> {
                 GuardedTool(
                     description = "$description $DESCRIPTION_SUFFIX",
-                    inputSchema = withGuidanceProperties(inputSchema),
+                    inputSchema = withGuidanceProperties(inputSchema, toolName),
                     handler = { request -> highlight(toolName, request.arguments) },
                     showsToolCallIndicator = false,
                 )
@@ -88,10 +90,12 @@ class ElderToolGuidance internal constructor(
                 GuidanceTarget(
                     bounds = step.bounds,
                     kind = step.kind,
-                    instruction = substitutor.substitute(instruction),
+                    instruction = substitutor.substitute(step.instructionOverride ?: instruction),
                     explanation = explanation.takeIf { it.isNotEmpty() }?.let(substitutor::substitute),
                     scrollDirection = step.scrollDirection,
                     swipeStart = step.swipeStart,
+                    swipeEnd = step.swipeEnd,
+                    systemGesture = step.systemGesture,
                 ),
             )
         Log.i(TAG, "$toolName: $outcome")
@@ -139,9 +143,42 @@ class ElderToolGuidance internal constructor(
         return text
     }
 
-    private fun withGuidanceProperties(schema: ToolSchema): ToolSchema {
+    private fun withGuidanceProperties(
+        schema: ToolSchema,
+        toolName: String,
+    ): ToolSchema {
         val extra =
             buildJsonObject {
+                if (toolName in setOf("tap", "long_press", "double_tap")) {
+                    putJsonObject("target_bounds") {
+                        put("type", "object")
+                        put(
+                            "description",
+                            "When the screenshot identifies a single target but nodes only describe a large container, " +
+                                "give that target's exact screen-pixel rectangle. " +
+                                "For a chat room, bound ONLY its row, not the whole list. " +
+                                "The x,y point must be inside it. Omit if the target cannot be identified confidently.",
+                        )
+                        putJsonObject("properties") {
+                            listOf("left", "top", "right", "bottom").forEach { edge ->
+                                putJsonObject(edge) { put("type", "integer") }
+                            }
+                        }
+                        put("required", JsonArray(listOf("left", "top", "right", "bottom").map(::JsonPrimitive)))
+                        put("additionalProperties", false)
+                    }
+                }
+                if (toolName == "swipe") {
+                    putJsonObject("gesture") {
+                        put("type", "string")
+                        put(
+                            "description",
+                            "Set to home to guide going HOME with gesture navigation: ignores supplied coordinates " +
+                                "and uses the bottom centre edge. Only use after verifying gesture navigation on the screen. " +
+                                "Omit for app-list or content swipes. This only shows guidance; it never performs the gesture.",
+                        )
+                    }
+                }
                 putJsonObject(PARAM_INSTRUCTION) {
                     put("type", "string")
                     put("maxLength", MAX_INSTRUCTION_CHARS)

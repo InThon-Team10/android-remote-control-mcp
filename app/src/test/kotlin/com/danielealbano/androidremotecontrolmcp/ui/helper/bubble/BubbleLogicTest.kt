@@ -122,25 +122,12 @@ class BubbleLogicTest {
     }
 
     @Test
-    fun `a step ends thinking for the rest of the request`() {
-        var tracker = ThinkingTracker().next(awaiting = true, guidanceActive = false)
-        assertTrue(tracker.visible)
-
-        tracker = tracker.next(awaiting = true, guidanceActive = true)
-        assertFalse(tracker.visible)
-        tracker = tracker.next(awaiting = true, guidanceActive = false)
-        assertFalse(tracker.visible)
-    }
-
-    @Test
-    fun `a new request shows thinking again`() {
-        var tracker = ThinkingTracker().next(true, false).next(true, true).next(true, false)
-        assertFalse(tracker.visible)
-
-        tracker = tracker.next(awaiting = false, guidanceActive = false)
-        tracker = tracker.next(awaiting = true, guidanceActive = false)
-
-        assertTrue(tracker.visible)
+    fun `every gap between guidance steps shows thinking and never the chat panel`() {
+        repeat(3) {
+            assertEquals(BubbleLayoutState(false, false, true), resolveLayout(true, false, true))
+            assertEquals(BubbleLayoutState(false, false, false), resolveLayout(true, true, true))
+        }
+        assertEquals(BubbleLayoutState(true, true, false), resolveLayout(true, false, false))
     }
 
     @Test

@@ -103,11 +103,11 @@ class GuidanceModelTest {
     @Test
     fun `spoken text is the instruction followed by the explanation as its own sentence`() {
         assertEquals(
-            "'보내기' 버튼을 눌러 주세요. 누르면 메시지가 전송돼요",
+            "'보내기' 버튼을 눌러 주세요\n누르면 메시지가 전송돼요",
             GuidanceCaption("'보내기' 버튼을 눌러 주세요", "누르면 메시지가 전송돼요").spokenText,
         )
-        assertEquals("눌러 주세요! 전송돼요", GuidanceCaption("눌러 주세요!", "전송돼요").spokenText)
-        assertEquals("눌러 주세요. 전송돼요", GuidanceCaption("눌러 주세요.", "전송돼요").spokenText)
+        assertEquals("눌러 주세요!\n전송돼요", GuidanceCaption("눌러 주세요!", "전송돼요").spokenText)
+        assertEquals("눌러 주세요.\n전송돼요", GuidanceCaption("눌러 주세요.", "전송돼요").spokenText)
     }
 
     @Test

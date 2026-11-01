@@ -2,6 +2,40 @@
 
 <!-- impeccable:product-schema 1 -->
 
+## Text-first guidance (2026-11-01, current decision)
+
+This section supersedes older runtime descriptions below.
+
+- Requests are typed or dictated with on-device Korean recognition into an editable draft. Only Send submits text.
+  Microphone permission is optional for typing; the Realtime voice session is disabled.
+- Screen analysis and step planning use `gpt-6.1-terra` through Responses with low reasoning effort. Existing model
+  selections migrate to the pinned model. Required tool calls keep free-form prose from replacing highlights;
+  explicit question/completion/unavailable replies are still allowed. This validates routing, not semantic correctness.
+- Each running interval without a guidance target shows the thinking character. Request entry dims the background;
+  typing guidance keeps the target and keyboard accessible. Captions follow keyboard bounds, scroll for large fonts,
+  and reserve space for instructions and exit controls when a large target would consume the screen.
+- Content-scroll arrows follow the finger, opposite to content direction, with an exact start and endpoint inside
+  the scroll container. Covered/invalid paths are refused. `gesture=home` starts at the bottom system edge, points
+  upward and asks for immediate release. App-list swipes are only appropriate on the launcher.
+- Screenshot-based `target_bounds` lets guidance illuminate one chat row when accessibility exposes only a generic
+  container. Self-chat identity and the recipient must be confirmed for each new sending task. Notes requests stay
+  in a suitable notes app; Back is not a generic recovery action. These model decisions still require live evaluation.
+- On API 34+, eligible full-screen app captures use `takeScreenshotOfWindow` without hiding the thinking UI.
+  Keyboard/dialog/multiwindow/unsupported/failure cases retain display capture and can still briefly hide overlays.
+- Android TTS reads only the rendered caption instruction and explanation. Re-layout does not repeat it; replacing
+  or closing the caption replaces/stops speech. No conversation or progress narration is generated. The app uses
+  natural pitch 1.0 and rate 0.95, preserving system settings and the speech opt-out/TalkBack duplicate suppression.
+- User decision: retain the existing input completion behavior; do not add an input-done button. The observed
+  first-character/keyboard transition issue remains: TYPE can finish on a window change or after 2.5 seconds idle.
+
+Validation: selected regression suites, ktlintCheck and assembleGmsDebug were run; the PR records final results.
+The Terra account access and required-function-call contract were checked with synthetic input and no screen data.
+Debug builds were installed and launched on SM-S938N using the optional `helperDebugApplicationId` property to
+preserve the previously signed app. No APK, screenshot or local API key is committed.
+Actual TTS listening quality, cross-app keyboard transitions, screenshot-only target accuracy, 200% custom fonts,
+TalkBack and Switch Access have not been fully verified. Caption speech restores the listening alternative from
+the earlier silent-only experiment; current accessibility is not certified by build/test success.
+
 ## Platform
 
 android
@@ -66,3 +100,4 @@ android
 - 주요 설명 18sp 이상, 시스템 글자 확대 200%에서 잘림·겹침 없음, 텍스트 대비 4.5:1 이상.
 - 색·위치·소리 하나에만 의미를 맡기지 않는다: 강조와 화살표에는 항상 글 설명이 함께 있고, 소리로 읽는 안내는 화면에도 글로 보인다.
 - TalkBack 이름·역할·상태·읽기 순서, 끌기의 대체 동작, 시스템 애니메이션 감소 설정을 지킨다.
+
