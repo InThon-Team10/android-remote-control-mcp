@@ -65,7 +65,11 @@ sealed class McpToolException(
 
 private fun Char.isLineBreaking(): Boolean = isISOControl() || this == '\u2028' || this == '\u2029'
 
-private fun String.escapeControlCharacters(): String {
+/**
+ * Replaces control characters and line separators of a client-supplied value by a visible
+ * unicode escape so the text it is echoed in stays on a single line. No-op for other text.
+ */
+internal fun String.escapeControlCharacters(): String {
     if (none { it.isLineBreaking() }) return this
     val escaped = StringBuilder(length + ESCAPE_HEADROOM)
     for (c in this) {

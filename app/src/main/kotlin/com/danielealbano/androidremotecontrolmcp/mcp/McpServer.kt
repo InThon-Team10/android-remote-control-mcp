@@ -24,7 +24,6 @@ import io.ktor.server.engine.sslConnector
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.response.respond
-import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
@@ -336,7 +335,7 @@ class McpServer(
                     call.respond(HttpStatusCode.NotFound)
                 } else {
                     // A sharing app may supply a malformed MIME; fall back to octet-stream rather than 500.
-                    call.respondBytes(entry.bytes, contentTypeOrOctetStream(entry.mimeType), HttpStatusCode.OK)
+                    call.respondSharedBlob(entry)
                 }
             }
 

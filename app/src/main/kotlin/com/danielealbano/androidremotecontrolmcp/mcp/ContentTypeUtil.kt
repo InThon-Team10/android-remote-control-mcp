@@ -1,6 +1,11 @@
 package com.danielealbano.androidremotecontrolmcp.mcp
 
+import com.danielealbano.androidremotecontrolmcp.services.sharing.LinkEntry
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.response.header
+import io.ktor.server.response.respondBytes
 
 /**
  * Parses [mimeType] into a [ContentType], falling back to `application/octet-stream` when it is malformed.
@@ -16,3 +21,12 @@ internal fun contentTypeOrOctetStream(mimeType: String): ContentType =
     } else {
         runCatching { ContentType.parse(mimeType) }.getOrDefault(ContentType.Application.OctetStream)
     }
+
+/**
+ * Serves a capability-link [entry] under its declared type (see [contentTypeOrOctetStream]) with
+ * `X-Content-Type-Options: nosniff`, so a browser never reinterprets the blob (e.g. as HTML) on the server's origin.
+ */
+internal suspend fun ApplicationCall.respondSharedBlob(entry: LinkEntry) {
+    response.header("X-Content-Type-Options", "nosniff")
+    respondBytes(entry.bytes, contentTypeOrOctetStream(entry.mimeType), HttpStatusCode.OK)
+}

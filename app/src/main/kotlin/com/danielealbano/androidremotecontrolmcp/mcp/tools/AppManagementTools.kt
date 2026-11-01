@@ -4,6 +4,7 @@ import android.util.Log
 import com.danielealbano.androidremotecontrolmcp.data.model.AppFilter
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.mcp.escapeControlCharacters
 import com.danielealbano.androidremotecontrolmcp.privacy.PrivacyToolGate
 import com.danielealbano.androidremotecontrolmcp.services.apps.AppManager
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -48,7 +49,9 @@ class OpenAppHandler
             result.onFailure { e ->
                 throw McpToolException.ActionFailed("Failed to open application '$packageId': ${e.message}")
             }
-            return McpToolUtils.textResult("Application '$packageId' launched successfully.")
+            return McpToolUtils.textResult(
+                "Application '${packageId.escapeControlCharacters()}' launched successfully.",
+            )
         }
 
         fun register(
@@ -217,7 +220,7 @@ class CloseAppHandler
                 throw McpToolException.ActionFailed("Failed to close application '$packageId': ${e.message}")
             }
             return McpToolUtils.textResult(
-                "Kill signal sent for application '$packageId'. " +
+                "Kill signal sent for application '${packageId.escapeControlCharacters()}'. " +
                     "Note: this only affects background processes.",
             )
         }

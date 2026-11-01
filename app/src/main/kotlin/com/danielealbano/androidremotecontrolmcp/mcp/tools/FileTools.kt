@@ -4,6 +4,7 @@ package com.danielealbano.androidremotecontrolmcp.mcp.tools
 
 import com.danielealbano.androidremotecontrolmcp.data.model.ToolPermissionsConfig
 import com.danielealbano.androidremotecontrolmcp.mcp.McpToolException
+import com.danielealbano.androidremotecontrolmcp.mcp.escapeControlCharacters
 import com.danielealbano.androidremotecontrolmcp.services.storage.FileOperationProvider
 import com.danielealbano.androidremotecontrolmcp.services.storage.StorageLocationProvider
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -363,12 +364,15 @@ class WriteFileHandler
         suspend fun execute(arguments: JsonObject?): CallToolResult =
             try {
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
-                val path = McpToolUtils.requireString(arguments, "path")
+                val path = requireFilePath(arguments)
                 val content = McpToolUtils.requireString(arguments, "content")
 
                 fileOperationProvider.writeFile(locationId, path, content)
 
-                McpToolUtils.textResult("File written successfully: $locationId/$path")
+                McpToolUtils.textResult(
+                    "File written successfully: " +
+                        "${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: McpToolException) {
@@ -441,12 +445,15 @@ class AppendFileHandler
         suspend fun execute(arguments: JsonObject?): CallToolResult =
             try {
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
-                val path = McpToolUtils.requireString(arguments, "path")
+                val path = requireFilePath(arguments)
                 val content = McpToolUtils.requireString(arguments, "content")
 
                 fileOperationProvider.appendFile(locationId, path, content)
 
-                McpToolUtils.textResult("Content appended successfully to: $locationId/$path")
+                McpToolUtils.textResult(
+                    "Content appended successfully to: " +
+                        "${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: McpToolException) {
@@ -520,7 +527,7 @@ class FileReplaceHandler
         suspend fun execute(arguments: JsonObject?): CallToolResult =
             try {
                 val locationId = McpToolUtils.requireString(arguments, "location_id")
-                val path = McpToolUtils.requireString(arguments, "path")
+                val path = requireFilePath(arguments)
                 val oldString = McpToolUtils.requireString(arguments, "old_string")
                 if (oldString.isEmpty()) {
                     throw McpToolException.InvalidParams("Parameter 'old_string' must be non-empty")
@@ -625,7 +632,8 @@ class DownloadFromUrlHandler
                 val downloadedBytes = fileOperationProvider.downloadFromUrl(locationId, path, url)
 
                 McpToolUtils.textResult(
-                    "File downloaded successfully. Size: $downloadedBytes bytes. Saved to: $locationId/$path",
+                    "File downloaded successfully. Size: $downloadedBytes bytes. " +
+                        "Saved to: ${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
                 )
             } catch (e: CancellationException) {
                 // A cancelled download stays a cancellation, never a failed download
@@ -705,7 +713,10 @@ class DeleteFileHandler
 
                 fileOperationProvider.deleteFile(locationId, path)
 
-                McpToolUtils.textResult("File deleted successfully: $locationId/$path")
+                McpToolUtils.textResult(
+                    "File deleted successfully: " +
+                        "${locationId.escapeControlCharacters()}/${path.escapeControlCharacters()}",
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: McpToolException) {
@@ -787,4 +798,13 @@ fun registerFileTools(
     if (perms.isToolEnabled(DeleteFileHandler.TOOL_NAME)) {
         DeleteFileHandler(fileOperationProvider).register(registrar, toolNamePrefix)
     }
+}
+
+/** Reads the `path` parameter of a write operation and rejects one that names a directory. */
+private fun requireFilePath(arguments: JsonObject?): String {
+    val path = McpToolUtils.requireString(arguments, "path")
+    if (path.endsWith("/")) {
+        throw McpToolException.InvalidParams("Parameter 'path' must name a file, not a directory")
+    }
+    return path
 }
